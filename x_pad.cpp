@@ -30,14 +30,16 @@
 #define JOYSTICK_AXIS_LEFT_X 10
 #define JOYSTICK_AXIS_LEFT_Y 11
 
+#define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.05f
+
 // global variables
-static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureModifierDown = 0;
+static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0;
 
 // global commandref variables
-static XPLMCommandRef viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureModifierCommand = NULL;
+static XPLMCommandRef viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propAngleDegreesAllDataRef = NULL, mixtureRatioAllDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL;
 
 // command-handler that handles the view modifier command
 int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
@@ -93,16 +95,22 @@ int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the mixture modifier command
-int MixtureModifierCommandHandler(XPLMCommandRef       inCommand,
+int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
                                     XPLMCommandPhase     inPhase,
                                     void *               inRefcon)
 {
 	if (inPhase == xplm_CommandBegin)
-        mixtureModifierDown = 1;
+        mixtureControlModifierDown = 1;
 	else if (inPhase == xplm_CommandEnd)
-        mixtureModifierDown = 0;
+        mixtureControlModifierDown = 0;
     
 	return 0;
+}
+
+// normalizes a value of a range [inMin, inMax] to a value of the range [outMin, outMax]
+float Normalize(float value, float inMin, float inMax, float outMin, float outMax)
+{
+    return (outMax - outMin) / (inMax - inMin) * (value - inMax) + outMax;
 }
 
 // flightloop-callback that handles the joystick axis
@@ -112,6 +120,17 @@ float JoystickAxisFlightCallback(
                             int                  inCounter,
                             void *               inRefcon)
 {
+    char out[64];
+    sprintf(out, "acfRSCIdlespeedPrpDataRef: %f\n", XPLMGetDataf(acfRSCMingovPrpDataRef));
+    XPLMDebugString(out);
+    
+    sprintf(out, "acfRSCRedlinePrpDataRef: %f\n", XPLMGetDataf(acfRSCRedlinePrpDataRef));
+    XPLMDebugString(out);
+    
+    sprintf(out, "propRotationSpeedRadSecAllDataRef: %f\n", XPLMGetDataf(propRotationSpeedRadSecAllDataRef));
+    XPLMDebugString(out);
+    
+    
     if (XPLMGetDatai(hasJostickDataRef))
     {
         /*for (int i = 0; i < 10; i++)
@@ -128,13 +147,64 @@ float JoystickAxisFlightCallback(
         
         if (viewModifierDown == 0)
         {
-            float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
+
+        if (propPitchModifierDown != 0)
+        {
+            float acfRSCMingovPrp = XPLMGetDataf(acfRSCMingovPrpDataRef);
+            float acfRSCRedlinePrp = XPLMGetDataf(acfRSCRedlinePrpDataRef);
+            float propRotationSpeedRadSecAll = XPLMGetDataf(propRotationSpeedRadSecAllDataRef);
+            
+            // increase prop pitch
+            if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+            {
+                // normalize range [0.5, 0.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
+                float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
+                
+                // ensure we don't set values larger than 1.0
+                XPLMSetDataf(propRotationSpeedRadSecAllDataRef, propRotationSpeedRadSecAll < acfRSCRedlinePrp ? propRotationSpeedRadSecAll + d : acfRSCRedlinePrp);
+            }
+            // decrease prop pitch
+            else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+            {
+                // normalize range [0.5, 1.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
+                float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
+                
+                // ensure we don't set values smaller than 0.0
+                XPLMSetDataf(propRotationSpeedRadSecAllDataRef, propRotationSpeedRadSecAll > acfRSCMingovPrp ? propRotationSpeedRadSecAll + d : acfRSCMingovPrp);
+            }
+        }
+        else if (mixtureControlModifierDown != 0)
+        {
+            float mixtureRatioAll = XPLMGetDataf(mixtureRatioAllDataRef);
+            
+            // increase mixture setting
+            if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+            {
+                // normalize range [0.5, 0.0] to [0.0, 1.0]
+                float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                
+                // ensure we don't set values larger than 1.0
+                XPLMSetDataf(mixtureRatioAllDataRef, mixtureRatioAll < 1.0f ? mixtureRatioAll + d : 1.0f);
+            }
+            // decrease mixture setting
+            else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+            {
+                // normalize range [0.5, 1.0] to [0.0, 1.0]
+                float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                
+                // ensure we don't set values smaller than 0.0
+                XPLMSetDataf(mixtureRatioAllDataRef, mixtureRatioAll > 0.0f ? mixtureRatioAll + d : 0.0f);
+            }
+        }
+            else
+            {
+                float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
             
             // increase throttle setting
             if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
             {
-                // normalize range (0.5, 0.0) to (0.0, 1.0)
-                float d = 0.05f * (-2.0f * joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] + 1.0f);
+                // normalize range [0.5, 0.0] to [0.0, 1.0]
+                float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
                 
                 // ensure we don't set values larger than 1.0
                 XPLMSetDataf(throttleRatioAllDataRef, throttleRatioAll < 1.0f ? throttleRatioAll + d : 1.0f);
@@ -142,9 +212,9 @@ float JoystickAxisFlightCallback(
             // decrease throttle setting
             else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
             {
-                // normalize range (0.5, 1.0) to (0.0, 1.0)
-                float d = - 0.05f * (2.0f * joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] - 1.0f);
-
+                // normalize range [0.5, 1.0] to [0.0, 1.0]
+                float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                
                 // ensure we don't set values smaller than 0.0
                 XPLMSetDataf(throttleRatioAllDataRef, throttleRatioAll > 0.0f ? throttleRatioAll + d : 0.0f);
             }
@@ -162,51 +232,6 @@ float JoystickAxisFlightCallback(
                 XPLMSetDataf(rightBrakeRatioDataRef, 0.0f);
             }
         }
-        else if (propPitchModifierDown != 0)
-        {
-            float propAngleDegreesAll = XPLMGetDataf(propAngleDegreesAllDataRef);
-            
-            // increase prop pitch
-            if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
-            {
-                // normalize range (0.5, 0.0) to (0.0, 1.0)
-                float d = 0.05f * (-2.0f * joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] + 1.0f);
-                
-                // ensure we don't set values larger than 1.0
-                XPLMSetDataf(propAngleDegreesAllDataRef, propAngleDegreesAll < 1.0f ? propAngleDegreesAll + d : 1.0f);
-            }
-            // decrease prop pitch
-            else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
-            {
-                // normalize range (0.5, 1.0) to (0.0, 1.0)
-                float d = - 0.05f * (2.0f * joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] - 1.0f);
-                
-                // ensure we don't set values smaller than 0.0
-                XPLMSetDataf(propAngleDegreesAllDataRef, propAngleDegreesAll > 0.0f ? propAngleDegreesAll + d : 0.0f);
-            }
-        }
-        else if (mixtureModifierDown != 0)
-        {
-            float mixtureRatioAll = XPLMGetDataf(mixtureRatioAllDataRef);
-            
-            // increase mixture setting
-            if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
-            {
-                // normalize range (0.5, 0.0) to (0.0, 1.0)
-                float d = 0.05f * (-2.0f * joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] + 1.0f);
-                
-                // ensure we don't set values larger than 1.0
-                XPLMSetDataf(mixtureRatioAllDataRef, mixtureRatioAll < 1.0f ? mixtureRatioAll + d : 1.0f);
-            }
-            // decrease mixture setting
-            else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
-            {
-                // normalize range (0.5, 1.0) to (0.0, 1.0)
-                float d = - 0.05f * (2.0f * joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] - 1.0f);
-                
-                // ensure we don't set values smaller than 0.0
-                XPLMSetDataf(mixtureRatioAllDataRef, mixtureRatioAll > 0.0f ? mixtureRatioAll + d : 0.0f);
-            }
         }
 
     }
@@ -225,6 +250,8 @@ PLUGIN_API int XPluginStart(
     strcpy(outDesc, NAME" allows flying X-Plane by gamepad!");
 
     // obtain datarefs
+    acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
+    acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
     joystickAxisAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_assignments");
@@ -233,14 +260,18 @@ PLUGIN_API int XPluginStart(
     leftBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/left_brake_ratio");
     rightBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/right_brake_ratio");
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
-    propAngleDegreesAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_angle_degrees_all");
-    mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_angle_degrees_all");
+    propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
+    mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
     
     // create custom commands
-	viewModifierCommand = XPLMCreateCommand(NAME"/LookModifier", "Look Modifier");
+	viewModifierCommand = XPLMCreateCommand(NAME"/view_modifier", "View Modifier");
+    propPitchModifierCommand = XPLMCreateCommand(NAME"/prop_pitch_modifier", "Prop Pitch Modifier");
+    mixtureControlModifierCommand = XPLMCreateCommand(NAME"/mixture_control_modifier", "Mixture Control Modifier");
     
 	// register custom commands
 	XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(propPitchModifierCommand, PropPitchModifierCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
 
     // register flight loop callback
     XPLMRegisterFlightLoopCallback(JoystickAxisFlightCallback, -1, NULL);
