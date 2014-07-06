@@ -22,6 +22,12 @@
 // define version
 #define VERSION "0.1"
 
+// define view types
+#define VIEW_TYPE_FORWARDS_WITH_PANEL 1000
+#define VIEW_TYPE_CHASE 1017
+#define VIEW_TYPE_FORWARDS_WITH_HUD 1023
+#define VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK 1026
+
 // define axis assignments
 #define AXIS_ASSIGNMENT_NONE 0
 #define AXIS_ASSIGNMENT_YAW 3
@@ -58,13 +64,43 @@
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.05f
 
 // global variables
-static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0;
+static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, trimModifierDown = 0;
 
 // global commandref variables
-static XPLMCommandRef viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, trimModifierCommand = NULL;
+static XPLMCommandRef switchViewCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, trimModifierCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL;
+
+// command-handler that handles the switch view command
+int SwitchViewCommandHandler(XPLMCommandRef       inCommand,
+                                    XPLMCommandPhase     inPhase,
+                                    void *               inRefcon)
+{
+	if (inPhase == xplm_CommandBegin)
+    {
+        switch (XPLMGetDatai(viewTypeDataRef)) {
+            case VIEW_TYPE_FORWARDS_WITH_PANEL:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+                break;
+                
+            case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_hud"));
+                break;
+                
+            case VIEW_TYPE_FORWARDS_WITH_HUD:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
+                break;
+                
+            case VIEW_TYPE_CHASE:
+            default:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+                break;
+        }
+    }
+    
+	return 0;
+}
 
 // command-handler that handles the view modifier command
 int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
@@ -79,7 +115,8 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
     
     static int defaultJoystickButtonAssignments[1600];
     
-	if (inPhase == xplm_CommandBegin)
+    // only apply the modifier if no other modifier is down which can alter any assignments
+	if (inPhase == xplm_CommandBegin && trimModifierDown == 0)
     {
         viewModifierDown = 1;
         
@@ -104,7 +141,7 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
         
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
-	else if (inPhase == xplm_CommandEnd)
+	else if (inPhase == xplm_CommandEnd && trimModifierDown == 0)
     {
         viewModifierDown = 0;
         
@@ -158,8 +195,11 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
 {
     static int defaultJoystickButtonAssignments[1600];
     
-	if (inPhase == xplm_CommandBegin)
+    // only apply the modifier if no other modifier is down which can alter any assignments
+	if (inPhase == xplm_CommandBegin && viewModifierDown == 0)
     {
+        trimModifierDown = 1;
+        
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         
@@ -180,8 +220,10 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
         
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
-	else if (inPhase == xplm_CommandEnd)
+	else if (inPhase == xplm_CommandEnd && viewModifierDown == 0)
     {
+        trimModifierDown = 0;
+        
         // restore the default button assignments
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, defaultJoystickButtonAssignments, 0, 1600);
     }
@@ -323,6 +365,7 @@ PLUGIN_API int XPluginStart(
     // obtain datarefs
     acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
+    viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
     hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
     joystickAxisAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_assignments");
@@ -336,12 +379,14 @@ PLUGIN_API int XPluginStart(
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
     
     // create custom commands
+    switchViewCommand = XPLMCreateCommand(NAME"/switch_view", "Switch View");
 	viewModifierCommand = XPLMCreateCommand(NAME"/view_modifier", "View Modifier");
     propPitchModifierCommand = XPLMCreateCommand(NAME"/prop_pitch_modifier", "Prop Pitch Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(NAME"/mixture_control_modifier", "Mixture Control Modifier");
     trimModifierCommand = XPLMCreateCommand(NAME"/trim_modifier", "Trim Modifier");
     
 	// register custom commands
+  	XPLMRegisterCommandHandler(switchViewCommand, SwitchViewCommandHandler, 1, NULL);
 	XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(propPitchModifierCommand, PropPitchModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
