@@ -22,24 +22,49 @@
 // define version
 #define VERSION "0.1"
 
+// define axis assignments
 #define AXIS_ASSIGNMENT_NONE 0
 #define AXIS_ASSIGNMENT_YAW 3
 #define AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT 41
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
+// define button assignments
+#define BUTTON_ASSIGNMENT_PITCH_TRIM_UP 259
+#define BUTTON_ASSIGNMENT_PITCH_TRIM_DOWN 261
+#define BUTTON_ASSIGNMENT_RUDDER_TRIM_LEFT 262
+#define BUTTON_ASSIGNMENT_RUDDER_TRIM_RIGHT 264
+#define BUTTON_ASSIGNMENT_AILERON_TRIM_LEFT 265
+#define BUTTON_ASSIGNMENT_AILERON_TRIM_RIGHT 267
+#define BUTTON_ASSIGNMENT_GENERAL_COMMAND_LEFT 940
+#define BUTTON_ASSIGNMENT_GENERAL_COMMAND_RIGHT 941
+#define BUTTON_ASSIGNMENT_GENERAL_COMMAND_UP 942
+#define BUTTON_ASSIGNMENT_GENERAL_COMMAND_DOWN 943
+
+// define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 10
 #define JOYSTICK_AXIS_LEFT_Y 11
 
+// define joystick buttons
+#define JOYSTICK_BUTTON_DPAD_LEFT 167
+#define JOYSTICK_BUTTON_DPAD_RIGHT 165
+#define JOYSTICK_BUTTON_DPAD_UP 164
+#define JOYSTICK_BUTTON_DPAD_DOWN 166
+#define JOYSTICK_BUTTON_SQUARE 175
+#define JOYSTICK_BUTTON_CIRCLE 173
+#define JOYSTICK_BUTTON_TRIANGLE 172
+#define JOYSTICK_BUTTON_CROSS 174
+
+// define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.05f
 
 // global variables
 static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0;
 
 // global commandref variables
-static XPLMCommandRef viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL;
+static XPLMCommandRef viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, trimModifierCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL;
 
 // command-handler that handles the view modifier command
 int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
@@ -52,6 +77,8 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
     int joystickAxisReverse[100];
     XPLMGetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
     
+    static int defaultJoystickButtonAssignments[1600];
+    
 	if (inPhase == xplm_CommandBegin)
     {
         viewModifierDown = 1;
@@ -62,6 +89,20 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
         
         // reverse the left joystick's y axis while the view modifier is applied
         joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 1;
+        
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        
+        // store the default button assignments
+        memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
+        
+        // assign panel scrolling controls to the dpad
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_GENERAL_COMMAND_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_GENERAL_COMMAND_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_GENERAL_COMMAND_UP;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_GENERAL_COMMAND_DOWN;
+        
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
 	else if (inPhase == xplm_CommandEnd)
     {
@@ -73,6 +114,9 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
         
         // disable the axis reversing when the view modifier is not applied anymore
         joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 0;
+        
+        // restore the default button assignments
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, defaultJoystickButtonAssignments, 0, 1600);
     }
     
     XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
@@ -107,6 +151,44 @@ int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
 	return 0;
 }
 
+// command-handler that handles the trim modifier command
+int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
+                               XPLMCommandPhase     inPhase,
+                               void *               inRefcon)
+{
+    static int defaultJoystickButtonAssignments[1600];
+    
+	if (inPhase == xplm_CommandBegin)
+    {
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        
+        // store the default button assignments
+        memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
+        
+        char out[64];
+        sprintf(out, "LEFT DPAD: %d\n", joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT]);
+        XPLMDebugString(out);
+        
+        // assign trim controls to the buttons and dpad
+        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_AILERON_TRIM_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_AILERON_TRIM_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = BUTTON_ASSIGNMENT_PITCH_TRIM_DOWN;
+        joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = BUTTON_ASSIGNMENT_PITCH_TRIM_UP;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_RUDDER_TRIM_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_RUDDER_TRIM_RIGHT;
+        
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+    }
+	else if (inPhase == xplm_CommandEnd)
+    {
+        // restore the default button assignments
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, defaultJoystickButtonAssignments, 0, 1600);
+    }
+    
+	return 0;
+}
+
 // normalizes a value of a range [inMin, inMax] to a value of the range [outMin, outMax]
 float Normalize(float value, float inMin, float inMax, float outMin, float outMax)
 {
@@ -120,17 +202,6 @@ float JoystickAxisFlightCallback(
                             int                  inCounter,
                             void *               inRefcon)
 {
-    char out[64];
-    sprintf(out, "acfRSCIdlespeedPrpDataRef: %f\n", XPLMGetDataf(acfRSCMingovPrpDataRef));
-    XPLMDebugString(out);
-    
-    sprintf(out, "acfRSCRedlinePrpDataRef: %f\n", XPLMGetDataf(acfRSCRedlinePrpDataRef));
-    XPLMDebugString(out);
-    
-    sprintf(out, "propRotationSpeedRadSecAllDataRef: %f\n", XPLMGetDataf(propRotationSpeedRadSecAllDataRef));
-    XPLMDebugString(out);
-    
-    
     if (XPLMGetDatai(hasJostickDataRef))
     {
         /*for (int i = 0; i < 10; i++)
@@ -255,6 +326,7 @@ PLUGIN_API int XPluginStart(
     hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
     joystickAxisAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_assignments");
+    joystickButtonAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_button_assignments");
     joystickAxisValuesDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_values");
     joystickAxisReverseDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_reverse");
     leftBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/left_brake_ratio");
@@ -267,11 +339,13 @@ PLUGIN_API int XPluginStart(
 	viewModifierCommand = XPLMCreateCommand(NAME"/view_modifier", "View Modifier");
     propPitchModifierCommand = XPLMCreateCommand(NAME"/prop_pitch_modifier", "Prop Pitch Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(NAME"/mixture_control_modifier", "Mixture Control Modifier");
+    trimModifierCommand = XPLMCreateCommand(NAME"/trim_modifier", "Trim Modifier");
     
 	// register custom commands
 	XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(propPitchModifierCommand, PropPitchModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(trimModifierCommand, TrimModifierCommandHandler, 1, NULL);
 
     // register flight loop callback
     XPLMRegisterFlightLoopCallback(JoystickAxisFlightCallback, -1, NULL);
