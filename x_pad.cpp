@@ -91,16 +91,16 @@
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.05f
 
 // global variables
-static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, trimModifierDown = 0;
+static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0;
 
 // global commandref variables
-static XPLMCommandRef switchViewCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, trimModifierCommand = NULL;
+static XPLMCommandRef cycleViewCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL;
 
 // command-handler that handles the switch view command
-int SwitchViewCommandHandler(XPLMCommandRef       inCommand,
+int CycleViewCommandHandler(XPLMCommandRef       inCommand,
                              XPLMCommandPhase     inPhase,
                              void *               inRefcon)
 {
@@ -203,7 +203,7 @@ int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
     return 0;
 }
 
-// command-handler that handles the mixture modifier command
+// command-handler that handles the mixture control modifier command
 int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
         XPLMCommandPhase     inPhase,
         void *               inRefcon)
@@ -213,6 +213,19 @@ int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
     else if (inPhase == xplm_CommandEnd)
         mixtureControlModifierDown = 0;
 
+    return 0;
+}
+
+// command-handler that handles the cowl flap modifier command
+int CowlFlapModifierCommandHandler(XPLMCommandRef       inCommand,
+                                   XPLMCommandPhase     inPhase,
+                                   void *               inRefcon)
+{
+    if (inPhase == xplm_CommandBegin)
+        cowlFlapModifierDown = 1;
+    else if (inPhase == xplm_CommandEnd)
+        cowlFlapModifierDown = 0;
+    
     return 0;
 }
 
@@ -239,12 +252,12 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
         XPLMDebugString(out);
 
         // assign trim controls to the buttons and dpad
-        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_AILERON_TRIM_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_AILERON_TRIM_RIGHT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = BUTTON_ASSIGNMENT_PITCH_TRIM_DOWN;
-        joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = BUTTON_ASSIGNMENT_PITCH_TRIM_UP;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_RUDDER_TRIM_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_RUDDER_TRIM_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_AILERON_TRIM_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_AILERON_TRIM_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_PITCH_TRIM_DOWN;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_PITCH_TRIM_UP;
+        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_RUDDER_TRIM_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_RUDDER_TRIM_RIGHT;
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
@@ -336,6 +349,29 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     XPLMSetDataf(mixtureRatioAllDataRef, mixtureRatioAll > 0.0f ? mixtureRatioAll + d : 0.0f);
                 }
             }
+            else if (cowlFlapModifierDown != 0)
+            {
+                float cowlFlapRatioAll = XPLMGetDataf(cowlFlapRatioDataRef);
+                
+                // increase mixture setting
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 0.0] to [0.0, 1.0]
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                    
+                    // ensure we don't set values larger than 1.0
+                    XPLMSetDataf(cowlFlapRatioDataRef, cowlFlapRatioAll < 1.0f ? cowlFlapRatioAll + d : 1.0f);
+                }
+                // decrease mixture setting
+                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 1.0] to [0.0, 1.0]
+                    float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                    
+                    // ensure we don't set values smaller than 0.0
+                    XPLMSetDataf(cowlFlapRatioDataRef, cowlFlapRatioAll > 0.0f ? cowlFlapRatioAll + d : 0.0f);
+                }
+            }
             else
             {
                 float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
@@ -403,19 +439,22 @@ PLUGIN_API int XPluginStart(char *		outName,
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
     propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
+    cowlFlapRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/cowl_flap_ratio");
 
     // create custom commands
-    switchViewCommand = XPLMCreateCommand(NAME"/switch_view", "Switch View");
+    cycleViewCommand = XPLMCreateCommand(NAME"/cycle_view", "Cycle View");
     viewModifierCommand = XPLMCreateCommand(NAME"/view_modifier", "View Modifier");
     propPitchModifierCommand = XPLMCreateCommand(NAME"/prop_pitch_modifier", "Prop Pitch Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(NAME"/mixture_control_modifier", "Mixture Control Modifier");
+    cowlFlapModifierCommand = XPLMCreateCommand(NAME"/cowl_flap_modifier", "Cowl Flap Modifier");
     trimModifierCommand = XPLMCreateCommand(NAME"/trim_modifier", "Trim Modifier");
 
     // register custom commands
-    XPLMRegisterCommandHandler(switchViewCommand, SwitchViewCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(cycleViewCommand, CycleViewCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(propPitchModifierCommand, PropPitchModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(trimModifierCommand, TrimModifierCommandHandler, 1, NULL);
 
     // register flight loop callback
