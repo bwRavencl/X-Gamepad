@@ -45,6 +45,8 @@
 
 // define axis assignments
 #define AXIS_ASSIGNMENT_NONE 0
+#define AXIS_ASSIGNMENT_PITCH 1
+#define AXIS_ASSIGNMENT_ROLL 2
 #define AXIS_ASSIGNMENT_YAW 3
 #define AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT 41
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
@@ -64,6 +66,8 @@
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 10
 #define JOYSTICK_AXIS_LEFT_Y 11
+#define JOYSTICK_AXIS_RIGHT_X 12
+#define JOYSTICK_AXIS_RIGHT_Y 13
 
 // define joystick buttons
 #define JOYSTICK_BUTTON_DPAD_LEFT 167
@@ -74,6 +78,14 @@
 #define JOYSTICK_BUTTON_CIRCLE 173
 #define JOYSTICK_BUTTON_TRIANGLE 172
 #define JOYSTICK_BUTTON_CROSS 174
+#define JOYSTICK_BUTTON_START 163
+#define JOYSTICK_BUTTON_SELECT 160
+#define JOYSTICK_BUTTON_L1 170
+#define JOYSTICK_BUTTON_R1 171
+#define JOYSTICK_BUTTON_L2 168
+#define JOYSTICK_BUTTON_R2 169
+#define JOYSTICK_BUTTON_L3 161
+#define JOYSTICK_BUTTON_R3 162
 
 // define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.05f
@@ -89,8 +101,8 @@ static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL
 
 // command-handler that handles the switch view command
 int SwitchViewCommandHandler(XPLMCommandRef       inCommand,
-                                    XPLMCommandPhase     inPhase,
-                                    void *               inRefcon)
+                             XPLMCommandPhase     inPhase,
+                             void *               inRefcon)
 {
 	if (inPhase == xplm_CommandBegin)
     {
@@ -179,8 +191,8 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
 
 // command-handler that handles the prop pitch modifier command
 int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
-                               XPLMCommandPhase     inPhase,
-                               void *               inRefcon)
+                                    XPLMCommandPhase     inPhase,
+                                    void *               inRefcon)
 {
 	if (inPhase == xplm_CommandBegin)
         propPitchModifierDown = 1;
@@ -192,8 +204,8 @@ int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
 
 // command-handler that handles the mixture modifier command
 int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
-                                    XPLMCommandPhase     inPhase,
-                                    void *               inRefcon)
+                                         XPLMCommandPhase     inPhase,
+                                         void *               inRefcon)
 {
 	if (inPhase == xplm_CommandBegin)
         mixtureControlModifierDown = 1;
@@ -222,7 +234,7 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
         memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
         
         char out[64];
-        sprintf(out, "LEFT DPAD: %d\n", joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT]);
+        sprintf(out, "SELECT: %d\n", joystickButtonAssignments[JOYSTICK_BUTTON_SELECT]);
         XPLMDebugString(out);
         
         // assign trim controls to the buttons and dpad
@@ -253,11 +265,10 @@ float Normalize(float value, float inMin, float inMax, float outMin, float outMa
 }
 
 // flightloop-callback that handles the joystick axis
-float JoystickAxisFlightCallback(
-                            float                inElapsedSinceLastCall,
-                            float                inElapsedTimeSinceLastFlightLoop,
-                            int                  inCounter,
-                            void *               inRefcon)
+float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
+                                 float                inElapsedTimeSinceLastFlightLoop,
+                                 int                  inCounter,
+                                 void *               inRefcon)
 {
     if (XPLMGetDatai(hasJostickDataRef))
     {
@@ -367,10 +378,9 @@ float JoystickAxisFlightCallback(
     return -1.0f;
 }
 
-PLUGIN_API int XPluginStart(
-    char *		outName,
-    char *		outSig,
-    char *		outDesc)
+PLUGIN_API int XPluginStart(char *		outName,
+                            char *		outSig,
+                            char *		outDesc)
 {
     // set plugin info
     strcpy(outName, NAME);
@@ -426,9 +436,8 @@ PLUGIN_API int XPluginEnable(void)
     return 1;
 }
 
-PLUGIN_API void XPluginReceiveMessage(
-    XPLMPluginID	inFromWho,
-    long			inMessage,
-    void *			inParam)
+PLUGIN_API void XPluginReceiveMessage(XPLMPluginID	inFromWho,
+                                      long			inMessage,
+                                      void *		inParam)
 {
 }
