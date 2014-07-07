@@ -9,8 +9,8 @@ Suggested mappings for a DualShock 3 controller:
 
 | Axis                  | Control |
 | --------------------- | ------- |
-| Left Joystick X-Axis  | yaw     |
-| Left Joystick Y-Axis  | none    |
+|  Left Joystick X-Axis | yaw     |
+|  Left Joystick Y-Axis | none    |
 | Right Joystick X-Axis | roll    |
 | Right Joystick Y-Axis | pitch   |
 
