@@ -16,19 +16,10 @@
  */
 
 #include "XPLMDataAccess.h"
-#include "XPLMDefs.h"
-#include "XPLMDisplay.h"
-#include "XPLMGraphics.h"
-#include "XPLMMenus.h"
-#include "XPLMPlugin.h"
 #include "XPLMProcessing.h"
 #include "XPLMUtilities.h"
-#include "XPStandardWidgets.h"
-#include "XPWidgets.h"
 
-#include <fstream>
 #include <string.h>
-#include <sstream>
 
 // define name
 #define NAME "X-pad"
@@ -247,10 +238,6 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
         // store the default button assignments
         memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
 
-        char out[64];
-        sprintf(out, "SELECT: %d\n", joystickButtonAssignments[JOYSTICK_BUTTON_SELECT]);
-        XPLMDebugString(out);
-
         // assign trim controls to the buttons and dpad
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_AILERON_TRIM_LEFT;
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_AILERON_TRIM_RIGHT;
@@ -286,13 +273,6 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
 {
     if (XPLMGetDatai(hasJostickDataRef))
     {
-        /*for (int i = 0; i < 10; i++)
-        {
-            char out[64];
-            sprintf(out, "Axis Center [%d]: %f\n", i, joystickPitchCenter[i]);
-            XPLMDebugString(out);
-        }*/
-
         float joystickPitchNullzone = XPLMGetDataf(joystickPitchNullzoneDataRef);
 
         float joystickAxisValues[100];
@@ -442,12 +422,12 @@ PLUGIN_API int XPluginStart(char *		outName,
     cowlFlapRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/cowl_flap_ratio");
 
     // create custom commands
-    cycleViewCommand = XPLMCreateCommand(NAME"/cycle_view", "Cycle View");
-    viewModifierCommand = XPLMCreateCommand(NAME"/view_modifier", "View Modifier");
-    propPitchModifierCommand = XPLMCreateCommand(NAME"/prop_pitch_modifier", "Prop Pitch Modifier");
-    mixtureControlModifierCommand = XPLMCreateCommand(NAME"/mixture_control_modifier", "Mixture Control Modifier");
-    cowlFlapModifierCommand = XPLMCreateCommand(NAME"/cowl_flap_modifier", "Cowl Flap Modifier");
-    trimModifierCommand = XPLMCreateCommand(NAME"/trim_modifier", "Trim Modifier");
+    cycleViewCommand = XPLMCreateCommand(NAME_LOWERCASE"/cycle_view", "Cycle View");
+    viewModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/view_modifier", "View Modifier");
+    propPitchModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/prop_pitch_modifier", "Prop Pitch Modifier");
+    mixtureControlModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/mixture_control_modifier", "Mixture Control Modifier");
+    cowlFlapModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/cowl_flap_modifier", "Cowl Flap Modifier");
+    trimModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/trim_modifier", "Trim Modifier");
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleViewCommand, CycleViewCommandHandler, 1, NULL);
