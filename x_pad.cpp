@@ -43,16 +43,20 @@
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
 // define button assignments
-#define BUTTON_ASSIGNMENT_PITCH_TRIM_UP 259
-#define BUTTON_ASSIGNMENT_PITCH_TRIM_DOWN 261
-#define BUTTON_ASSIGNMENT_RUDDER_TRIM_LEFT 262
-#define BUTTON_ASSIGNMENT_RUDDER_TRIM_RIGHT 264
-#define BUTTON_ASSIGNMENT_AILERON_TRIM_LEFT 265
-#define BUTTON_ASSIGNMENT_AILERON_TRIM_RIGHT 267
-#define BUTTON_ASSIGNMENT_GENERAL_COMMAND_LEFT 940
-#define BUTTON_ASSIGNMENT_GENERAL_COMMAND_RIGHT 941
-#define BUTTON_ASSIGNMENT_GENERAL_COMMAND_UP 942
-#define BUTTON_ASSIGNMENT_GENERAL_COMMAND_DOWN 943
+#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_UP 259
+#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_DOWN 261
+#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_LEFT 262
+#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_RIGHT 264
+#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_LEFT 265
+#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_RIGHT 267
+#define BUTTON_ASSIGNMENT_GENERAL_LEFT 940
+#define BUTTON_ASSIGNMENT_GENERAL_RIGHT 941
+#define BUTTON_ASSIGNMENT_GENERAL_UP 942
+#define BUTTON_ASSIGNMENT_GENERAL_DOWN 943
+#define BUTTON_ASSIGNMENT_GENERAL_ROT_UP 964
+#define BUTTON_ASSIGNMENT_GENERAL_ROT_DOWN 965
+#define BUTTON_ASSIGNMENT_GENERAL_ROT_LEFT 966
+#define BUTTON_ASSIGNMENT_GENERAL_ROT_RIGHT 967
 
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 10
@@ -92,8 +96,8 @@ static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL
 
 // command-handler that handles the switch view command
 int CycleViewCommandHandler(XPLMCommandRef       inCommand,
-                             XPLMCommandPhase     inPhase,
-                             void *               inRefcon)
+                            XPLMCommandPhase     inPhase,
+                            void *               inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
     {
@@ -153,10 +157,14 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
         memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
 
         // assign panel scrolling controls to the dpad
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_GENERAL_COMMAND_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_GENERAL_COMMAND_RIGHT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_GENERAL_COMMAND_UP;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_GENERAL_COMMAND_DOWN;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_GENERAL_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_GENERAL_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_GENERAL_UP;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_GENERAL_DOWN;
+        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_GENERAL_ROT_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_GENERAL_ROT_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = BUTTON_ASSIGNMENT_GENERAL_ROT_UP;
+        joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = BUTTON_ASSIGNMENT_GENERAL_ROT_DOWN;
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
@@ -239,12 +247,12 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
         memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
 
         // assign trim controls to the buttons and dpad
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_AILERON_TRIM_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_AILERON_TRIM_RIGHT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_PITCH_TRIM_DOWN;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_PITCH_TRIM_UP;
-        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_RUDDER_TRIM_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_RUDDER_TRIM_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_DOWN;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_UP;
+        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_LEFT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_RIGHT;
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
@@ -277,6 +285,18 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
 
         float joystickAxisValues[100];
         XPLMGetDatavf(joystickAxisValuesDataRef, joystickAxisValues, 0, 100);
+        
+        // keep the value of the left joystick's y axis at 0.5 until a value higher/lower than 0.0/1.0 is read because axis can get initialized with a value of 0.0 or 1.0 instead of 0.5 if they haven't been moved yet - this can result in unexpected behaviour especially if the axis is used in relative mode
+        static float leftJoystickMinYValue = 1.0f, leftJoystickMaxYValue = 0.0f;
+
+        if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < leftJoystickMinYValue)
+            leftJoystickMinYValue = joystickAxisValues[JOYSTICK_AXIS_LEFT_Y];
+        
+        if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > leftJoystickMaxYValue)
+            leftJoystickMaxYValue = joystickAxisValues[JOYSTICK_AXIS_LEFT_Y];
+        
+        if (leftJoystickMinYValue == 1.0f || leftJoystickMaxYValue == 0.0f)
+            joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] = 0.5f;
 
         if (viewModifierDown == 0)
         {
