@@ -7,7 +7,7 @@ GNU General Public License v2.0
 #####Disclaimer:
 This plugin currently only supports DualShock 3 controllers connected via Bluetooth under Mac OS X.
 Support for other controllers and operating systems may be added in the future.
-Since this plugin was designed only for the author's personal usage, it is not expected to be robust and may not work with certain configurations, especially if there are more than one game-controllers connected.
+Since this plugin was designed only for the author's personal usage, it is not expected to be robust and may not work with certain configurations, especially if there are more multiple game-controllers connected.
 
 #####Instructions:
 Suggested mappings for a DualShock 3 controller:
