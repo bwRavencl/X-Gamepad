@@ -4,13 +4,18 @@
 #####License Information:
 GNU General Public License v2.0
 
+#####Disclaimer:
+This plugin currently only supports DualShock 3 controllers connected via Bluetooth under Mac OS X.
+Support for other controllers and operating systems may be added in the future.
+Since this plugin was designed only for the author's personal usage, it is not expected to be robust and may not work with certain configurations, especially if there are more than one game-controllers connected.
+
 #####Instructions:
 Suggested mappings for a DualShock 3 controller:
 
 | Axis                  | Control |
 | --------------------- | ------- |
-| Left Joystick X-Axis | yaw     |
-| Left Joystick Y-Axis | none    |
+| Left Joystick X-Axis  | yaw     |
+| Left Joystick Y-Axis  | none    |
 | Right Joystick X-Axis | roll    |
 | Right Joystick Y-Axis | pitch   |
 
