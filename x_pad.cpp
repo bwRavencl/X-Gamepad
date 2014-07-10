@@ -92,7 +92,7 @@ static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifi
 static XPLMCommandRef cycleViewCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // command-handler that handles the switch view command
 int CycleViewCommandHandler(XPLMCommandRef       inCommand,
@@ -297,6 +297,8 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
         
         if (leftJoystickMinYValue == 1.0f || leftJoystickMaxYValue == 0.0f)
             joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] = 0.5f;
+        
+        int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
 
         if (viewModifierDown == 0)
         {
@@ -312,18 +314,22 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 {
                     // normalize range [0.5, 0.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
                     float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
+                    
+                    float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll + d;
 
                     // ensure we don't set values larger than 1.0
-                    XPLMSetDataf(propRotationSpeedRadSecAllDataRef, propRotationSpeedRadSecAll < acfRSCRedlinePrp ? propRotationSpeedRadSecAll + d : acfRSCRedlinePrp);
+                    XPLMSetDataf(propRotationSpeedRadSecAllDataRef, newPropRotationSpeedRadSecAll < acfRSCRedlinePrp ? newPropRotationSpeedRadSecAll : acfRSCRedlinePrp);
                 }
                 // decrease prop pitch
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
-                    float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
 
+                    float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll - d;
+                    
                     // ensure we don't set values smaller than 0.0
-                    XPLMSetDataf(propRotationSpeedRadSecAllDataRef, propRotationSpeedRadSecAll > acfRSCMingovPrp ? propRotationSpeedRadSecAll + d : acfRSCMingovPrp);
+                    XPLMSetDataf(propRotationSpeedRadSecAllDataRef, newPropRotationSpeedRadSecAll > acfRSCMingovPrp ? newPropRotationSpeedRadSecAll : acfRSCMingovPrp);
                 }
             }
             else if (mixtureControlModifierDown != 0)
@@ -336,23 +342,25 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
                     float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
 
+                    float newMixtureRatioAll = mixtureRatioAll + d;
+                    
                     // ensure we don't set values larger than 1.0
-                    XPLMSetDataf(mixtureRatioAllDataRef, mixtureRatioAll < 1.0f ? mixtureRatioAll + d : 1.0f);
+                    XPLMSetDataf(mixtureRatioAllDataRef, newMixtureRatioAll < 1.0f ? newMixtureRatioAll : 1.0f);
                 }
                 // decrease mixture setting
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
 
+                    float newMixtureRatioAll = mixtureRatioAll - d;
+                    
                     // ensure we don't set values smaller than 0.0
-                    XPLMSetDataf(mixtureRatioAllDataRef, mixtureRatioAll > 0.0f ? mixtureRatioAll + d : 0.0f);
+                    XPLMSetDataf(mixtureRatioAllDataRef, newMixtureRatioAll > 0.0f ? newMixtureRatioAll : 0.0f);
                 }
             }
             else if (cowlFlapModifierDown != 0)
             {
-                int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
-                
                 float cowlFlapRatio[acfNumEngines];
                 XPLMGetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
                 
@@ -364,17 +372,22 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     
                     // ensure we don't set values larger than 1.0
                     for (int i = 0; i < acfNumEngines; i++)
-                        cowlFlapRatio[i] = cowlFlapRatio[i] < 1.0f ? cowlFlapRatio[i] + d : 1.0f;
+                    {
+                        float newCowlFlapRatio = cowlFlapRatio[i] + d;
+                        cowlFlapRatio[i] = newCowlFlapRatio < 1.0f ? newCowlFlapRatio : 1.0f;
+                    }
                 }
                 // decrease mixture setting
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
                     
-                    // ensure we don't set values smaller than 0.0                   
                     for (int i = 0; i < acfNumEngines; i++)
-                        cowlFlapRatio[i] = cowlFlapRatio[i] > 0.0f ? cowlFlapRatio[i] + d : 0.0f;
+                    {
+                        float newCowlFlapRatio = cowlFlapRatio[i] - d;
+                        cowlFlapRatio[i] = newCowlFlapRatio > 0.0f ? newCowlFlapRatio : 0.0f;
+                    }
                 }
                 
                 XPLMSetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
@@ -382,24 +395,58 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
             else
             {
                 float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
+                
+                float thrustReverserDeployRatio[acfNumEngines];
+                XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
+                
+                float averageThrustReverserDeployRatio = 0.0f;
+                for (int i = 0; i < acfNumEngines; i++)
+                    averageThrustReverserDeployRatio += thrustReverserDeployRatio[i];
+                averageThrustReverserDeployRatio /= acfNumEngines;
 
                 // increase throttle setting
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
                     float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
-
-                    // ensure we don't set values larger than 1.0
-                    XPLMSetDataf(throttleRatioAllDataRef, throttleRatioAll < 1.0f ? throttleRatioAll + d : 1.0f);
+                    
+                    // invert d if thrust reversers are engaged
+                    if (averageThrustReverserDeployRatio > 0.5f)
+                    {
+                        float newThrottleRatioAll = throttleRatioAll - d;
+                        
+                        // ensure we don't set values smaller than 0.0
+                        XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
+                    }
+                    else
+                    {
+                        float newThrottleRatioAll = throttleRatioAll + d;
+                        
+                        // ensure we don't set values larger than 1.0
+                        XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                    }
                 }
                 // decrease throttle setting
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
 
-                    // ensure we don't set values smaller than 0.0
-                    XPLMSetDataf(throttleRatioAllDataRef, throttleRatioAll > 0.0f ? throttleRatioAll + d : 0.0f);
+                    // invert d if thrust reversers are engaged
+                    if (averageThrustReverserDeployRatio > 0.5f)
+                    {
+                        float newThrottleRatioAll = throttleRatioAll + d;
+                        
+                        // ensure we don't set values larger than 1.0
+                        XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                    }
+                    else
+                    {
+                        float newThrottleRatioAll = throttleRatioAll - d;
+                        
+                        // ensure we don't set values smaller than 0.0
+                        XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
+                    }
                 }
 
                 // apply brakes
@@ -448,6 +495,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
     cowlFlapRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/cowl_flap_ratio");
+    thrustReverserDeployRatioDataRef = XPLMFindDataRef("sim/flightmodel2/engines/thrust_reverser_deploy_ratio");
 
     // create custom commands
     cycleViewCommand = XPLMCreateCommand(NAME_LOWERCASE"/cycle_view", "Cycle View");
