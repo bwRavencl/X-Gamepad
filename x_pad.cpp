@@ -92,7 +92,7 @@ static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifi
 static XPLMCommandRef cycleViewCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL;
 
 // command-handler that handles the switch view command
 int CycleViewCommandHandler(XPLMCommandRef       inCommand,
@@ -351,7 +351,10 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
             }
             else if (cowlFlapModifierDown != 0)
             {
-                float cowlFlapRatioAll = XPLMGetDataf(cowlFlapRatioDataRef);
+                int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
+                
+                float cowlFlapRatio[acfNumEngines];
+                XPLMGetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
                 
                 // increase mixture setting
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
@@ -360,7 +363,8 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
                     
                     // ensure we don't set values larger than 1.0
-                    XPLMSetDataf(cowlFlapRatioDataRef, cowlFlapRatioAll < 1.0f ? cowlFlapRatioAll + d : 1.0f);
+                    for (int i = 0; i < acfNumEngines; i++)
+                        cowlFlapRatio[i] = cowlFlapRatio[i] < 1.0f ? cowlFlapRatio[i] + d : 1.0f;
                 }
                 // decrease mixture setting
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
@@ -368,9 +372,12 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
                     float d = - JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
                     
-                    // ensure we don't set values smaller than 0.0
-                    XPLMSetDataf(cowlFlapRatioDataRef, cowlFlapRatioAll > 0.0f ? cowlFlapRatioAll + d : 0.0f);
+                    // ensure we don't set values smaller than 0.0                   
+                    for (int i = 0; i < acfNumEngines; i++)
+                        cowlFlapRatio[i] = cowlFlapRatio[i] > 0.0f ? cowlFlapRatio[i] + d : 0.0f;
                 }
+                
+                XPLMSetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
             }
             else
             {
@@ -427,6 +434,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     // obtain datarefs
     acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
+    acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
     viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
     hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
