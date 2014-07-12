@@ -37,3 +37,4 @@ Suggested mappings for a DualShock 3 controller:
 | R2         | sim/flight_controls/brakes_toggle_regular                |
 | L3         | sim/general/zoom_out                                     |
 | R3         | sim/general/zoom_in                                      |
+| PS         | x_pad/toggle_mouse_pointer_control                       |

@@ -16,10 +16,16 @@
  */
 
 #include "XPLMDataAccess.h"
+#include "XPLMDisplay.h"
 #include "XPLMProcessing.h"
 #include "XPLMUtilities.h"
 
+#include <stack>
 #include <string.h>
+
+#if APL
+#include "ApplicationServices/ApplicationServices.h"
+#endif
 
 // define name
 #define NAME "X-pad"
@@ -43,6 +49,7 @@
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
 // define button assignments
+#define BUTTON_ASSIGNMENT_NONE_NONE 0
 #define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_UP 259
 #define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_DOWN 261
 #define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_LEFT 262
@@ -81,18 +88,48 @@
 #define JOYSTICK_BUTTON_R2 169
 #define JOYSTICK_BUTTON_L3 161
 #define JOYSTICK_BUTTON_R3 162
+#define JOYSTICK_BUTTON_R3 162
+#define JOYSTICK_BUTTON_PS 176
 
 // define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.05f
 
+// define mouse pointer sensitivity
+#define JOYSTICK_MOUSE_POINTER_SENSITIVITY 100.0f
+
 // global variables
-static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0;
+static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0;
+
+// global assignments stack
+static std::stack <int*> buttonAssignmentsStack;
 
 // global commandref variables
-static XPLMCommandRef cycleViewCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL;
+static XPLMCommandRef cycleViewCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+
+// push the current button assignments to the stack
+void PushButtonAssignments(void)
+{
+    int joystickButtonAssignments[1600];
+    XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+    
+    int *defaultJoystickButtonAssignments = (int*) malloc(sizeof(int) * 1600);
+    memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
+    
+    buttonAssignmentsStack.push(defaultJoystickButtonAssignments);
+}
+
+// pop the topmost button assignments from the stack
+void PopButtonAssignments(void)
+{
+    if (!buttonAssignmentsStack.empty())
+    {
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, buttonAssignmentsStack.top(), 0, 1600);
+        buttonAssignmentsStack.pop();
+    }
+}
 
 // command-handler that handles the switch view command
 int CycleViewCommandHandler(XPLMCommandRef       inCommand,
@@ -136,10 +173,8 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
     int joystickAxisReverse[100];
     XPLMGetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
 
-    static int defaultJoystickButtonAssignments[1600];
-
     // only apply the modifier if no other modifier is down which can alter any assignments
-    if (inPhase == xplm_CommandBegin && trimModifierDown == 0)
+    if (inPhase == xplm_CommandBegin && trimModifierDown == 0  && mousePointerControlEnabled == 0)
     {
         viewModifierDown = 1;
 
@@ -150,13 +185,13 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
         // reverse the left joystick's y axis while the view modifier is applied
         joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 1;
 
-        int joystickButtonAssignments[1600];
-        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
         // store the default button assignments
-        memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
+        PushButtonAssignments();
 
         // assign panel scrolling controls to the dpad
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_GENERAL_LEFT;
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_GENERAL_RIGHT;
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_GENERAL_UP;
@@ -180,7 +215,7 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
         joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 0;
 
         // restore the default button assignments
-        XPLMSetDatavi(joystickButtonAssignmentsDataRef, defaultJoystickButtonAssignments, 0, 1600);
+        PopButtonAssignments();
     }
 
     XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
@@ -233,20 +268,18 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
                                XPLMCommandPhase     inPhase,
                                void *               inRefcon)
 {
-    static int defaultJoystickButtonAssignments[1600];
-
     // only apply the modifier if no other modifier is down which can alter any assignments
-    if (inPhase == xplm_CommandBegin && viewModifierDown == 0)
+    if (inPhase == xplm_CommandBegin && viewModifierDown == 0 && mousePointerControlEnabled == 0)
     {
         trimModifierDown = 1;
 
-        int joystickButtonAssignments[1600];
-        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
         // store the default button assignments
-        memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
+        PushButtonAssignments();
 
         // assign trim controls to the buttons and dpad
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_LEFT;
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_RIGHT;
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_DOWN;
@@ -261,9 +294,76 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
         trimModifierDown = 0;
 
         // restore the default button assignments
-        XPLMSetDatavi(joystickButtonAssignmentsDataRef, defaultJoystickButtonAssignments, 0, 1600);
+        PopButtonAssignments();
     }
 
+    return 0;
+}
+
+// command-handler that handles the toggle mouse pointer control command
+int ToggleMousePointerControlCommandHandler(XPLMCommandRef       inCommand,
+                                            XPLMCommandPhase     inPhase,
+                                            void *               inRefcon)
+{
+    if (inPhase == xplm_CommandBegin)
+    {
+        int joystickAxisAssignments[100];
+        XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+        
+        if (mousePointerControlEnabled == 0)
+        {
+            mousePointerControlEnabled = 1;
+        
+            // assign no controls to the left joystick's axis since it will control the mouse pointer
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
+        
+            // store the default button assignments
+            PushButtonAssignments();
+        
+            // assign no commands to the l2 and r2 buttons since they will be used as left and right mouse buttons
+            int joystickButtonAssignments[1600];
+            XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+            
+            joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = BUTTON_ASSIGNMENT_NONE_NONE;
+            joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_NONE_NONE;
+        
+            XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        }
+        else
+        {
+            mousePointerControlEnabled = 0;
+            
+            // get current mouse pointer location
+            CGEventRef getLocationEvent = CGEventCreate(NULL);
+            CGPoint location = CGEventGetLocation(getLocationEvent);
+            CFRelease(getLocationEvent);
+            
+            // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
+#ifdef APL
+            if (CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft) != 0)
+            {
+                CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, location, kCGMouseButtonLeft);
+                CGEventPost(kCGHIDEventTap, event);
+            }
+            if (CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight) != 0)
+            {
+                CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseUp, location, kCGMouseButtonRight);
+                CGEventPost(kCGHIDEventTap, event);
+            }
+#endif
+        
+            // assign the default controls to the left joystick's axis
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_YAW;
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
+        
+            // restore the default button assignments
+            PopButtonAssignments();
+        }
+        
+        XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+    }
+    
     return 0;
 }
 
@@ -392,6 +492,128 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 
                 XPLMSetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
             }
+            else if (mousePointerControlEnabled != 0)
+            {
+                int distX = 0, distY = 0;
+                
+                // move mouse pointer left
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] < 0.5f - joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 0.0] to [0.0, 1.0]
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 0.0f, 0.0f, 1.0f);
+                    
+                    // apply acceleration function (y = x^2)
+                    distX -= (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
+                }
+                // move mouse pointer right
+                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.5f + joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 1.0] to [0.0, 1.0]
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 1.0f, 0.0f, 1.0f);
+                    
+                    // apply acceleration function (y = x^2)
+                    distX += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
+                }
+                
+                // move mouse pointer up
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 0.0] to [0.0, 1.0]
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                    
+                    // apply acceleration function (y = x^2)
+                    distY -= (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
+                }
+                // move mouse pointer down
+                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 1.0] to [0.0, 1.0]
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^2)
+                    distY += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
+                }
+          
+                // get current mouse pointer location
+#ifdef APL
+                CGEventRef getLocationEvent = CGEventCreate(NULL);
+                CGPoint location = CGEventGetLocation(getLocationEvent);
+                CFRelease(getLocationEvent);
+                int oldX = location.x;
+                int oldY = location.y;
+#endif
+                
+                // ensure we don't move the mouse pointer out of the screen
+                int newX = oldX + distX;
+                int newY = oldY + distY;
+                
+                int width = 0, height = 0;
+                XPLMGetScreenSize(&width, &height);
+                
+                newX = newX >= 0 ? newX : 0;
+                newX = newX < width ? newX : width - 1;
+                newY = newY >= 0 ? newY : 0;
+                newY = newY < height ? newY : height - 1;
+
+                // move mouse pointer by distX and distY pixels
+#ifdef APL
+                CGEventRef moveMouseEvent = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, CGPointMake(newX, newY), kCGMouseButtonLeft);
+                CGEventPost(kCGHIDEventTap, moveMouseEvent);
+                CFRelease(moveMouseEvent);
+#endif
+                
+                int joystickButtonValues[1600];
+                XPLMGetDatavi(joystickButtonValuesDataRef, joystickButtonValues, 0, 1600);
+                
+#ifdef APL
+                // get mouse button status
+                int leftMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft);
+                int rightMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight);
+                
+                // update mouse pointer location since we need the current location to create a mouse up/down event
+                getLocationEvent = CGEventCreate(NULL);
+                location = CGEventGetLocation(getLocationEvent);
+                CFRelease(getLocationEvent);
+#endif
+                
+                if (joystickButtonValues[JOYSTICK_BUTTON_CROSS] != 0)
+                {
+                    // press left mouse button down
+                    if (leftMouseButtonDown == 0)
+                    {
+                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, location, kCGMouseButtonLeft);
+                        CGEventPost(kCGHIDEventTap, event);
+                    }
+                }
+                else
+                {
+                    // release left mouse button
+                    if (leftMouseButtonDown != 0)
+                    {
+                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, location, kCGMouseButtonLeft);
+                        CGEventPost(kCGHIDEventTap, event);
+                    }
+                }
+                
+                if (joystickButtonValues[JOYSTICK_BUTTON_CIRCLE] != 0)
+                {
+                    // press right mouse button down
+                    if (rightMouseButtonDown == 0)
+                    {
+                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseDown, location, kCGMouseButtonRight);
+                        CGEventPost(kCGHIDEventTap, event);
+                    }
+                }
+                else
+                {
+                    // release right mouse button
+                    if (rightMouseButtonDown != 0)
+                    {
+                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseUp, location, kCGMouseButtonRight);
+                        CGEventPost(kCGHIDEventTap, event);
+                    }
+                }
+            }
             else
             {
                 float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
@@ -489,6 +711,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     joystickButtonAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_button_assignments");
     joystickAxisValuesDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_values");
     joystickAxisReverseDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_reverse");
+    joystickButtonValuesDataRef = XPLMFindDataRef("sim/joystick/joystick_button_values");
     leftBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/left_brake_ratio");
     rightBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/right_brake_ratio");
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
@@ -504,6 +727,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     mixtureControlModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/mixture_control_modifier", "Mixture Control Modifier");
     cowlFlapModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/cowl_flap_modifier", "Cowl Flap Modifier");
     trimModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/trim_modifier", "Trim Modifier");
+    toggleMousePointerControlCommand = XPLMCreateCommand(NAME_LOWERCASE"/toggle_mouse_pointer_control", "Toggle Mouse Pointer Control");
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleViewCommand, CycleViewCommandHandler, 1, NULL);
@@ -512,6 +736,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(trimModifierCommand, TrimModifierCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
 
     // register flight loop callback
     XPLMRegisterFlightLoopCallback(JoystickAxisFlightCallback, -1, NULL);
@@ -521,6 +746,9 @@ PLUGIN_API int XPluginStart(char *		outName,
 
 PLUGIN_API void	XPluginStop(void)
 {
+    // revert any remaining button assignments
+    while (!buttonAssignmentsStack.empty())
+        PopButtonAssignments();
 }
 
 PLUGIN_API void XPluginDisable(void)
