@@ -464,29 +464,30 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 float cowlFlapRatio[acfNumEngines];
                 XPLMGetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
                 
-                // increase mixture setting
+                // decrease cowl flap setting
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
                     float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                    
+                    // ensure we don't set values smaller than 0.0
+                    for (int i = 0; i < acfNumEngines; i++)
+                    {
+                        float newCowlFlapRatio = cowlFlapRatio[i] - d;
+                        cowlFlapRatio[i] = newCowlFlapRatio > 0.0f ? newCowlFlapRatio : 0.0f;
+                    }
+                }
+                // increase cowl flap setting
+                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 1.0] to [0.0, 1.0]
+                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
                     
                     // ensure we don't set values larger than 1.0
                     for (int i = 0; i < acfNumEngines; i++)
                     {
                         float newCowlFlapRatio = cowlFlapRatio[i] + d;
                         cowlFlapRatio[i] = newCowlFlapRatio < 1.0f ? newCowlFlapRatio : 1.0f;
-                    }
-                }
-                // decrease mixture setting
-                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
-                {
-                    // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
-                    
-                    for (int i = 0; i < acfNumEngines; i++)
-                    {
-                        float newCowlFlapRatio = cowlFlapRatio[i] - d;
-                        cowlFlapRatio[i] = newCowlFlapRatio > 0.0f ? newCowlFlapRatio : 0.0f;
                     }
                 }
                 
