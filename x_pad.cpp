@@ -112,13 +112,10 @@ static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL
 // push the current button assignments to the stack
 void PushButtonAssignments(void)
 {
-    int joystickButtonAssignments[1600];
+    int *joystickButtonAssignments = (int*) malloc(sizeof(int) * 1600);
+    
     XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-    
-    int *defaultJoystickButtonAssignments = (int*) malloc(sizeof(int) * 1600);
-    memcpy(defaultJoystickButtonAssignments, joystickButtonAssignments, 1600);
-    
-    buttonAssignmentsStack.push(defaultJoystickButtonAssignments);
+    buttonAssignmentsStack.push(joystickButtonAssignments);
 }
 
 // pop the topmost button assignments from the stack
@@ -126,7 +123,13 @@ void PopButtonAssignments(void)
 {
     if (!buttonAssignmentsStack.empty())
     {
-        XPLMSetDatavi(joystickButtonAssignmentsDataRef, buttonAssignmentsStack.top(), 0, 1600);
+        int *joystickButtonAssignments = buttonAssignmentsStack.top();
+        
+        if (joystickButtonAssignments != NULL)
+        {
+            XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+            free(joystickButtonAssignments);
+        }
         buttonAssignmentsStack.pop();
     }
 }
