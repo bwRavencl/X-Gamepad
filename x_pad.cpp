@@ -242,8 +242,8 @@ int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
 
 // command-handler that handles the mixture control modifier command
 int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
-        XPLMCommandPhase     inPhase,
-        void *               inRefcon)
+                                         XPLMCommandPhase     inPhase,
+                                         void *               inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
         mixtureControlModifierDown = 1;
@@ -537,31 +537,53 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     // apply acceleration function (y = x^2)
                     distY += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
                 }
-          
-                // get current mouse pointer location
-#ifdef APL
-                CGEventRef getLocationEvent = CGEventCreate(NULL);
-                CGPoint location = CGEventGetLocation(getLocationEvent);
-                CFRelease(getLocationEvent);
-                int oldX = location.x;
-                int oldY = location.y;
-#endif
-                
-                // ensure we don't move the mouse pointer out of the screen
-                int newX = oldX + distX;
-                int newY = oldY + distY;
-                
-                int width = 0, height = 0;
-                XPLMGetScreenSize(&width, &height);
-                
-                newX = newX >= 0 ? newX : 0;
-                newX = newX < width ? newX : width - 1;
-                newY = newY >= 0 ? newY : 0;
-                newY = newY < height ? newY : height - 1;
 
-                // move mouse pointer by distX and distY pixels
 #ifdef APL
-                CGEventRef moveMouseEvent = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, CGPointMake(newX, newY), kCGMouseButtonLeft);
+                // get current mouse pointer location
+                CGEventRef getLocationEvent = CGEventCreate(NULL);
+                CGPoint oldLocation = CGEventGetLocation(getLocationEvent);
+                CFRelease(getLocationEvent);
+                
+                CGPoint newLocation;
+                newLocation.x = oldLocation.x + distX;
+                newLocation.y = oldLocation.y + distY;
+
+                // get active displays
+                CGDirectDisplayID activeDisplays[8];
+                uint32_t displayCount = 0;
+                CGGetActiveDisplayList(8, activeDisplays, &displayCount);
+
+                // get display ids of the display on which the mouse pointer was contained before and will be once moved - values of -1 indicate that the pointer is outside of all displays
+                int oldContainingDisplay = -1;
+                int newContainingDisplay = -1;
+                for (int i = 0; i < displayCount; i++)
+                {
+                    CGRect screenBounds = CGDisplayBounds(activeDisplays[i]);
+                    
+                    if (CGRectContainsPoint(screenBounds, oldLocation))
+                        oldContainingDisplay = i;
+                    
+                    if (CGRectContainsPoint(screenBounds, newLocation))
+                        newContainingDisplay = i;
+                }
+
+                // ensure the pointer is not moved beyond the bounds of the display it was contained in before
+                if (newContainingDisplay == -1 && oldContainingDisplay > -1)
+                {
+                    CGRect screenBounds = CGDisplayBounds(activeDisplays[oldContainingDisplay]);
+                    int minX = (int) screenBounds.origin.x;
+                    int minY = (int) screenBounds.origin.y;
+                    int maxX = (int) minX + screenBounds.size.width - 1;
+                    int maxY = (int) minY + screenBounds.size.height - 1;
+                    
+                    newLocation.x = newLocation.x >= minX ? newLocation.x : minX;
+                    newLocation.x = newLocation.x <= maxX ? newLocation.x : maxX;
+                    newLocation.y = newLocation.y >= minY ? newLocation.y : minY;
+                    newLocation.y = newLocation.y < maxY ? newLocation.y : maxY;
+                }
+                
+                // move mouse pointer by distX and distY pixels
+                CGEventRef moveMouseEvent = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, newLocation, kCGMouseButtonLeft);
                 CGEventPost(kCGHIDEventTap, moveMouseEvent);
                 CFRelease(moveMouseEvent);
 #endif
@@ -576,7 +598,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 
                 // update mouse pointer location since we need the current location to create a mouse up/down event
                 getLocationEvent = CGEventCreate(NULL);
-                location = CGEventGetLocation(getLocationEvent);
+                newLocation = CGEventGetLocation(getLocationEvent);
                 CFRelease(getLocationEvent);
 #endif
                 
@@ -585,7 +607,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     // press left mouse button down
                     if (leftMouseButtonDown == 0)
                     {
-                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, location, kCGMouseButtonLeft);
+                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, newLocation, kCGMouseButtonLeft);
                         CGEventPost(kCGHIDEventTap, event);
                     }
                 }
@@ -594,7 +616,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     // release left mouse button
                     if (leftMouseButtonDown != 0)
                     {
-                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, location, kCGMouseButtonLeft);
+                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, newLocation, kCGMouseButtonLeft);
                         CGEventPost(kCGHIDEventTap, event);
                     }
                 }
@@ -604,7 +626,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     // press right mouse button down
                     if (rightMouseButtonDown == 0)
                     {
-                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseDown, location, kCGMouseButtonRight);
+                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseDown, newLocation, kCGMouseButtonRight);
                         CGEventPost(kCGHIDEventTap, event);
                     }
                 }
@@ -613,7 +635,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                     // release right mouse button
                     if (rightMouseButtonDown != 0)
                     {
-                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseUp, location, kCGMouseButtonRight);
+                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseUp, newLocation, kCGMouseButtonRight);
                         CGEventPost(kCGHIDEventTap, event);
                     }
                 }
