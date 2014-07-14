@@ -206,7 +206,7 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
-    else if (inPhase == xplm_CommandEnd && trimModifierDown == 0)
+    else if (inPhase == xplm_CommandEnd && trimModifierDown == 0 && mousePointerControlEnabled == 0)
     {
         viewModifierDown = 0;
 
@@ -292,7 +292,7 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
-    else if (inPhase == xplm_CommandEnd && viewModifierDown == 0)
+    else if (inPhase == xplm_CommandEnd && viewModifierDown == 0 && mousePointerControlEnabled == 0)
     {
         trimModifierDown = 0;
 
