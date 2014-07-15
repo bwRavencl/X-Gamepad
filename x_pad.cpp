@@ -91,6 +91,9 @@
 #define JOYSTICK_BUTTON_R3 162
 #define JOYSTICK_BUTTON_PS 176
 
+// define speedbrake toggle/arm command long press time
+#define SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME 1.0f
+
 // define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.05f
 
@@ -104,10 +107,10 @@ static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifi
 static std::stack <int*> buttonAssignmentsStack;
 
 // global commandref variables
-static XPLMCommandRef cycleViewCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
+static XPLMCommandRef cycleViewCommand = NULL, speedBrakeToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // push the current button assignments to the stack
 void PushButtonAssignments(void)
@@ -162,6 +165,45 @@ int CycleViewCommandHandler(XPLMCommandRef       inCommand,
         }
     }
 
+    return 0;
+}
+
+// command-handler that handles the speedbrake toggle / arm command
+int SpeedBrakeToggleArmCommandHandler(XPLMCommandRef       inCommand,
+                                      XPLMCommandPhase     inPhase,
+                                      void *               inRefcon)
+{
+    static float beginTime = 0.0f;
+    
+    float oldSpeedbrakeRatio = XPLMGetDataf(speedbrakeRatioDataRef);
+    
+    if (inPhase == xplm_CommandBegin)
+        beginTime = XPLMGetElapsedTime();
+    else if (inPhase == xplm_CommandContinue)
+    {
+        // arm / unarm speedbrake
+        if (XPLMGetElapsedTime() - beginTime >= SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME)
+        {
+            float newSpeedbrakeRatio = oldSpeedbrakeRatio == -0.5f ? 0.0f : -0.5f;
+            
+            XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
+            
+            beginTime = MAXFLOAT;
+        }
+    }
+    else if (inPhase == xplm_CommandEnd)
+    {
+        // toggle speedbrake
+        if (XPLMGetElapsedTime() - beginTime < SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+        {
+            float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
+            
+            XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
+        }
+        
+        beginTime = 0.0f;
+    }
+    
     return 0;
 }
 
@@ -740,6 +782,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     joystickButtonValuesDataRef = XPLMFindDataRef("sim/joystick/joystick_button_values");
     leftBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/left_brake_ratio");
     rightBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/right_brake_ratio");
+    speedbrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/speedbrake_ratio");
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
     propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
@@ -748,6 +791,7 @@ PLUGIN_API int XPluginStart(char *		outName,
 
     // create custom commands
     cycleViewCommand = XPLMCreateCommand(NAME_LOWERCASE"/cycle_view", "Cycle View");
+    speedBrakeToggleArmCommand = XPLMCreateCommand(NAME_LOWERCASE"/speed_brake_toggle_arm", "Toggle/Arm Speedbrake");
     viewModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/view_modifier", "View Modifier");
     propPitchModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/prop_pitch_modifier", "Prop Pitch Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/mixture_control_modifier", "Mixture Control Modifier");
@@ -757,6 +801,7 @@ PLUGIN_API int XPluginStart(char *		outName,
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleViewCommand, CycleViewCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(speedBrakeToggleArmCommand, SpeedBrakeToggleArmCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(propPitchModifierCommand, PropPitchModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
