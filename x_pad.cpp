@@ -95,7 +95,7 @@
 #define SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME 1.0f
 
 // define relative control multiplier
-#define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.05f
+#define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.04f
 
 // define mouse pointer sensitivity
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 100.0f
