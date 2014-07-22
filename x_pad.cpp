@@ -95,10 +95,10 @@
 #define SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME 1.0f
 
 // define relative control multiplier
-#define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 0.04f
+#define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.0f
 
 // define mouse pointer sensitivity
-#define JOYSTICK_MOUSE_POINTER_SENSITIVITY 100.0f
+#define JOYSTICK_MOUSE_POINTER_SENSITIVITY 25.0f
 
 // global variables
 static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0;
@@ -426,6 +426,8 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
 {
     if (XPLMGetDatai(hasJostickDataRef))
     {
+        float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
+        
         float joystickPitchNullzone = XPLMGetDataf(joystickPitchNullzoneDataRef);
 
         float joystickAxisValues[100];
@@ -458,7 +460,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
+                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
                     
                     float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll + d;
 
@@ -469,7 +471,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
+                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
 
                     float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll - d;
                     
@@ -485,7 +487,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
 
                     float newMixtureRatioAll = mixtureRatioAll + d;
                     
@@ -496,7 +498,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
 
                     float newMixtureRatioAll = mixtureRatioAll - d;
                     
@@ -513,7 +515,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
                     
                     // ensure we don't set values smaller than 0.0
                     for (int i = 0; i < acfNumEngines; i++)
@@ -526,7 +528,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
                     
                     // ensure we don't set values larger than 1.0
                     for (int i = 0; i < acfNumEngines; i++)
@@ -546,38 +548,38 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 0.0f, 0.0f, 1.0f);
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 0.0f, 0.0f, 1.0f);
                     
                     // apply acceleration function (y = x^2)
-                    distX -= (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
+                    distX -= (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall;
                 }
                 // move mouse pointer right
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 1.0f, 0.0f, 1.0f);
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 1.0f, 0.0f, 1.0f);
                     
                     // apply acceleration function (y = x^2)
-                    distX += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
+                    distX += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall;
                 }
                 
                 // move mouse pointer up
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
                     
                     // apply acceleration function (y = x^2)
-                    distY -= (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
+                    distY -= (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall;
                 }
                 // move mouse pointer down
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
 
                     // apply acceleration function (y = x^2)
-                    distY += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f);
+                    distY += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall;
                 }
 
 #ifdef APL
@@ -698,7 +700,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
                     
                     // invert d if thrust reversers are engaged
                     if (averageThrustReverserDeployRatio > 0.5f)
@@ -720,7 +722,7 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                 else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
 
                     // invert d if thrust reversers are engaged
                     if (averageThrustReverserDeployRatio > 0.5f)
