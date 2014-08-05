@@ -270,8 +270,6 @@ int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
         propPitchModifierDown = 1;
     else if (inPhase == xplm_CommandEnd)
         propPitchModifierDown = 0;
-    
-    lastAxisAssignment = XPLMGetElapsedTime();
 
     return 0;
 }
@@ -285,8 +283,6 @@ int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
         mixtureControlModifierDown = 1;
     else if (inPhase == xplm_CommandEnd)
         mixtureControlModifierDown = 0;
-    
-    lastAxisAssignment = XPLMGetElapsedTime();
 
     return 0;
 }
@@ -300,8 +296,6 @@ int CowlFlapModifierCommandHandler(XPLMCommandRef       inCommand,
         cowlFlapModifierDown = 1;
     else if (inPhase == xplm_CommandEnd)
         cowlFlapModifierDown = 0;
-    
-    lastAxisAssignment = XPLMGetElapsedTime();
     
     return 0;
 }
