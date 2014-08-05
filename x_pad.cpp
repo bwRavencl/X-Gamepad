@@ -34,6 +34,32 @@
 // define version
 #define VERSION "0.1"
 
+// define joystick axis
+#define JOYSTICK_AXIS_LEFT_X 10
+#define JOYSTICK_AXIS_LEFT_Y 11
+#define JOYSTICK_AXIS_RIGHT_X 12
+#define JOYSTICK_AXIS_RIGHT_Y 13
+
+// define joystick buttons
+#define JOYSTICK_BUTTON_DPAD_LEFT 167
+#define JOYSTICK_BUTTON_DPAD_RIGHT 165
+#define JOYSTICK_BUTTON_DPAD_UP 164
+#define JOYSTICK_BUTTON_DPAD_DOWN 166
+#define JOYSTICK_BUTTON_SQUARE 175
+#define JOYSTICK_BUTTON_CIRCLE 173
+#define JOYSTICK_BUTTON_TRIANGLE 172
+#define JOYSTICK_BUTTON_CROSS 174
+#define JOYSTICK_BUTTON_START 163
+#define JOYSTICK_BUTTON_SELECT 160
+#define JOYSTICK_BUTTON_L1 170
+#define JOYSTICK_BUTTON_R1 171
+#define JOYSTICK_BUTTON_L2 168
+#define JOYSTICK_BUTTON_R2 169
+#define JOYSTICK_BUTTON_L3 161
+#define JOYSTICK_BUTTON_R3 162
+#define JOYSTICK_BUTTON_R3 162
+#define JOYSTICK_BUTTON_PS 176
+
 // define view types
 #define VIEW_TYPE_FORWARDS_WITH_PANEL 1000
 #define VIEW_TYPE_CHASE 1017
@@ -65,32 +91,6 @@
 #define BUTTON_ASSIGNMENT_GENERAL_ROT_LEFT 966
 #define BUTTON_ASSIGNMENT_GENERAL_ROT_RIGHT 967
 
-// define joystick axis
-#define JOYSTICK_AXIS_LEFT_X 10
-#define JOYSTICK_AXIS_LEFT_Y 11
-#define JOYSTICK_AXIS_RIGHT_X 12
-#define JOYSTICK_AXIS_RIGHT_Y 13
-
-// define joystick buttons
-#define JOYSTICK_BUTTON_DPAD_LEFT 167
-#define JOYSTICK_BUTTON_DPAD_RIGHT 165
-#define JOYSTICK_BUTTON_DPAD_UP 164
-#define JOYSTICK_BUTTON_DPAD_DOWN 166
-#define JOYSTICK_BUTTON_SQUARE 175
-#define JOYSTICK_BUTTON_CIRCLE 173
-#define JOYSTICK_BUTTON_TRIANGLE 172
-#define JOYSTICK_BUTTON_CROSS 174
-#define JOYSTICK_BUTTON_START 163
-#define JOYSTICK_BUTTON_SELECT 160
-#define JOYSTICK_BUTTON_L1 170
-#define JOYSTICK_BUTTON_R1 171
-#define JOYSTICK_BUTTON_L2 168
-#define JOYSTICK_BUTTON_R2 169
-#define JOYSTICK_BUTTON_L3 161
-#define JOYSTICK_BUTTON_R3 162
-#define JOYSTICK_BUTTON_R3 162
-#define JOYSTICK_BUTTON_PS 176
-
 // define speedbrake toggle/arm command long press time
 #define SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME 1.0f
 
@@ -102,6 +102,8 @@
 
 // global variables
 static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0;
+
+static float lastAxisAssignment = 0.0f;
 
 // global assignments stack
 static std::stack <int*> buttonAssignmentsStack;
@@ -212,59 +214,65 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
                                XPLMCommandPhase     inPhase,
                                void *               inRefcon)
 {
-    int joystickAxisAssignments[100];
-    XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-
-    int joystickAxisReverse[100];
-    XPLMGetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
-
-    // only apply the modifier if no other modifier is down which can alter any assignments
-    if (inPhase == xplm_CommandBegin && trimModifierDown == 0  && mousePointerControlEnabled == 0)
+    if (inPhase != xplm_CommandContinue)
     {
-        viewModifierDown = 1;
+    
+        int joystickAxisAssignments[100];
+        XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
 
-        // assign the view controls to the left joystick's axis
-        joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT;
-        joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_VIEW_UP_DOWN;
+        int joystickAxisReverse[100];
+        XPLMGetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
 
-        // reverse the left joystick's y axis while the view modifier is applied
-        joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 1;
+        // only apply the modifier if no other modifier is down which can alter any assignments
+        if (inPhase == xplm_CommandBegin && trimModifierDown == 0  && mousePointerControlEnabled == 0)
+        {
+            viewModifierDown = 1;
 
-        // store the default button assignments
-        PushButtonAssignments();
+            // assign the view controls to the left joystick's axis
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT;
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_VIEW_UP_DOWN;
 
-        // assign panel scrolling controls to the dpad
-        int joystickButtonAssignments[1600];
-        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+            // reverse the left joystick's y axis while the view modifier is applied
+            joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 1;
+
+            // store the default button assignments
+            PushButtonAssignments();
+
+            // assign panel scrolling controls to the dpad
+            int joystickButtonAssignments[1600];
+            XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_GENERAL_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_GENERAL_RIGHT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_GENERAL_UP;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_GENERAL_DOWN;
-        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_GENERAL_ROT_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_GENERAL_ROT_RIGHT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = BUTTON_ASSIGNMENT_GENERAL_ROT_UP;
-        joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = BUTTON_ASSIGNMENT_GENERAL_ROT_DOWN;
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_GENERAL_LEFT;
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_GENERAL_RIGHT;
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_GENERAL_UP;
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_GENERAL_DOWN;
+            joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_GENERAL_ROT_LEFT;
+            joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_GENERAL_ROT_RIGHT;
+            joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = BUTTON_ASSIGNMENT_GENERAL_ROT_UP;
+            joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = BUTTON_ASSIGNMENT_GENERAL_ROT_DOWN;
 
-        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+            XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        }
+        else if (inPhase == xplm_CommandEnd && trimModifierDown == 0 && mousePointerControlEnabled == 0)
+        {
+            viewModifierDown = 0;
+
+            // assign the default controls to the left joystick's axis
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_YAW;
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
+
+            // disable the axis reversing when the view modifier is not applied anymore
+            joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 0;
+
+            // restore the default button assignments
+            PopButtonAssignments();
+        }
+
+        XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+        XPLMSetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
+        
+        lastAxisAssignment = XPLMGetElapsedTime();
     }
-    else if (inPhase == xplm_CommandEnd && trimModifierDown == 0 && mousePointerControlEnabled == 0)
-    {
-        viewModifierDown = 0;
-
-        // assign the default controls to the left joystick's axis
-        joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_YAW;
-        joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
-
-        // disable the axis reversing when the view modifier is not applied anymore
-        joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 0;
-
-        // restore the default button assignments
-        PopButtonAssignments();
-    }
-
-    XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-    XPLMSetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
 
     return 0;
 }
@@ -278,6 +286,8 @@ int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
         propPitchModifierDown = 1;
     else if (inPhase == xplm_CommandEnd)
         propPitchModifierDown = 0;
+    
+    lastAxisAssignment = XPLMGetElapsedTime();
 
     return 0;
 }
@@ -291,6 +301,8 @@ int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
         mixtureControlModifierDown = 1;
     else if (inPhase == xplm_CommandEnd)
         mixtureControlModifierDown = 0;
+    
+    lastAxisAssignment = XPLMGetElapsedTime();
 
     return 0;
 }
@@ -304,6 +316,8 @@ int CowlFlapModifierCommandHandler(XPLMCommandRef       inCommand,
         cowlFlapModifierDown = 1;
     else if (inPhase == xplm_CommandEnd)
         cowlFlapModifierDown = 0;
+    
+    lastAxisAssignment = XPLMGetElapsedTime();
     
     return 0;
 }
@@ -407,6 +421,8 @@ int ToggleMousePointerControlCommandHandler(XPLMCommandRef       inCommand,
         }
         
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+        
+        lastAxisAssignment = XPLMGetElapsedTime();
     }
     
     return 0;
@@ -424,7 +440,10 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
                                  int                  inCounter,
                                  void *               inRefcon)
 {
-    if (XPLMGetDatai(hasJostickDataRef))
+    float elapsedSinceLastAxisAssignment = XPLMGetElapsedTime() - lastAxisAssignment;
+    
+    // only handle the left joystick's axis if at least 750 ms have passed since the last axis assignment has occured, so that the user has time to center the joystick after releasing a modifier key
+    if (XPLMGetDatai(hasJostickDataRef) &&  elapsedSinceLastAxisAssignment > 0.75f)
     {
         float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
         
