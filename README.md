@@ -35,7 +35,7 @@ X-pad's default mappings for a DualShock 3 controller:
 | ---------- | -------------------------------------------------------- |
 | DPAD Left  | sim/flight_controls/flap_up                              |
 | DPAD Right | sim/flight_controls/flap_down                            |
-| DPAD Up    | x_pad/speed_brake_toggle_arm                             |
+| DPAD Up    | x_pad/speed_brake_and_carb_heat_toggle_arm               |
 | DPAD Down  | sim/flight_controls/gear_toggle                          |
 | Square     | x_pad/cycle_view                                         |
 | Circle     | x_pad/mixture_control_modifier                           |

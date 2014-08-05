@@ -76,7 +76,7 @@
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
 #define CYCLE_VIEW_COMMAND NAME_LOWERCASE"/cycle_view"
-#define SPEED_BRAKE_TOGGLE_ARM_COMMAND NAME_LOWERCASE"/speed_brake_toggle_arm"
+#define SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND NAME_LOWERCASE"/speed_brake_and_carb_heat_toggle_arm"
 #define VIEW_MODIFIER_COMMAND NAME_LOWERCASE"/view_modifier"
 #define PROP_PITCH_MODIFIER_COMMAND NAME_LOWERCASE"/prop_pitch_modifier"
 #define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE"/mixture_control_modifier"
@@ -102,10 +102,10 @@ static float lastAxisAssignment = 0.0f;
 static std::stack <int*> buttonAssignmentsStack;
 
 // global commandref variables
-static XPLMCommandRef cycleViewCommand = NULL, speedBrakeToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
+static XPLMCommandRef cycleViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // push the current button assignments to the stack
 void PushButtonAssignments(void)
@@ -163,40 +163,65 @@ int CycleViewCommandHandler(XPLMCommandRef       inCommand,
     return 0;
 }
 
-// command-handler that handles the speedbrake toggle / arm command
-int SpeedBrakeToggleArmCommandHandler(XPLMCommandRef       inCommand,
-                                      XPLMCommandPhase     inPhase,
-                                      void *               inRefcon)
+// command-handler that handles the speedbrake toggle / arm command or the carb heat, if the plane has no speedbrake
+int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef       inCommand,
+                                                 XPLMCommandPhase     inPhase,
+                                                 void *               inRefcon)
 {
-    static float beginTime = 0.0f;
-    
-    float oldSpeedbrakeRatio = XPLMGetDataf(speedbrakeRatioDataRef);
-    
-    if (inPhase == xplm_CommandBegin)
-        beginTime = XPLMGetElapsedTime();
-    else if (inPhase == xplm_CommandContinue)
+    // if a speedbrake exists this command controls it
+    if (XPLMGetDatai(acfSbrkEQDataRef) != 0)
     {
-        // arm / unarm speedbrake
-        if (XPLMGetElapsedTime() - beginTime >= SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME)
+        static float beginTime = 0.0f;
+    
+        float oldSpeedbrakeRatio = XPLMGetDataf(speedbrakeRatioDataRef);
+    
+        if (inPhase == xplm_CommandBegin)
+            beginTime = XPLMGetElapsedTime();
+        else if (inPhase == xplm_CommandContinue)
         {
-            float newSpeedbrakeRatio = oldSpeedbrakeRatio == -0.5f ? 0.0f : -0.5f;
+            // arm / unarm speedbrake
+            if (XPLMGetElapsedTime() - beginTime >= SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME)
+            {
+                float newSpeedbrakeRatio = oldSpeedbrakeRatio == -0.5f ? 0.0f : -0.5f;
             
-            XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
+                XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
             
-            beginTime = MAXFLOAT;
+                beginTime = MAXFLOAT;
+            }
+        }
+        else if (inPhase == xplm_CommandEnd)
+        {
+            // toggle speedbrake
+            if (XPLMGetElapsedTime() - beginTime < SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+            {
+                float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
+            
+                XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
+            }
+        
+            beginTime = 0.0f;
         }
     }
-    else if (inPhase == xplm_CommandEnd)
+    // if the aircraft is not equipped with a speedbrake this command toggles the carb heat
+    else
     {
-        // toggle speedbrake
-        if (XPLMGetElapsedTime() - beginTime < SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+        if (inPhase == xplm_CommandBegin)
         {
-            float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
+            int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
             
-            XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
+            if (acfNumEngines > 0)
+            {
+                float carbHeatRatio[acfNumEngines];
+                XPLMGetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
+                
+                float newCarbHeatRatio = carbHeatRatio[0] <= 0.5f ? 1.0f : 0.0f;
+            
+                for (int i = 0; i < acfNumEngines; i++)
+                    carbHeatRatio[i] = newCarbHeatRatio;
+            
+                XPLMSetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
+            }
         }
-        
-        beginTime = 0.0f;
     }
     
     return 0;
@@ -790,7 +815,7 @@ void SetDefaultAssignments(void)
         
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_up");
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_down");
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand(SPEED_BRAKE_TOGGLE_ARM_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand(SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
         joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand(CYCLE_VIEW_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
@@ -831,6 +856,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
+    acfSbrkEQDataRef = XPLMFindDataRef("sim/aircraft/parts/acf_sbrkEQ");
     viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
     hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
@@ -845,12 +871,13 @@ PLUGIN_API int XPluginStart(char *		outName,
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
     propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
+    carbHeatRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/carb_heat_ratio");
     cowlFlapRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/cowl_flap_ratio");
     thrustReverserDeployRatioDataRef = XPLMFindDataRef("sim/flightmodel2/engines/thrust_reverser_deploy_ratio");
 
     // create custom commands
     cycleViewCommand = XPLMCreateCommand(CYCLE_VIEW_COMMAND, "Cycle View");
-    speedBrakeToggleArmCommand = XPLMCreateCommand(SPEED_BRAKE_TOGGLE_ARM_COMMAND, "Toggle/Arm Speedbrake");
+    speedBrakeAndCarbHeatToggleArmCommand = XPLMCreateCommand(SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND, "Toggle/Arm Speedbrake/Carb Heat");
     viewModifierCommand = XPLMCreateCommand(VIEW_MODIFIER_COMMAND, "View Modifier");
     propPitchModifierCommand = XPLMCreateCommand(PROP_PITCH_MODIFIER_COMMAND, "Prop Pitch Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(MIXTURE_CONTROL_MODIFIER_COMMAND, "Mixture Control Modifier");
@@ -860,7 +887,7 @@ PLUGIN_API int XPluginStart(char *		outName,
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleViewCommand, CycleViewCommandHandler, 1, NULL);
-    XPLMRegisterCommandHandler(speedBrakeToggleArmCommand, SpeedBrakeToggleArmCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(speedBrakeAndCarbHeatToggleArmCommand, SpeedBrakeAndCarbHeatToggleArmCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(propPitchModifierCommand, PropPitchModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
