@@ -75,6 +75,15 @@
 #define AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT 41
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
+#define CYCLE_VIEW_COMMAND NAME_LOWERCASE"/cycle_view"
+#define SPEED_BRAKE_TOGGLE_ARM_COMMAND NAME_LOWERCASE"/speed_brake_toggle_arm"
+#define VIEW_MODIFIER_COMMAND NAME_LOWERCASE"/view_modifier"
+#define PROP_PITCH_MODIFIER_COMMAND NAME_LOWERCASE"/prop_pitch_modifier"
+#define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE"/mixture_control_modifier"
+#define COWL_FLAP_MODIFIER_COMMAND NAME_LOWERCASE"/cowl_flap_modifier"
+#define TRIM_MODIFIER_COMMAND NAME_LOWERCASE"/trim_modifier"
+#define TOGGLE_MOUSE_POINTER_CONTROL_COMMAND NAME_LOWERCASE"/toggle_mouse_pointer_control"
+
 // define speedbrake toggle/arm command long press time
 #define SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME 1.0f
 
@@ -781,21 +790,21 @@ void SetDefaultAssignments(void)
         
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_up");
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_down");
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("x_pad/speed_brake_toggle_arm");
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand(SPEED_BRAKE_TOGGLE_ARM_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
-        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("x_pad/cycle_view");
-        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("x_pad/mixture_control_modifier");
-        joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand("x_pad/prop_pitch_modifier");
-        joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand("x_pad/cowl_flap_modifier");
+        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand(CYCLE_VIEW_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand(PROP_PITCH_MODIFIER_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_START] = (std::size_t) XPLMFindCommand("sim/autopilot/servos_toggle");
         joystickButtonAssignments[JOYSTICK_BUTTON_SELECT] = (std::size_t) XPLMFindCommand("sim/engines/thrust_reverse_toggle");
-        joystickButtonAssignments[JOYSTICK_BUTTON_L1] = (std::size_t) XPLMFindCommand("x_pad/trim_modifier");
-        joystickButtonAssignments[JOYSTICK_BUTTON_R1] = (std::size_t) XPLMFindCommand("x_pad/view_modifier");
+        joystickButtonAssignments[JOYSTICK_BUTTON_L1] = (std::size_t) XPLMFindCommand(TRIM_MODIFIER_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_R1] = (std::size_t) XPLMFindCommand(VIEW_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_L2] = (std::size_t) XPLMFindCommand("sim/none/none");
         joystickButtonAssignments[JOYSTICK_BUTTON_R2] = (std::size_t) XPLMFindCommand("sim/flight_controls/brakes_toggle_regular");
         joystickButtonAssignments[JOYSTICK_BUTTON_L3] = (std::size_t) XPLMFindCommand("sim/general/zoom_out");
         joystickButtonAssignments[JOYSTICK_BUTTON_R3] = (std::size_t) XPLMFindCommand("sim/general/zoom_in");
-        joystickButtonAssignments[JOYSTICK_BUTTON_PS] = (std::size_t) XPLMFindCommand("x_pad/toggle_mouse_pointer_control");
+        joystickButtonAssignments[JOYSTICK_BUTTON_PS] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
         
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
@@ -840,14 +849,14 @@ PLUGIN_API int XPluginStart(char *		outName,
     thrustReverserDeployRatioDataRef = XPLMFindDataRef("sim/flightmodel2/engines/thrust_reverser_deploy_ratio");
 
     // create custom commands
-    cycleViewCommand = XPLMCreateCommand(NAME_LOWERCASE"/cycle_view", "Cycle View");
-    speedBrakeToggleArmCommand = XPLMCreateCommand(NAME_LOWERCASE"/speed_brake_toggle_arm", "Toggle/Arm Speedbrake");
-    viewModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/view_modifier", "View Modifier");
-    propPitchModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/prop_pitch_modifier", "Prop Pitch Modifier");
-    mixtureControlModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/mixture_control_modifier", "Mixture Control Modifier");
-    cowlFlapModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/cowl_flap_modifier", "Cowl Flap Modifier");
-    trimModifierCommand = XPLMCreateCommand(NAME_LOWERCASE"/trim_modifier", "Trim Modifier");
-    toggleMousePointerControlCommand = XPLMCreateCommand(NAME_LOWERCASE"/toggle_mouse_pointer_control", "Toggle Mouse Pointer Control");
+    cycleViewCommand = XPLMCreateCommand(CYCLE_VIEW_COMMAND, "Cycle View");
+    speedBrakeToggleArmCommand = XPLMCreateCommand(SPEED_BRAKE_TOGGLE_ARM_COMMAND, "Toggle/Arm Speedbrake");
+    viewModifierCommand = XPLMCreateCommand(VIEW_MODIFIER_COMMAND, "View Modifier");
+    propPitchModifierCommand = XPLMCreateCommand(PROP_PITCH_MODIFIER_COMMAND, "Prop Pitch Modifier");
+    mixtureControlModifierCommand = XPLMCreateCommand(MIXTURE_CONTROL_MODIFIER_COMMAND, "Mixture Control Modifier");
+    cowlFlapModifierCommand = XPLMCreateCommand(COWL_FLAP_MODIFIER_COMMAND, "Cowl Flap Modifier");
+    trimModifierCommand = XPLMCreateCommand(TRIM_MODIFIER_COMMAND, "Trim Modifier");
+    toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND, "Toggle Mouse Pointer Control");
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleViewCommand, CycleViewCommandHandler, 1, NULL);
