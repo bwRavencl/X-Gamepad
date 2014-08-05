@@ -4,6 +4,13 @@
 #####License Information:
 GNU General Public License v2.0
 
+#####Description:
+X-pad adds extended support for gamepads to X-Plane.
+It allows the user to control functions like throttle, prop pitch or mixture using the relative position of an axis.
+In order to facilitate the control of a complex simulation like X-Plane by gamepad, extensive use of modifier keys is made by X-pad.
+At this point the supported button and axis layout is very much dictated by X-pad based on the author's experience.
+You must thus refer to the suggested mappings below in order to set up X-Plane correctly for using the plugin.
+
 #####Disclaimer:
 This plugin currently only supports DualShock 3 controllers connected via Bluetooth under Mac OS X.
 Support for other controllers and operating systems may be added in the future.
