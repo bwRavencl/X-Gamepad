@@ -74,23 +74,6 @@
 #define AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT 41
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
-// define button assignments
-#define BUTTON_ASSIGNMENT_NONE_NONE 0
-#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_UP 259
-#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_DOWN 261
-#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_LEFT 262
-#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_RIGHT 264
-#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_LEFT 265
-#define BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_RIGHT 267
-#define BUTTON_ASSIGNMENT_GENERAL_LEFT 940
-#define BUTTON_ASSIGNMENT_GENERAL_RIGHT 941
-#define BUTTON_ASSIGNMENT_GENERAL_UP 942
-#define BUTTON_ASSIGNMENT_GENERAL_DOWN 943
-#define BUTTON_ASSIGNMENT_GENERAL_ROT_UP 964
-#define BUTTON_ASSIGNMENT_GENERAL_ROT_DOWN 965
-#define BUTTON_ASSIGNMENT_GENERAL_ROT_LEFT 966
-#define BUTTON_ASSIGNMENT_GENERAL_ROT_RIGHT 967
-
 // define speedbrake toggle/arm command long press time
 #define SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME 1.0f
 
@@ -242,14 +225,14 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
             int joystickButtonAssignments[1600];
             XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         
-            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_GENERAL_LEFT;
-            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_GENERAL_RIGHT;
-            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_GENERAL_UP;
-            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_GENERAL_DOWN;
-            joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_GENERAL_ROT_LEFT;
-            joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_GENERAL_ROT_RIGHT;
-            joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = BUTTON_ASSIGNMENT_GENERAL_ROT_UP;
-            joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = BUTTON_ASSIGNMENT_GENERAL_ROT_DOWN;
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/general/left");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/general/right");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("sim/general/up");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/general/down");
+            joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("sim/general/rot_left");
+            joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/general/rot_right");
+            joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand("sim/general/rot_up");
+            joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand("sim/general/rot_down");
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         }
@@ -339,12 +322,12 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_AILERON_TRIM_RIGHT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_DOWN;
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_PITCH_TRIM_UP;
-        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_LEFT;
-        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_FLIGHT_CONTROLS_RUDDER_TRIM_RIGHT;
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_left");
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_right");
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_down");
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_up");
+        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_right");
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
@@ -384,8 +367,8 @@ int ToggleMousePointerControlCommandHandler(XPLMCommandRef       inCommand,
             int joystickButtonAssignments[1600];
             XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
             
-            joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = BUTTON_ASSIGNMENT_NONE_NONE;
-            joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = BUTTON_ASSIGNMENT_NONE_NONE;
+            joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand("sim/none/none");
+            joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/none/none");
         
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         }
