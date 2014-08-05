@@ -17,6 +17,7 @@
 
 #include "XPLMDataAccess.h"
 #include "XPLMDisplay.h"
+#include "XPLMMenus.h"
 #include "XPLMProcessing.h"
 #include "XPLMUtilities.h"
 
@@ -32,7 +33,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "0.1"
+#define VERSION "0.2"
 
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 10
@@ -763,6 +764,57 @@ float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
     return -1.0f;
 }
 
+// set the default axis and button assignments
+void SetDefaultAssignments(void)
+{
+    // only set default assignments if a joystick is found and if no modifier is down which can alter any assignments
+    if (XPLMGetDatai(hasJostickDataRef) && viewModifierDown == 0 && trimModifierDown == 0  && mousePointerControlEnabled == 0)
+    {
+        // set default axis assignments
+        int joystickAxisAssignments[100];
+        XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+        
+        joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_YAW;
+        joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
+        joystickAxisAssignments[JOYSTICK_AXIS_RIGHT_X] = AXIS_ASSIGNMENT_ROLL;
+        joystickAxisAssignments[JOYSTICK_AXIS_RIGHT_Y] = AXIS_ASSIGNMENT_PITCH;
+        
+        XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+        
+        // set default button assignments
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flap_up");
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flap_down");
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("x_pad/speed_brake_toggle_arm");
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/gear_toggle");
+        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("x_pad/cycle_view");
+        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("x_pad/mixture_control_modifier");
+        joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand("x_pad/prop_pitch_modifier");
+        joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand("x_pad/cowl_flap_modifier");
+        joystickButtonAssignments[JOYSTICK_BUTTON_START] = (std::size_t) XPLMFindCommand("sim/autopilot/servos_toggle");
+        joystickButtonAssignments[JOYSTICK_BUTTON_SELECT] = (std::size_t) XPLMFindCommand("sim/engines/thrust_reverse_toggle");
+        joystickButtonAssignments[JOYSTICK_BUTTON_L1] = (std::size_t) XPLMFindCommand("x_pad/trim_modifier");
+        joystickButtonAssignments[JOYSTICK_BUTTON_R1] = (std::size_t) XPLMFindCommand("x_pad/view_modifier");
+        joystickButtonAssignments[JOYSTICK_BUTTON_L2] = (std::size_t) XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[JOYSTICK_BUTTON_R2] = (std::size_t) XPLMFindCommand("sim/flight_controls/brakes_toggle_regular");
+        joystickButtonAssignments[JOYSTICK_BUTTON_L3] = (std::size_t) XPLMFindCommand("sim/general/zoom_out");
+        joystickButtonAssignments[JOYSTICK_BUTTON_R3] = (std::size_t) XPLMFindCommand("sim/general/zoom_in");
+        joystickButtonAssignments[JOYSTICK_BUTTON_PS] = (std::size_t) XPLMFindCommand("x_pad/toggle_mouse_pointer_control");
+        
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+    }
+}
+
+// handles the menu-entries
+void MenuHandlerCallback(void* inMenuRef, void* inItemRef)
+{
+    // set default assignments menu entry
+    if ((long) inItemRef == 0)
+        SetDefaultAssignments();
+}
+
 PLUGIN_API int XPluginStart(char *		outName,
                             char *		outSig,
                             char *		outDesc)
@@ -815,6 +867,11 @@ PLUGIN_API int XPluginStart(char *		outName,
 
     // register flight loop callback
     XPLMRegisterFlightLoopCallback(JoystickAxisFlightCallback, -1, NULL);
+    
+    // create menu-entries
+    int subMenuItem = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 1);
+    XPLMMenuID menu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
+    XPLMAppendMenuItem(menu, "Set Default Assignments", (void*) 0, 1);
 
     return 1;
 }
