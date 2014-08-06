@@ -18,10 +18,15 @@
 #include "XPLMDataAccess.h"
 #include "XPLMDisplay.h"
 #include "XPLMMenus.h"
+#include "XPLMPlanes.h"
+#include "XPLMPlugin.h"
 #include "XPLMProcessing.h"
 #include "XPLMUtilities.h"
 
+#include <algorithm>
 #include <stack>
+#include <stdio.h>
+#include <string>
 #include <string.h>
 
 #if APL
@@ -75,6 +80,10 @@
 #define AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT 41
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
+// define '.acf' file 'show cockpit object in: 2-d forward panel views' string
+#define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
+
+// define custom command names
 #define CYCLE_VIEW_COMMAND NAME_LOWERCASE"/cycle_view"
 #define SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND NAME_LOWERCASE"/speed_brake_and_carb_heat_toggle_arm"
 #define VIEW_MODIFIER_COMMAND NAME_LOWERCASE"/view_modifier"
@@ -94,7 +103,7 @@
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 25.0f
 
 // global variables
-static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0;
+static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0;
 
 static float lastAxisAssignment = 0.0f;
 
@@ -105,7 +114,7 @@ static std::stack <int*> buttonAssignmentsStack;
 static XPLMCommandRef cycleViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfAuthorDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // push the current button assignments to the stack
 void PushButtonAssignments(void)
@@ -132,6 +141,127 @@ void PopButtonAssignments(void)
     }
 }
 
+// returns 1 if the file under the supplied path exists, otherwise 0 is returned
+int FileExists(const char * filePath){
+    FILE *file = fopen(filePath, "r");
+    
+    if (file != NULL)
+    {
+        fclose(file);
+        return 1;
+    }
+    
+    return 0;
+}
+
+// returns the directory seperator - overrides XPLMGetDirectorySeparator() to return the POSIX '/' instead of ':' OS X
+const char* GetDirectorySeparator()
+{
+    const char *directorySeperator = XPLMGetDirectorySeparator();
+    return (strcmp(directorySeperator, ":") == 0 ?  "/" : directorySeperator);
+}
+
+// convert an OS X path with ':' directory seperators to a POSIX path with '/' seperators
+#if APL
+void CarbonPathToPOSIXPath(char *path)
+{
+    // replace ':' with '/'
+    for(int i = 0; i < strlen(path); i++)
+        if(path[i] == ':') path[i] = '/';
+    
+    // prepend '/Volumes/' prefix
+    const char *prefix = "/Volumes/";
+    size_t len = strlen(prefix);
+    
+    memmove(path + len, path, strlen(path) + 1);
+    
+    for (int i = 0; i < len; i++)
+        path[i] = prefix[i];
+}
+#endif
+
+// heuristic function that returns 1 if the current aircraft does have a 2D panel, otherwise 0 is returned
+/*int Has2DPanel(void)
+{
+    // workaround for aircraft authors who use transparent 2D panel bitmaps (Carenado & Alabeo)
+    char acfAuthor[500];
+    XPLMGetDatab(acfAuthorDataRef, acfAuthor, 0, 500);
+    
+    if (strcmp(acfAuthor, "Carenado") == 0)
+        return 0;
+    else if (strcmp(acfAuthor, "Alabeo") == 0)
+        return 0;
+    
+    char fileName[256], path[512];
+    XPLMGetNthAircraftModel(0, fileName, path);
+    XPLMExtractFileAndPath(path);
+    
+    // under OS X replace the ':' seperator with the POSIX '/'
+    char *aircraftDirectoryPath = path;
+#if APL
+    CarbonPathToPOSIXPath(aircraftDirectoryPath);
+#endif
+    
+    // check if a 'Panel.png' file exists in the 'cockpit/-PANELS-/' subdirectory
+    const char *directorySeperator = GetDirectorySeparator();
+    char probeFilePath[1024];
+    sprintf(probeFilePath, "%s%scockpit%s-PANELS-%sPanel.png", aircraftDirectoryPath, directorySeperator, directorySeperator, directorySeperator);
+    if (FileExists(probeFilePath) != 0)
+        return 1;
+    
+    // check if an 'ACFFILENAME_panel.png' file exists in the aircraft directory
+    char prefix[strlen(fileName) - 3];
+    memcpy(prefix, &fileName[0], strlen(fileName) - 3);
+    prefix[sizeof(prefix) - 1] = '\0';
+    
+    sprintf(probeFilePath, "%s%s%s_panel.png", aircraftDirectoryPath, directorySeperator, prefix);
+    if (FileExists(probeFilePath) != 0)
+        return 1;
+    
+    // check if a cockpit object exists
+    sprintf(probeFilePath, "%s%s%s_cockpit.obj", aircraftDirectoryPath, directorySeperator, prefix);
+    if (FileExists(probeFilePath) != 0)
+        return 0;
+    
+    // check if an inner cockpit object exists
+    sprintf(probeFilePath, "%s%s%s_cockpit_INN.obj", aircraftDirectoryPath, directorySeperator, prefix);
+    if (FileExists(probeFilePath) != 0)
+        return 0;
+    
+    // if no cockpit objects exist and there's no custom panel bitmap, we must assume that the aircraft is using a default 2D panel
+    return 1;
+}*/
+
+// returns 1 if the current aircraft does have a 2D panel, otherwise 0 is returned - for non-parseable sub 1004 version '.acf' files 1 is returned
+int Has2DPanel(void)
+{
+    char fileName[256], path[512];
+    XPLMGetNthAircraftModel(0, fileName, path);
+    
+    // under OS X replace the ':' seperator with the POSIX '/'
+    char *aircraftFilePath = path;
+#if APL
+    CarbonPathToPOSIXPath(aircraftFilePath);
+#endif
+    
+    int has2DPanel = 1;
+    
+    FILE *file = fopen(aircraftFilePath, "r");
+    if(file != NULL)
+    {
+        char temp[512];
+        while(fgets(temp, 512, file) != NULL)
+        {
+            if((strstr(temp, ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS)) != NULL)
+                has2DPanel = 0;
+        }
+        
+        fclose(file);
+    }
+    
+    return has2DPanel;
+}
+
 // command-handler that handles the switch view command
 int CycleViewCommandHandler(XPLMCommandRef       inCommand,
                             XPLMCommandPhase     inPhase,
@@ -155,7 +285,10 @@ int CycleViewCommandHandler(XPLMCommandRef       inCommand,
 
         case VIEW_TYPE_CHASE:
         default:
-            XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+            if (Has2DPanel())
+                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+            else
+                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
             break;
         }
     }
@@ -446,12 +579,19 @@ float Normalize(float value, float inMin, float inMax, float outMin, float outMa
     return (outMax - outMin) / (inMax - inMin) * (value - inMax) + outMax;
 }
 
-// flightloop-callback that handles the joystick axis
-float JoystickAxisFlightCallback(float                inElapsedSinceLastCall,
-                                 float                inElapsedTimeSinceLastFlightLoop,
-                                 int                  inCounter,
-                                 void *               inRefcon)
+// flightloop-callback that mainly handles the joystick axis among other minor stuff
+float FlightLoopCallback(float                inElapsedSinceLastCall,
+                         float                inElapsedTimeSinceLastFlightLoop,
+                         int                  inCounter,
+                         void *               inRefcon)
 {
+    // handle switch to 3D command look
+    if (switchTo3DCommandLook != 0)
+    {
+        XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+        switchTo3DCommandLook = 0;
+    }
+    
     float elapsedSinceLastAxisAssignment = XPLMGetElapsedTime() - lastAxisAssignment;
     
     // only handle the left joystick's axis if at least 750 ms have passed since the last axis assignment has occured, so that the user has time to center the joystick after releasing a modifier key
@@ -853,6 +993,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     strcpy(outDesc, NAME" allows flying X-Plane by gamepad!");
 
     // obtain datarefs
+    acfAuthorDataRef = XPLMFindDataRef("sim/aircraft/view/acf_author");
     acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
@@ -896,7 +1037,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
 
     // register flight loop callback
-    XPLMRegisterFlightLoopCallback(JoystickAxisFlightCallback, -1, NULL);
+    XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
     
     // create menu-entries
     int subMenuItem = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 1);
@@ -926,4 +1067,12 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID	inFromWho,
                                       long			inMessage,
                                       void *		inParam)
 {
+    // if another plane is loaded and it has no 2D panel automatically switch the view to the 3D cockpit in the next flightloop
+    if (inMessage == XPLM_MSG_PLANE_LOADED)
+    {
+        switchTo3DCommandLook = 0;
+        
+        if (Has2DPanel() == 0)
+            switchTo3DCommandLook = 1;
+    }
 }
