@@ -180,58 +180,6 @@ void CarbonPathToPOSIXPath(char *path)
 }
 #endif
 
-// heuristic function that returns 1 if the current aircraft does have a 2D panel, otherwise 0 is returned
-/*int Has2DPanel(void)
-{
-    // workaround for aircraft authors who use transparent 2D panel bitmaps (Carenado & Alabeo)
-    char acfAuthor[500];
-    XPLMGetDatab(acfAuthorDataRef, acfAuthor, 0, 500);
-    
-    if (strcmp(acfAuthor, "Carenado") == 0)
-        return 0;
-    else if (strcmp(acfAuthor, "Alabeo") == 0)
-        return 0;
-    
-    char fileName[256], path[512];
-    XPLMGetNthAircraftModel(0, fileName, path);
-    XPLMExtractFileAndPath(path);
-    
-    // under OS X replace the ':' seperator with the POSIX '/'
-    char *aircraftDirectoryPath = path;
-#if APL
-    CarbonPathToPOSIXPath(aircraftDirectoryPath);
-#endif
-    
-    // check if a 'Panel.png' file exists in the 'cockpit/-PANELS-/' subdirectory
-    const char *directorySeperator = GetDirectorySeparator();
-    char probeFilePath[1024];
-    sprintf(probeFilePath, "%s%scockpit%s-PANELS-%sPanel.png", aircraftDirectoryPath, directorySeperator, directorySeperator, directorySeperator);
-    if (FileExists(probeFilePath) != 0)
-        return 1;
-    
-    // check if an 'ACFFILENAME_panel.png' file exists in the aircraft directory
-    char prefix[strlen(fileName) - 3];
-    memcpy(prefix, &fileName[0], strlen(fileName) - 3);
-    prefix[sizeof(prefix) - 1] = '\0';
-    
-    sprintf(probeFilePath, "%s%s%s_panel.png", aircraftDirectoryPath, directorySeperator, prefix);
-    if (FileExists(probeFilePath) != 0)
-        return 1;
-    
-    // check if a cockpit object exists
-    sprintf(probeFilePath, "%s%s%s_cockpit.obj", aircraftDirectoryPath, directorySeperator, prefix);
-    if (FileExists(probeFilePath) != 0)
-        return 0;
-    
-    // check if an inner cockpit object exists
-    sprintf(probeFilePath, "%s%s%s_cockpit_INN.obj", aircraftDirectoryPath, directorySeperator, prefix);
-    if (FileExists(probeFilePath) != 0)
-        return 0;
-    
-    // if no cockpit objects exist and there's no custom panel bitmap, we must assume that the aircraft is using a default 2D panel
-    return 1;
-}*/
-
 // returns 1 if the current aircraft does have a 2D panel, otherwise 0 is returned - for non-parseable sub 1004 version '.acf' files 1 is returned
 int Has2DPanel(void)
 {
@@ -246,6 +194,7 @@ int Has2DPanel(void)
     
     int has2DPanel = 1;
     
+    // search the '.acf' file for a special string which indicates that the aircraft shows the 3D cockpit object in the 2D forward panel view
     FILE *file = fopen(aircraftFilePath, "r");
     if(file != NULL)
     {
