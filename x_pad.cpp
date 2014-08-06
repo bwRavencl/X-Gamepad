@@ -1016,8 +1016,8 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID	inFromWho,
                                       long			inMessage,
                                       void *		inParam)
 {
-    // if another plane is loaded and it has no 2D panel automatically switch the view to the 3D cockpit in the next flightloop
-    if (inMessage == XPLM_MSG_PLANE_LOADED)
+    // if another plane or airport is loaded and the plane has no 2D panel, automatically switch the view to the 3D cockpit in the next flightloop
+    if (inMessage == XPLM_MSG_PLANE_LOADED || inMessage == XPLM_MSG_AIRPORT_LOADED)
     {
         switchTo3DCommandLook = 0;
         
