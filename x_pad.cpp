@@ -520,7 +520,7 @@ int ToggleMousePointerControlCommandHandler(XPLMCommandRef       inCommand,
 // normalizes a value of a range [inMin, inMax] to a value of the range [outMin, outMax]
 float Normalize(float value, float inMin, float inMax, float outMin, float outMax)
 {
-    return (outMax - outMin) / (inMax - inMin) * (value - inMax) + outMax;
+    return (outMax - outMin) / (inMax - inMin) * (value - inMax) + (outMax - outMin);
 }
 
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
