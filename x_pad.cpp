@@ -16,18 +16,13 @@
  */
 
 #include "XPLMDataAccess.h"
-#include "XPLMDisplay.h"
 #include "XPLMMenus.h"
 #include "XPLMPlanes.h"
 #include "XPLMPlugin.h"
 #include "XPLMProcessing.h"
 #include "XPLMUtilities.h"
 
-#include <algorithm>
 #include <stack>
-#include <stdio.h>
-#include <string>
-#include <string.h>
 
 #if APL
 #include "ApplicationServices/ApplicationServices.h"
