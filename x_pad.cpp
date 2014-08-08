@@ -79,7 +79,7 @@
 #define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
 
 // define custom command names
-#define CYCLE_VIEW_COMMAND NAME_LOWERCASE"/cycle_view"
+#define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE"/cycle_reset_view"
 #define SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND NAME_LOWERCASE"/speed_brake_and_carb_heat_toggle_arm"
 #define VIEW_MODIFIER_COMMAND NAME_LOWERCASE"/view_modifier"
 #define PROP_PITCH_MODIFIER_COMMAND NAME_LOWERCASE"/prop_pitch_modifier"
@@ -88,8 +88,8 @@
 #define TRIM_MODIFIER_COMMAND NAME_LOWERCASE"/trim_modifier"
 #define TOGGLE_MOUSE_POINTER_CONTROL_COMMAND NAME_LOWERCASE"/toggle_mouse_pointer_control"
 
-// define speedbrake toggle/arm command long press time
-#define SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME 1.0f
+// define long press time
+#define BUTTON_LONG_PRESS_TIME 1.0f
 
 // define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.0f
@@ -106,7 +106,7 @@ static float lastAxisAssignment = 0.0f;
 static std::stack <int*> buttonAssignmentsStack;
 
 // global commandref variables
-static XPLMCommandRef cycleViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
 
 // global dataref variables
 static XPLMDataRef acfAuthorDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
@@ -193,35 +193,86 @@ int Has2DPanel(void)
     return has2DPanel;
 }
 
-// command-handler that handles the switch view command
-int CycleViewCommandHandler(XPLMCommandRef       inCommand,
-                            XPLMCommandPhase     inPhase,
-                            void *               inRefcon)
+/*int ResetCamera(XPLMCameraPosition_t * outCameraPosition,
+                int                    inIsLosingControl,
+                void *                 inRefcon)
 {
+    outCameraPosition->x = 0.0f;
+    outCameraPosition->y = 0.0f;
+    outCameraPosition->z = 0.0f;
+    outCameraPosition->heading = 0.0f;
+    outCameraPosition->pitch = 0.0f;
+    outCameraPosition->roll = 0.0f;
+    outCameraPosition->zoom = 1.0f;
+    
+    return 1;
+}*/
+
+// command-handler that handles the switch / reset view command
+int CycleResetViewCommandHandler(XPLMCommandRef       inCommand,
+                                 XPLMCommandPhase     inPhase,
+                                 void *               inRefcon)
+{
+    static float beginTime = 0.0f;
+    
     if (inPhase == xplm_CommandBegin)
+        beginTime = XPLMGetElapsedTime();
+    else if (inPhase == xplm_CommandContinue)
     {
-        switch (XPLMGetDatai(viewTypeDataRef))
+        // reset view
+        if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
         {
-        case VIEW_TYPE_FORWARDS_WITH_PANEL:
-            XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-            break;
-
-        case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
-            XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_hud"));
-            break;
-
-        case VIEW_TYPE_FORWARDS_WITH_HUD:
-            XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
-            break;
-
-        case VIEW_TYPE_CHASE:
-        default:
-            if (Has2DPanel())
-                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
-            else
-                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-            break;
+            switch (XPLMGetDatai(viewTypeDataRef))
+            {
+                case VIEW_TYPE_FORWARDS_WITH_PANEL:
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+                    break;
+            
+                case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+                    break;
+            
+                case VIEW_TYPE_CHASE:
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/circle"));
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
+                    break;
+            }
+            
+            beginTime = MAXFLOAT;
         }
+    }
+    else if (inPhase == xplm_CommandEnd)
+    {
+        // cycle view
+        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+        {
+            switch (XPLMGetDatai(viewTypeDataRef))
+            {
+                case VIEW_TYPE_FORWARDS_WITH_PANEL:
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+                    break;
+
+                case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_hud"));
+                    break;
+
+                case VIEW_TYPE_FORWARDS_WITH_HUD:
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
+                    break;
+
+                case VIEW_TYPE_CHASE:
+                default:
+                    if (Has2DPanel())
+                        XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+                    else
+                        XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+                    break;
+            }
+        }
+        
+        beginTime = 0.0f;
     }
 
     return 0;
@@ -244,7 +295,7 @@ int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef       inCommand,
         else if (inPhase == xplm_CommandContinue)
         {
             // arm / unarm speedbrake
-            if (XPLMGetElapsedTime() - beginTime >= SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME)
+            if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
             {
                 float newSpeedbrakeRatio = oldSpeedbrakeRatio == -0.5f ? 0.0f : -0.5f;
             
@@ -256,7 +307,7 @@ int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef       inCommand,
         else if (inPhase == xplm_CommandEnd)
         {
             // toggle speedbrake
-            if (XPLMGetElapsedTime() - beginTime < SPEEDBRAKE_TOGGLE_ARM_COMMAND_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+            if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
             {
                 float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
             
@@ -888,7 +939,7 @@ void SetDefaultAssignments(void)
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_down");
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand(SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
-        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand(CYCLE_VIEW_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand(CYCLE_RESET_VIEW_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand(PROP_PITCH_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
@@ -948,7 +999,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     thrustReverserDeployRatioDataRef = XPLMFindDataRef("sim/flightmodel2/engines/thrust_reverser_deploy_ratio");
 
     // create custom commands
-    cycleViewCommand = XPLMCreateCommand(CYCLE_VIEW_COMMAND, "Cycle View");
+    cycleResetViewCommand = XPLMCreateCommand(CYCLE_RESET_VIEW_COMMAND, "Cycle/Reset View");
     speedBrakeAndCarbHeatToggleArmCommand = XPLMCreateCommand(SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND, "Toggle/Arm Speedbrake/Carb Heat");
     viewModifierCommand = XPLMCreateCommand(VIEW_MODIFIER_COMMAND, "View Modifier");
     propPitchModifierCommand = XPLMCreateCommand(PROP_PITCH_MODIFIER_COMMAND, "Prop Pitch Modifier");
@@ -958,7 +1009,7 @@ PLUGIN_API int XPluginStart(char *		outName,
     toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND, "Toggle Mouse Pointer Control");
 
     // register custom commands
-    XPLMRegisterCommandHandler(cycleViewCommand, CycleViewCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(cycleResetViewCommand, CycleResetViewCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(speedBrakeAndCarbHeatToggleArmCommand, SpeedBrakeAndCarbHeatToggleArmCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(propPitchModifierCommand, PropPitchModifierCommandHandler, 1, NULL);
