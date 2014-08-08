@@ -136,19 +136,6 @@ void PopButtonAssignments(void)
     }
 }
 
-// returns 1 if the file under the supplied path exists, otherwise 0 is returned
-int FileExists(const char * filePath){
-    FILE *file = fopen(filePath, "r");
-    
-    if (file != NULL)
-    {
-        fclose(file);
-        return 1;
-    }
-    
-    return 0;
-}
-
 // returns the directory seperator - overrides XPLMGetDirectorySeparator() to return the POSIX '/' instead of ':' OS X
 const char* GetDirectorySeparator()
 {
