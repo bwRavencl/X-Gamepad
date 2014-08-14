@@ -193,21 +193,6 @@ int Has2DPanel(void)
     return has2DPanel;
 }
 
-/*int ResetCamera(XPLMCameraPosition_t * outCameraPosition,
-                int                    inIsLosingControl,
-                void *                 inRefcon)
-{
-    outCameraPosition->x = 0.0f;
-    outCameraPosition->y = 0.0f;
-    outCameraPosition->z = 0.0f;
-    outCameraPosition->heading = 0.0f;
-    outCameraPosition->pitch = 0.0f;
-    outCameraPosition->roll = 0.0f;
-    outCameraPosition->zoom = 1.0f;
-    
-    return 1;
-}*/
-
 // command-handler that handles the switch / reset view command
 int CycleResetViewCommandHandler(XPLMCommandRef       inCommand,
                                  XPLMCommandPhase     inPhase,
