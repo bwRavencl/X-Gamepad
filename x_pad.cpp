@@ -78,14 +78,14 @@
 #define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
 
 // define custom command names
-#define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE"/cycle_reset_view"
-#define SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND NAME_LOWERCASE"/speed_brake_and_carb_heat_toggle_arm"
-#define VIEW_MODIFIER_COMMAND NAME_LOWERCASE"/view_modifier"
-#define PROP_PITCH_MODIFIER_COMMAND NAME_LOWERCASE"/prop_pitch_modifier"
-#define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE"/mixture_control_modifier"
-#define COWL_FLAP_MODIFIER_COMMAND NAME_LOWERCASE"/cowl_flap_modifier"
-#define TRIM_MODIFIER_COMMAND NAME_LOWERCASE"/trim_modifier"
-#define TOGGLE_MOUSE_POINTER_CONTROL_COMMAND NAME_LOWERCASE"/toggle_mouse_pointer_control"
+#define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
+#define SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND NAME_LOWERCASE "/speed_brake_and_carb_heat_toggle_arm"
+#define VIEW_MODIFIER_COMMAND NAME_LOWERCASE "/view_modifier"
+#define PROP_PITCH_MODIFIER_COMMAND NAME_LOWERCASE "/prop_pitch_modifier"
+#define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE "/mixture_control_modifier"
+#define COWL_FLAP_MODIFIER_COMMAND NAME_LOWERCASE "/cowl_flap_modifier"
+#define TRIM_MODIFIER_COMMAND NAME_LOWERCASE "/trim_modifier"
+#define TOGGLE_MOUSE_POINTER_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_pointer_control"
 
 // define long press time
 #define BUTTON_LONG_PRESS_TIME 1.0f
