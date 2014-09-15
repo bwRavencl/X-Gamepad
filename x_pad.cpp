@@ -193,9 +193,7 @@ static int Has2DPanel(void)
 }
 
 // command-handler that handles the switch / reset view command
-static int CycleResetViewCommandHandler(XPLMCommandRef       inCommand,
-                                        XPLMCommandPhase     inPhase,
-                                        void *               inRefcon)
+static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     static float beginTime = 0.0f;
     
@@ -263,9 +261,7 @@ static int CycleResetViewCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the speedbrake toggle / arm command or the carb heat, if the plane has no speedbrake
-static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef       inCommand,
-                                                        XPLMCommandPhase     inPhase,
-                                                        void *               inRefcon)
+static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     // if a speedbrake exists this command controls it
     if (XPLMGetDatai(acfSbrkEQDataRef) != 0)
@@ -327,9 +323,7 @@ static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef       inC
 }
 
 // command-handler that handles the view modifier command
-static int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
-                                      XPLMCommandPhase     inPhase,
-                                      void *               inRefcon)
+static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase != xplm_CommandContinue)
     {
@@ -395,9 +389,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the prop pitch modifier command
-static int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
-                                           XPLMCommandPhase     inPhase,
-                                           void *               inRefcon)
+static int PropPitchModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
         propPitchModifierDown = 1;
@@ -408,9 +400,7 @@ static int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the mixture control modifier command
-static int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
-                                                XPLMCommandPhase     inPhase,
-                                                void *               inRefcon)
+static int MixtureControlModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
         mixtureControlModifierDown = 1;
@@ -421,9 +411,7 @@ static int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the cowl flap modifier command
-static int CowlFlapModifierCommandHandler(XPLMCommandRef       inCommand,
-                                          XPLMCommandPhase     inPhase,
-                                          void *               inRefcon)
+static int CowlFlapModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
         cowlFlapModifierDown = 1;
@@ -434,9 +422,7 @@ static int CowlFlapModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the trim modifier command
-static int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
-                                      XPLMCommandPhase     inPhase,
-                                      void *               inRefcon)
+static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     // only apply the modifier if no other modifier is down which can alter any assignments
     if (inPhase == xplm_CommandBegin && viewModifierDown == 0 && mousePointerControlEnabled == 0)
@@ -471,9 +457,7 @@ static int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the toggle mouse pointer control command
-static int ToggleMousePointerControlCommandHandler(XPLMCommandRef       inCommand,
-                                                   XPLMCommandPhase     inPhase,
-                                                   void *               inRefcon)
+static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
     {
@@ -546,10 +530,7 @@ static float Normalize(float value, float inMin, float inMax, float outMin, floa
 }
 
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
-static float FlightLoopCallback(float                inElapsedSinceLastCall,
-                                float                inElapsedTimeSinceLastFlightLoop,
-                                int                  inCounter,
-                                void *               inRefcon)
+static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
     // handle switch to 3D command look
     if (switchTo3DCommandLook != 0)
@@ -942,16 +923,14 @@ static void SetDefaultAssignments(void)
 }
 
 // handles the menu-entries
-static void MenuHandlerCallback(void* inMenuRef, void* inItemRef)
+static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
 {
     // set default assignments menu entry
     if ((long) inItemRef == 0)
         SetDefaultAssignments();
 }
 
-PLUGIN_API int XPluginStart(char *		outName,
-                            char *		outSig,
-                            char *		outDesc)
+PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 {
     // set plugin info
     strcpy(outName, NAME);
@@ -1028,9 +1007,7 @@ PLUGIN_API int XPluginEnable(void)
     return 1;
 }
 
-PLUGIN_API void XPluginReceiveMessage(XPLMPluginID	inFromWho,
-                                      long			inMessage,
-                                      void *		inParam)
+PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, void *inParam)
 {
     // if another plane or airport is loaded and the plane has no 2D panel, automatically switch the view to the 3D cockpit in the next flightloop
     if (inMessage == XPLM_MSG_PLANE_LOADED || inMessage == XPLM_MSG_AIRPORT_LOADED)
