@@ -111,7 +111,7 @@ static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleA
 static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // push the current button assignments to the stack
-void PushButtonAssignments(void)
+static void PushButtonAssignments(void)
 {
     int *joystickButtonAssignments = (int*) malloc(sizeof(int) * 1600);
     
@@ -120,7 +120,7 @@ void PushButtonAssignments(void)
 }
 
 // pop the topmost button assignments from the stack
-void PopButtonAssignments(void)
+static void PopButtonAssignments(void)
 {
     if (!buttonAssignmentsStack.empty())
     {
@@ -136,7 +136,7 @@ void PopButtonAssignments(void)
 }
 
 // returns the directory seperator - overrides XPLMGetDirectorySeparator() to return the POSIX '/' instead of ':' OS X
-const char* GetDirectorySeparator()
+static const char* GetDirectorySeparator()
 {
     const char *directorySeperator = XPLMGetDirectorySeparator();
     return (strcmp(directorySeperator, ":") == 0 ?  "/" : directorySeperator);
@@ -144,7 +144,7 @@ const char* GetDirectorySeparator()
 
 // convert an OS X path with ':' directory seperators to a POSIX path with '/' seperators
 #if APL
-void CarbonPathToPOSIXPath(char *path)
+static void CarbonPathToPOSIXPath(char *path)
 {
     // replace ':' with '/'
     for(int i = 0; i < strlen(path); i++)
@@ -162,7 +162,7 @@ void CarbonPathToPOSIXPath(char *path)
 #endif
 
 // returns 1 if the current aircraft does have a 2D panel, otherwise 0 is returned - for non-parseable sub 1004 version '.acf' files 1 is returned
-int Has2DPanel(void)
+static int Has2DPanel(void)
 {
     char fileName[256], path[512];
     XPLMGetNthAircraftModel(0, fileName, path);
@@ -193,9 +193,9 @@ int Has2DPanel(void)
 }
 
 // command-handler that handles the switch / reset view command
-int CycleResetViewCommandHandler(XPLMCommandRef       inCommand,
-                                 XPLMCommandPhase     inPhase,
-                                 void *               inRefcon)
+static int CycleResetViewCommandHandler(XPLMCommandRef       inCommand,
+                                        XPLMCommandPhase     inPhase,
+                                        void *               inRefcon)
 {
     static float beginTime = 0.0f;
     
@@ -263,9 +263,9 @@ int CycleResetViewCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the speedbrake toggle / arm command or the carb heat, if the plane has no speedbrake
-int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef       inCommand,
-                                                 XPLMCommandPhase     inPhase,
-                                                 void *               inRefcon)
+static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef       inCommand,
+                                                        XPLMCommandPhase     inPhase,
+                                                        void *               inRefcon)
 {
     // if a speedbrake exists this command controls it
     if (XPLMGetDatai(acfSbrkEQDataRef) != 0)
@@ -327,9 +327,9 @@ int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the view modifier command
-int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
-                               XPLMCommandPhase     inPhase,
-                               void *               inRefcon)
+static int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
+                                      XPLMCommandPhase     inPhase,
+                                      void *               inRefcon)
 {
     if (inPhase != xplm_CommandContinue)
     {
@@ -395,9 +395,9 @@ int ViewModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the prop pitch modifier command
-int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
-                                    XPLMCommandPhase     inPhase,
-                                    void *               inRefcon)
+static int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
+                                           XPLMCommandPhase     inPhase,
+                                           void *               inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
         propPitchModifierDown = 1;
@@ -408,9 +408,9 @@ int PropPitchModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the mixture control modifier command
-int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
-                                         XPLMCommandPhase     inPhase,
-                                         void *               inRefcon)
+static int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
+                                                XPLMCommandPhase     inPhase,
+                                                void *               inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
         mixtureControlModifierDown = 1;
@@ -421,9 +421,9 @@ int MixtureControlModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the cowl flap modifier command
-int CowlFlapModifierCommandHandler(XPLMCommandRef       inCommand,
-                                   XPLMCommandPhase     inPhase,
-                                   void *               inRefcon)
+static int CowlFlapModifierCommandHandler(XPLMCommandRef       inCommand,
+                                          XPLMCommandPhase     inPhase,
+                                          void *               inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
         cowlFlapModifierDown = 1;
@@ -434,9 +434,9 @@ int CowlFlapModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the trim modifier command
-int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
-                               XPLMCommandPhase     inPhase,
-                               void *               inRefcon)
+static int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
+                                      XPLMCommandPhase     inPhase,
+                                      void *               inRefcon)
 {
     // only apply the modifier if no other modifier is down which can alter any assignments
     if (inPhase == xplm_CommandBegin && viewModifierDown == 0 && mousePointerControlEnabled == 0)
@@ -471,9 +471,9 @@ int TrimModifierCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // command-handler that handles the toggle mouse pointer control command
-int ToggleMousePointerControlCommandHandler(XPLMCommandRef       inCommand,
-                                            XPLMCommandPhase     inPhase,
-                                            void *               inRefcon)
+static int ToggleMousePointerControlCommandHandler(XPLMCommandRef       inCommand,
+                                                   XPLMCommandPhase     inPhase,
+                                                   void *               inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
     {
@@ -540,16 +540,16 @@ int ToggleMousePointerControlCommandHandler(XPLMCommandRef       inCommand,
 }
 
 // normalizes a value of a range [inMin, inMax] to a value of the range [outMin, outMax]
-float Normalize(float value, float inMin, float inMax, float outMin, float outMax)
+static float Normalize(float value, float inMin, float inMax, float outMin, float outMax)
 {
     return (outMax - outMin) / (inMax - inMin) * (value - inMax) + (outMax - outMin);
 }
 
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
-float FlightLoopCallback(float                inElapsedSinceLastCall,
-                         float                inElapsedTimeSinceLastFlightLoop,
-                         int                  inCounter,
-                         void *               inRefcon)
+static float FlightLoopCallback(float                inElapsedSinceLastCall,
+                                float                inElapsedTimeSinceLastFlightLoop,
+                                int                  inCounter,
+                                void *               inRefcon)
 {
     // handle switch to 3D command look
     if (switchTo3DCommandLook != 0)
@@ -899,7 +899,7 @@ float FlightLoopCallback(float                inElapsedSinceLastCall,
 }
 
 // set the default axis and button assignments
-void SetDefaultAssignments(void)
+static void SetDefaultAssignments(void)
 {
     // only set default assignments if a joystick is found and if no modifier is down which can alter any assignments
     if (XPLMGetDatai(hasJostickDataRef) && viewModifierDown == 0 && trimModifierDown == 0  && mousePointerControlEnabled == 0)
@@ -942,7 +942,7 @@ void SetDefaultAssignments(void)
 }
 
 // handles the menu-entries
-void MenuHandlerCallback(void* inMenuRef, void* inItemRef)
+static void MenuHandlerCallback(void* inMenuRef, void* inItemRef)
 {
     // set default assignments menu entry
     if ((long) inItemRef == 0)
