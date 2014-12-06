@@ -17,8 +17,9 @@ Please refer to the section 'Default Mappings' below in order to see which chang
 Furthermore it is recommended that you adjust the nullzone in X-Plane's 'Joystick & Equipment' screen to a value of 15%.
 
 #####Disclaimer:
-This plugin currently only supports DualShock 3 controllers connected via Bluetooth under Mac OS X.
-Support for other controllers and operating systems may be added in the future.
+This plugin currently only supports DualShock 3 controllers connected via Bluetooth under Mac OS X and Linux.
+When using Linux you will need QtSixA (http://qtsixa.sourceforge.net) to pair your controller with your computer.
+Support for other controllers and Windows may be added in the future.
 Since this plugin was designed only for the author's personal usage, it is not expected to be robust and may not work with certain configurations, especially if there are multiple game-controllers connected.
 
 #####Default Mappings:

@@ -26,6 +26,14 @@
 
 #if APL
 #include "ApplicationServices/ApplicationServices.h"
+#elif LIN
+#include <float.h> 
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <X11/Xlib.h>
+#include <X11/extensions/XTest.h>
 #endif
 
 // define name
@@ -33,7 +41,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "0.2"
+#define VERSION "0.3"
 
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 0
@@ -96,10 +104,19 @@
 // define mouse pointer sensitivity
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 25.0f
 
+// define MAXFLOAT
+#if LIN
+#define MAXFLOAT FLT_MAX
+#endif
+
 // global variables
 static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0;
 
 static float lastAxisAssignment = 0.0f;
+
+#ifdef LIN
+static Display *display = NULL;
+#endif
 
 // global assignments stack
 static std::stack <int*> buttonAssignmentsStack;
@@ -488,13 +505,12 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
         {
             mousePointerControlEnabled = 0;
             
-            // get current mouse pointer location
+            // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
+#if APL
             CGEventRef getLocationEvent = CGEventCreate(NULL);
             CGPoint location = CGEventGetLocation(getLocationEvent);
             CFRelease(getLocationEvent);
-            
-            // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
-#ifdef APL
+
             if (CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft) != 0)
             {
                 CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, location, kCGMouseButtonLeft);
@@ -504,6 +520,12 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
             {
                 CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseUp, location, kCGMouseButtonRight);
                 CGEventPost(kCGHIDEventTap, event);
+            }
+#elif LIN
+            if (display != NULL)
+            {
+                XTestFakeButtonEvent(display, 1, False, CurrentTime);
+                XTestFakeButtonEvent(display, 2, False, CurrentTime);
             }
 #endif
         
@@ -700,7 +722,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     distY += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall;
                 }
 
-#ifdef APL
+#if APL
                 // get current mouse pointer location
                 CGEventRef getLocationEvent = CGEventCreate(NULL);
                 CGPoint oldLocation = CGEventGetLocation(getLocationEvent);
@@ -748,58 +770,95 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 CGEventRef moveMouseEvent = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, newLocation, kCGMouseButtonLeft);
                 CGEventPost(kCGHIDEventTap, moveMouseEvent);
                 CFRelease(moveMouseEvent);
+#elif LIN
+                if (display != NULL)
+                {
+                    XWarpPointer(display, None, None, 0, 0, 0, 0, distX, distY);
+                    XFlush(display);
+                }
 #endif
                 
                 int joystickButtonValues[1600];
                 XPLMGetDatavi(joystickButtonValuesDataRef, joystickButtonValues, 0, 1600);
-                
-#ifdef APL
+
                 // get mouse button status
-                int leftMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft);
-                int rightMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight);
+                int leftMouseButtonDown = 0, rightMouseButtonDown = 0;
+#if APL
+                leftMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft);
+                rightMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight);
                 
                 // update mouse pointer location since we need the current location to create a mouse up/down event
                 getLocationEvent = CGEventCreate(NULL);
                 newLocation = CGEventGetLocation(getLocationEvent);
                 CFRelease(getLocationEvent);
+#elif LIN
+                if (display != NULL)
+                {
+                    Window root, child;
+                    int rootX, rootY, winX, winY;
+                    unsigned int mask;
+                    XQueryPointer(display, DefaultRootWindow(display), &root, &child, &rootX, &rootY, &winX, &winY, &mask);
+                    leftMouseButtonDown = (mask & Button1Mask) >> 8;
+                    rightMouseButtonDown = (mask & Button2Mask) >> 8;
+                }
 #endif
                 
                 if (joystickButtonValues[JOYSTICK_BUTTON_CROSS] != 0)
                 {
                     // press left mouse button down
+#if APL
                     if (leftMouseButtonDown == 0)
                     {
                         CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, newLocation, kCGMouseButtonLeft);
                         CGEventPost(kCGHIDEventTap, event);
                     }
+#elif LIN
+                    if (display != NULL)
+                        XTestFakeButtonEvent(display, 1, True, CurrentTime);
+#endif
                 }
                 else
                 {
                     // release left mouse button
+#if APL
                     if (leftMouseButtonDown != 0)
                     {
                         CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, newLocation, kCGMouseButtonLeft);
                         CGEventPost(kCGHIDEventTap, event);
                     }
+#elif LIN
+                    if (display != NULL)
+                        XTestFakeButtonEvent(display, 1, False, CurrentTime);
+#endif
                 }
                 
                 if (joystickButtonValues[JOYSTICK_BUTTON_CIRCLE] != 0)
                 {
                     // press right mouse button down
+#if APL
                     if (rightMouseButtonDown == 0)
                     {
                         CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseDown, newLocation, kCGMouseButtonRight);
                         CGEventPost(kCGHIDEventTap, event);
                     }
+#elif LIN
+                    if (display != NULL)
+                        XTestFakeButtonEvent(display, 2, True, CurrentTime);
+#endif
                 }
                 else
                 {
                     // release right mouse button
+#if APL
                     if (rightMouseButtonDown != 0)
                     {
                         CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseUp, newLocation, kCGMouseButtonRight);
                         CGEventPost(kCGHIDEventTap, event);
                     }
+#elif LIN
+                    if (display != NULL)
+                        XTestFakeButtonEvent(display, 2, False, CurrentTime);
+#endif
                 }
             }
             else
@@ -988,6 +1047,16 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMMenuID menu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
     XPLMAppendMenuItem(menu, "Set Default Assignments", (void*) 0, 1);
 
+#ifdef LIN
+    display = XOpenDisplay(NULL);
+    if(display != NULL)
+    {
+        int screenNumber = DefaultScreen(display);
+        XEvent event;
+        XQueryPointer(display, RootWindow(display, DefaultScreen(display)), &event.xbutton.root, &event.xbutton.window, &event.xbutton.x_root, &event.xbutton.y_root, &event.xbutton.x, &event.xbutton.y, &event.xbutton.state);
+    }
+#endif
+
     return 1;
 }
 
@@ -996,6 +1065,10 @@ PLUGIN_API void	XPluginStop(void)
     // revert any remaining button assignments
     while (!buttonAssignmentsStack.empty())
         PopButtonAssignments();
+
+#ifdef LIN
+    XCloseDisplay(display);
+#endif
 }
 
 PLUGIN_API void XPluginDisable(void)
