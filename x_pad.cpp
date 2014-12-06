@@ -1067,7 +1067,8 @@ PLUGIN_API void	XPluginStop(void)
         PopButtonAssignments();
 
 #ifdef LIN
-    XCloseDisplay(display);
+    if(display != NULL)
+        XCloseDisplay(display);
 #endif
 }
 
