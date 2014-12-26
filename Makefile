@@ -1,5 +1,5 @@
-BUILDDIR    :=      ./build
-SRC_BASE    :=      .
+BUILDDIR    := ./build
+SRC_BASE    := .
 TARGET      := x_pad
 TARGET_32   := 32
 TARGET_64   := 64
@@ -62,7 +62,7 @@ $(BUILDDIR)/$(TARGET)/64/lin.xpl: $(ALL_OBJECTS64)
 $(BUILDDIR)/$(TARGET)/32/lin.xpl: $(ALL_OBJECTS)
 	@echo Linking $@
 	mkdir -p $(dir $@)
-	gcc -m32 -static-libgcc -shared -Wl,--version-script=exports.txt -o $@ $(ALL_OBJECTS) $(LIBS)
+	gcc -m32 -static-libgcc -shared -Wl,--version-script=exports.txt -o $@ $(ALL_OBJECTS) $(LIBS) -L.
 
 # Compiler rules
 
