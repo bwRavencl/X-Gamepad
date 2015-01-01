@@ -41,7 +41,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "0.3"
+#define VERSION "0.4"
 
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 0
