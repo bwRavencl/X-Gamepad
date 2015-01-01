@@ -125,7 +125,7 @@ static std::stack <int*> buttonAssignmentsStack;
 static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // push the current button assignments to the stack
 static void PushButtonAssignments(void)
@@ -863,6 +863,41 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             }
             else
             {
+                static float normalizedViewHeading = 0.0f;
+
+                // handle view heading when the aircraft is on ground and the current view is 3D cockpit command look
+                if (XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
+                {
+                    float joystickHeadingNullzone = XPLMGetDataf(joystickHeadingNullzoneDataRef);
+
+                    // handle nullzone
+                    if(fabs(joystickAxisValues[JOYSTICK_AXIS_LEFT_X] - 0.5f) > joystickHeadingNullzone)
+                    {
+                        // normalize axis deflection
+                        if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.5f)
+                            normalizedViewHeading = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f + joystickHeadingNullzone, 1.0f, 0.0f, 1.0f);
+                        else
+                            normalizedViewHeading = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f - joystickHeadingNullzone, 0.0f, 0.0f, -1.0f);
+
+                        float groundspeed = XPLMGetDataf(groundspeedDataRef);
+
+                        // clamp absolute groundspeed to 15 m/s
+                        groundspeed = fabs(groundspeed < 15.0f ?  groundspeed : 15.0f);
+
+                        // apply acceleration function (y = x^2) and fade-out with increasing groundspeed
+                        float newPilotsHeadPsi = normalizedViewHeading * powf(joystickAxisValues[JOYSTICK_AXIS_LEFT_X] - 0.5f, 2.0f) * 2.0f * Normalize(groundspeed, 15.0f, 0.0f, -1.0f, 0.0f) * 90.0f;
+
+                        XPLMSetDataf(pilotsHeadPsiDataRef, newPilotsHeadPsi);
+                    }
+                    // reset the view if the axis deflection has jumped from a large value right into the nullzone
+                    else if (normalizedViewHeading != 0.0f)
+                    {
+                        XPLMSetDataf(pilotsHeadPsiDataRef, 0.0f);
+                        normalizedViewHeading = 0.0f;
+                    }
+                }
+                   
+
                 float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
                 
                 float thrustReverserDeployRatio[acfNumEngines];
@@ -1001,9 +1036,13 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
     acfSbrkEQDataRef = XPLMFindDataRef("sim/aircraft/parts/acf_sbrkEQ");
+    ongroundAnyDataRef = XPLMFindDataRef("sim/flightmodel/failures/onground_any");
+    groundspeedDataRef = XPLMFindDataRef("sim/flightmodel/position/groundspeed");
+    pilotsHeadPsiDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_psi");
     viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
     hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
+    joystickHeadingNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_heading_nullzone");
     joystickAxisAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_assignments");
     joystickButtonAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_button_assignments");
     joystickAxisValuesDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_values");
