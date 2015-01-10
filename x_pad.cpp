@@ -1,4 +1,4 @@
-/* Copyright (C) 2014  Matteo Hausner
+/* Copyright (C) 2015  Matteo Hausner
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <X11/Xlib.h>
+#include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
 #endif
 
@@ -85,6 +86,9 @@
 // define '.acf' file 'show cockpit object in: 2-d forward panel views' string
 #define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
 
+// define X-IvAp plugin signature
+#define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
+
 // define custom command names
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
 #define SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND NAME_LOWERCASE "/speed_brake_and_carb_heat_toggle_arm"
@@ -94,6 +98,7 @@
 #define COWL_FLAP_MODIFIER_COMMAND NAME_LOWERCASE "/cowl_flap_modifier"
 #define TRIM_MODIFIER_COMMAND NAME_LOWERCASE "/trim_modifier"
 #define TOGGLE_MOUSE_POINTER_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_pointer_control"
+#define PUSH_TO_TALK_COMMAND NAME_LOWERCASE "/push_to_talk"
 
 // define long press time
 #define BUTTON_LONG_PRESS_TIME 1.0f
@@ -122,7 +127,7 @@ static Display *display = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 
 // global commandref variables
-static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL;
 
 // global dataref variables
 static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
@@ -344,7 +349,6 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 {
     if (inPhase != xplm_CommandContinue)
     {
-    
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
 
@@ -526,6 +530,7 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
             {
                 XTestFakeButtonEvent(display, 1, False, CurrentTime);
                 XTestFakeButtonEvent(display, 2, False, CurrentTime);
+                XFlush(display);
             }
 #endif
         
@@ -542,6 +547,29 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
         lastAxisAssignment = XPLMGetElapsedTime();
     }
     
+    return 0;
+}
+
+// command-handler that handles the push-to-talk command
+static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase != xplm_CommandContinue)
+    {
+        // only do push-to-talk if X-IvAp is enabled
+        XPLMPluginID xIvApPluginId = XPLMFindPluginBySignature(X_IVAP_PLUGIN_SIGNATURE);
+
+        if (display != NULL && XPLMIsPluginEnabled(xIvApPluginId) != 0)
+        {
+#if APL
+            // TODO: OS X implementation
+#elif LIN
+            KeyCode keycode = XKeysymToKeycode(display, XK_Insert);
+            XTestFakeKeyEvent(display, keycode, inPhase == xplm_CommandBegin, CurrentTime);
+            XFlush(display);
+#endif
+        }
+    }
+
     return 0;
 }
 
@@ -814,7 +842,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     }
 #elif LIN
                     if (display != NULL)
+                    {
                         XTestFakeButtonEvent(display, 1, True, CurrentTime);
+                        XFlush(display);
+                    }
 #endif
                 }
                 else
@@ -828,7 +859,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     }
 #elif LIN
                     if (display != NULL)
+                    {
                         XTestFakeButtonEvent(display, 1, False, CurrentTime);
+                        XFlush(display);
+                    }
 #endif
                 }
                 
@@ -843,7 +877,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     }
 #elif LIN
                     if (display != NULL)
+                    {
                         XTestFakeButtonEvent(display, 2, True, CurrentTime);
+                        XFlush(display);
+                    }
 #endif
                 }
                 else
@@ -857,7 +894,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     }
 #elif LIN
                     if (display != NULL)
+                    {
                         XTestFakeButtonEvent(display, 2, False, CurrentTime);
+                        XFlush(display);
+                    }
 #endif
                 }
             }
@@ -1006,7 +1046,7 @@ static void SetDefaultAssignments(void)
         joystickButtonAssignments[JOYSTICK_BUTTON_SELECT] = (std::size_t) XPLMFindCommand("sim/engines/thrust_reverse_toggle");
         joystickButtonAssignments[JOYSTICK_BUTTON_L1] = (std::size_t) XPLMFindCommand(TRIM_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_R1] = (std::size_t) XPLMFindCommand(VIEW_MODIFIER_COMMAND);
-        joystickButtonAssignments[JOYSTICK_BUTTON_L2] = (std::size_t) XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[JOYSTICK_BUTTON_L2] = (std::size_t) XPLMFindCommand(PUSH_TO_TALK_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_R2] = (std::size_t) XPLMFindCommand("sim/flight_controls/brakes_toggle_regular");
         joystickButtonAssignments[JOYSTICK_BUTTON_L3] = (std::size_t) XPLMFindCommand("sim/general/zoom_out");
         joystickButtonAssignments[JOYSTICK_BUTTON_R3] = (std::size_t) XPLMFindCommand("sim/general/zoom_in");
@@ -1067,6 +1107,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     cowlFlapModifierCommand = XPLMCreateCommand(COWL_FLAP_MODIFIER_COMMAND, "Cowl Flap Modifier");
     trimModifierCommand = XPLMCreateCommand(TRIM_MODIFIER_COMMAND, "Trim Modifier");
     toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND, "Toggle Mouse Pointer Control");
+    pushToTalkCommand = XPLMCreateCommand(PUSH_TO_TALK_COMMAND, "Push-To-Talk");
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleResetViewCommand, CycleResetViewCommandHandler, 1, NULL);
@@ -1077,6 +1118,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(trimModifierCommand, TrimModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(pushToTalkCommand, PushToTalkCommandHandler, 1, NULL);
 
     // register flight loop callback
     XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
