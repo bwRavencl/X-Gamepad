@@ -114,6 +114,9 @@
 #define MAXFLOAT FLT_MAX
 #endif
 
+// hardcoded '.acf' files that have no 2-d panel
+static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf"};
+
 // global variables
 static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0;
 
@@ -196,6 +199,13 @@ static int Has2DPanel(void)
 #endif
     
     int has2DPanel = 1;
+
+    // check if the path to the '.acf' file matches one of the hardcoded aircraft that have no 2D panel and for which the check below fails
+    for (int i = 0; i < sizeof(ACF_WITHOUT2D_PANEL); i++)
+    {
+        if (strstr(aircraftFilePath, ACF_WITHOUT2D_PANEL[i]) != NULL)
+            return 0;
+    }
     
     // search the '.acf' file for a special string which indicates that the aircraft shows the 3D cockpit object in the 2D forward panel view
     FILE *file = fopen(aircraftFilePath, "r");
@@ -600,6 +610,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
         float joystickAxisValues[100];
         XPLMGetDatavf(joystickAxisValuesDataRef, joystickAxisValues, 0, 100);
+
+        static int joystickAxisLeftXCalibrated = 0;
+        if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.0f)
+            joystickAxisLeftXCalibrated = 1;
         
         // keep the value of the left joystick's y axis at 0.5 until a value higher/lower than 0.0/1.0 is read because axis can get initialized with a value of 0.0 or 1.0 instead of 0.5 if they haven't been moved yet - this can result in unexpected behaviour especially if the axis is used in relative mode
         static float leftJoystickMinYValue = 1.0f, leftJoystickMaxYValue = 0.0f;
@@ -905,8 +919,8 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             {
                 static float normalizedViewHeading = 0.0f;
 
-                // handle view heading when the aircraft is on ground and the current view is 3D cockpit command look
-                if (XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
+                // handle view heading when the joystick has been calibrated, the aircraft is on ground and the current view is 3D cockpit command look
+                if (joystickAxisLeftXCalibrated > 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
                 {
                     float joystickHeadingNullzone = XPLMGetDataf(joystickHeadingNullzoneDataRef);
 
