@@ -27,7 +27,7 @@
 #if APL
 #include "ApplicationServices/ApplicationServices.h"
 #elif LIN
-#include <float.h> 
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,7 +42,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "0.4"
+#define VERSION "0.5"
 
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 0
@@ -139,7 +139,7 @@ static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL
 static void PushButtonAssignments(void)
 {
     int *joystickButtonAssignments = (int*) malloc(sizeof(int) * 1600);
-    
+
     XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     buttonAssignmentsStack.push(joystickButtonAssignments);
 }
@@ -150,7 +150,7 @@ static void PopButtonAssignments(void)
     if (!buttonAssignmentsStack.empty())
     {
         int *joystickButtonAssignments = buttonAssignmentsStack.top();
-        
+
         if (joystickButtonAssignments != NULL)
         {
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
@@ -174,13 +174,13 @@ static void CarbonPathToPOSIXPath(char *path)
     // replace ':' with '/'
     for(int i = 0; i < strlen(path); i++)
         if(path[i] == ':') path[i] = '/';
-    
+
     // prepend '/Volumes/' prefix
     const char *prefix = "/Volumes/";
     size_t len = strlen(prefix);
-    
+
     memmove(path + len, path, strlen(path) + 1);
-    
+
     for (int i = 0; i < len; i++)
         path[i] = prefix[i];
 }
@@ -191,14 +191,12 @@ static int Has2DPanel(void)
 {
     char fileName[256], path[512];
     XPLMGetNthAircraftModel(0, fileName, path);
-    
+
     // under OS X replace the ':' seperator with the POSIX '/'
     char *aircraftFilePath = path;
 #if APL
     CarbonPathToPOSIXPath(aircraftFilePath);
 #endif
-    
-    int has2DPanel = 1;
 
     // check if the path to the '.acf' file matches one of the hardcoded aircraft that have no 2D panel and for which the check below fails
     for (int i = 0; i < sizeof(ACF_WITHOUT2D_PANEL); i++)
@@ -206,7 +204,9 @@ static int Has2DPanel(void)
         if (strstr(aircraftFilePath, ACF_WITHOUT2D_PANEL[i]) != NULL)
             return 0;
     }
-    
+
+    int has2DPanel = 1;
+
     // search the '.acf' file for a special string which indicates that the aircraft shows the 3D cockpit object in the 2D forward panel view
     FILE *file = fopen(aircraftFilePath, "r");
     if(file != NULL)
@@ -217,10 +217,10 @@ static int Has2DPanel(void)
             if((strstr(temp, ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS)) != NULL)
                 has2DPanel = 0;
         }
-        
+
         fclose(file);
     }
-    
+
     return has2DPanel;
 }
 
@@ -228,7 +228,7 @@ static int Has2DPanel(void)
 static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     static float beginTime = 0.0f;
-    
+
     if (inPhase == xplm_CommandBegin)
         beginTime = XPLMGetElapsedTime();
     else if (inPhase == xplm_CommandContinue)
@@ -242,18 +242,18 @@ static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPha
                     XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
                     XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
                     break;
-            
+
                 case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
                     XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
                     XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
                     break;
-            
+
                 case VIEW_TYPE_CHASE:
                     XPLMCommandOnce(XPLMFindCommand("sim/view/circle"));
                     XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
                     break;
             }
-            
+
             beginTime = MAXFLOAT;
         }
     }
@@ -285,7 +285,7 @@ static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPha
                     break;
             }
         }
-        
+
         beginTime = 0.0f;
     }
 
@@ -299,9 +299,9 @@ static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef inCommand
     if (XPLMGetDatai(acfSbrkEQDataRef) != 0)
     {
         static float beginTime = 0.0f;
-    
+
         float oldSpeedbrakeRatio = XPLMGetDataf(speedbrakeRatioDataRef);
-    
+
         if (inPhase == xplm_CommandBegin)
             beginTime = XPLMGetElapsedTime();
         else if (inPhase == xplm_CommandContinue)
@@ -310,9 +310,9 @@ static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef inCommand
             if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
             {
                 float newSpeedbrakeRatio = oldSpeedbrakeRatio == -0.5f ? 0.0f : -0.5f;
-            
+
                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
-            
+
                 beginTime = MAXFLOAT;
             }
         }
@@ -322,10 +322,10 @@ static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef inCommand
             if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
             {
                 float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
-            
+
                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
             }
-        
+
             beginTime = 0.0f;
         }
     }
@@ -335,22 +335,22 @@ static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef inCommand
         if (inPhase == xplm_CommandBegin)
         {
             int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
-            
+
             if (acfNumEngines > 0)
             {
                 float carbHeatRatio[acfNumEngines];
                 XPLMGetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
-                
+
                 float newCarbHeatRatio = carbHeatRatio[0] <= 0.5f ? 1.0f : 0.0f;
-            
+
                 for (int i = 0; i < acfNumEngines; i++)
                     carbHeatRatio[i] = newCarbHeatRatio;
-            
+
                 XPLMSetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
             }
         }
     }
-    
+
     return 0;
 }
 
@@ -383,7 +383,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             // assign panel scrolling controls to the dpad
             int joystickButtonAssignments[1600];
             XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-        
+
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/general/left");
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/general/right");
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("sim/general/up");
@@ -412,7 +412,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
         XPLMSetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
-        
+
         lastAxisAssignment = XPLMGetElapsedTime();
     }
 
@@ -448,7 +448,7 @@ static int CowlFlapModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandP
         cowlFlapModifierDown = 1;
     else if (inPhase == xplm_CommandEnd)
         cowlFlapModifierDown = 0;
-    
+
     return 0;
 }
 
@@ -466,7 +466,7 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         // assign trim controls to the buttons and dpad
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-        
+
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_left");
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_right");
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_down");
@@ -494,31 +494,31 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
     {
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-        
+
         if (mousePointerControlEnabled == 0)
         {
             mousePointerControlEnabled = 1;
-        
+
             // assign no controls to the left joystick's axis since it will control the mouse pointer
             joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_NONE;
             joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
-        
+
             // store the default button assignments
             PushButtonAssignments();
-        
+
             // assign no commands to the l2 and r2 buttons since they will be used as left and right mouse buttons
             int joystickButtonAssignments[1600];
             XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-            
+
             joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand("sim/none/none");
             joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/none/none");
-        
+
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         }
         else
         {
             mousePointerControlEnabled = 0;
-            
+
             // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
 #if APL
             CGEventRef getLocationEvent = CGEventCreate(NULL);
@@ -543,20 +543,20 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
                 XFlush(display);
             }
 #endif
-        
+
             // assign the default controls to the left joystick's axis
             joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_YAW;
             joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
-        
+
             // restore the default button assignments
             PopButtonAssignments();
         }
-        
+
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-        
+
         lastAxisAssignment = XPLMGetElapsedTime();
     }
-    
+
     return 0;
 }
 
@@ -598,14 +598,14 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
         switchTo3DCommandLook = 0;
     }
-    
+
     float elapsedSinceLastAxisAssignment = XPLMGetElapsedTime() - lastAxisAssignment;
-    
+
     // only handle the left joystick's axis if at least 750 ms have passed since the last axis assignment has occured, so that the user has time to center the joystick after releasing a modifier key
     if (XPLMGetDatai(hasJostickDataRef) &&  elapsedSinceLastAxisAssignment > 0.75f)
     {
         float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
-        
+
         float joystickPitchNullzone = XPLMGetDataf(joystickPitchNullzoneDataRef);
 
         float joystickAxisValues[100];
@@ -614,19 +614,19 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         static int joystickAxisLeftXCalibrated = 0;
         if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.0f)
             joystickAxisLeftXCalibrated = 1;
-        
+
         // keep the value of the left joystick's y axis at 0.5 until a value higher/lower than 0.0/1.0 is read because axis can get initialized with a value of 0.0 or 1.0 instead of 0.5 if they haven't been moved yet - this can result in unexpected behaviour especially if the axis is used in relative mode
         static float leftJoystickMinYValue = 1.0f, leftJoystickMaxYValue = 0.0f;
 
         if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < leftJoystickMinYValue)
             leftJoystickMinYValue = joystickAxisValues[JOYSTICK_AXIS_LEFT_Y];
-        
+
         if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > leftJoystickMaxYValue)
             leftJoystickMaxYValue = joystickAxisValues[JOYSTICK_AXIS_LEFT_Y];
-        
+
         if (leftJoystickMinYValue == 1.0f || leftJoystickMaxYValue == 0.0f)
             joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] = 0.5f;
-        
+
         int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
 
         if (viewModifierDown == 0)
@@ -643,7 +643,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 {
                     // normalize range [0.5, 0.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
                     float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
-                    
+
                     float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll + d;
 
                     // ensure we don't set values larger than 1.0
@@ -656,7 +656,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
 
                     float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll - d;
-                    
+
                     // ensure we don't set values smaller than 0.0
                     XPLMSetDataf(propRotationSpeedRadSecAllDataRef, newPropRotationSpeedRadSecAll > acfRSCMingovPrp ? newPropRotationSpeedRadSecAll : acfRSCMingovPrp);
                 }
@@ -672,7 +672,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
 
                     float newMixtureRatioAll = mixtureRatioAll + d;
-                    
+
                     // ensure we don't set values larger than 1.0
                     XPLMSetDataf(mixtureRatioAllDataRef, newMixtureRatioAll < 1.0f ? newMixtureRatioAll : 1.0f);
                 }
@@ -683,7 +683,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
 
                     float newMixtureRatioAll = mixtureRatioAll - d;
-                    
+
                     // ensure we don't set values smaller than 0.0
                     XPLMSetDataf(mixtureRatioAllDataRef, newMixtureRatioAll > 0.0f ? newMixtureRatioAll : 0.0f);
                 }
@@ -692,13 +692,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             {
                 float cowlFlapRatio[acfNumEngines];
                 XPLMGetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
-                
+
                 // decrease cowl flap setting
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
                     float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
-                    
+
                     // ensure we don't set values smaller than 0.0
                     for (int i = 0; i < acfNumEngines; i++)
                     {
@@ -711,7 +711,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
                     float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
-                    
+
                     // ensure we don't set values larger than 1.0
                     for (int i = 0; i < acfNumEngines; i++)
                     {
@@ -719,19 +719,19 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                         cowlFlapRatio[i] = newCowlFlapRatio < 1.0f ? newCowlFlapRatio : 1.0f;
                     }
                 }
-                
+
                 XPLMSetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
             }
             else if (mousePointerControlEnabled != 0)
             {
                 int distX = 0, distY = 0;
-                
+
                 // move mouse pointer left
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
                     float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 0.0f, 0.0f, 1.0f);
-                    
+
                     // apply acceleration function (y = x^2)
                     distX -= (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall;
                 }
@@ -740,17 +740,17 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 {
                     // normalize range [0.5, 1.0] to [0.0, 1.0]
                     float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 1.0f, 0.0f, 1.0f);
-                    
+
                     // apply acceleration function (y = x^2)
                     distX += (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall;
                 }
-                
+
                 // move mouse pointer up
                 if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
                     float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
-                    
+
                     // apply acceleration function (y = x^2)
                     distY -= (int) powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall;
                 }
@@ -769,7 +769,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 CGEventRef getLocationEvent = CGEventCreate(NULL);
                 CGPoint oldLocation = CGEventGetLocation(getLocationEvent);
                 CFRelease(getLocationEvent);
-                
+
                 CGPoint newLocation;
                 newLocation.x = oldLocation.x + distX;
                 newLocation.y = oldLocation.y + distY;
@@ -785,10 +785,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 for (int i = 0; i < displayCount; i++)
                 {
                     CGRect screenBounds = CGDisplayBounds(activeDisplays[i]);
-                    
+
                     if (CGRectContainsPoint(screenBounds, oldLocation))
                         oldContainingDisplay = i;
-                    
+
                     if (CGRectContainsPoint(screenBounds, newLocation))
                         newContainingDisplay = i;
                 }
@@ -801,13 +801,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     int minY = (int) screenBounds.origin.y;
                     int maxX = (int) minX + screenBounds.size.width - 1;
                     int maxY = (int) minY + screenBounds.size.height - 1;
-                    
+
                     newLocation.x = newLocation.x >= minX ? newLocation.x : minX;
                     newLocation.x = newLocation.x <= maxX ? newLocation.x : maxX;
                     newLocation.y = newLocation.y >= minY ? newLocation.y : minY;
                     newLocation.y = newLocation.y < maxY ? newLocation.y : maxY;
                 }
-                
+
                 // move mouse pointer by distX and distY pixels
                 CGEventRef moveMouseEvent = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, newLocation, kCGMouseButtonLeft);
                 CGEventPost(kCGHIDEventTap, moveMouseEvent);
@@ -819,7 +819,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     XFlush(display);
                 }
 #endif
-                
+
                 int joystickButtonValues[1600];
                 XPLMGetDatavi(joystickButtonValuesDataRef, joystickButtonValues, 0, 1600);
 
@@ -828,7 +828,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 #if APL
                 leftMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft);
                 rightMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight);
-                
+
                 // update mouse pointer location since we need the current location to create a mouse up/down event
                 getLocationEvent = CGEventCreate(NULL);
                 newLocation = CGEventGetLocation(getLocationEvent);
@@ -844,7 +844,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     rightMouseButtonDown = (mask & Button2Mask) >> 8;
                 }
 #endif
-                
+
                 if (joystickButtonValues[JOYSTICK_BUTTON_CROSS] != 0)
                 {
                     // press left mouse button down
@@ -879,7 +879,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     }
 #endif
                 }
-                
+
                 if (joystickButtonValues[JOYSTICK_BUTTON_CIRCLE] != 0)
                 {
                     // press right mouse button down
@@ -950,13 +950,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                         normalizedViewHeading = 0.0f;
                     }
                 }
-                   
+
 
                 float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
-                
+
                 float thrustReverserDeployRatio[acfNumEngines];
                 XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
-                
+
                 float averageThrustReverserDeployRatio = 0.0f;
                 for (int i = 0; i < acfNumEngines; i++)
                     averageThrustReverserDeployRatio += thrustReverserDeployRatio[i];
@@ -967,19 +967,19 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 {
                     // normalize range [0.5, 0.0] to [0.0, 1.0]
                     float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
-                    
+
                     // invert d if thrust reversers are engaged
                     if (averageThrustReverserDeployRatio > 0.5f)
                     {
                         float newThrottleRatioAll = throttleRatioAll - d;
-                        
+
                         // ensure we don't set values smaller than 0.0
                         XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
                     }
                     else
                     {
                         float newThrottleRatioAll = throttleRatioAll + d;
-                        
+
                         // ensure we don't set values larger than 1.0
                         XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
                     }
@@ -994,14 +994,14 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (averageThrustReverserDeployRatio > 0.5f)
                     {
                         float newThrottleRatioAll = throttleRatioAll + d;
-                        
+
                         // ensure we don't set values larger than 1.0
                         XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
                     }
                     else
                     {
                         float newThrottleRatioAll = throttleRatioAll - d;
-                        
+
                         // ensure we don't set values smaller than 0.0
                         XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
                     }
@@ -1036,18 +1036,18 @@ static void SetDefaultAssignments(void)
         // set default axis assignments
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-        
+
         joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_YAW;
         joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
         joystickAxisAssignments[JOYSTICK_AXIS_RIGHT_X] = AXIS_ASSIGNMENT_ROLL;
         joystickAxisAssignments[JOYSTICK_AXIS_RIGHT_Y] = AXIS_ASSIGNMENT_PITCH;
-        
+
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-        
+
         // set default button assignments
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-        
+
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_up");
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_down");
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand(SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND);
@@ -1065,7 +1065,7 @@ static void SetDefaultAssignments(void)
         joystickButtonAssignments[JOYSTICK_BUTTON_L3] = (std::size_t) XPLMFindCommand("sim/general/zoom_out");
         joystickButtonAssignments[JOYSTICK_BUTTON_R3] = (std::size_t) XPLMFindCommand("sim/general/zoom_in");
         joystickButtonAssignments[JOYSTICK_BUTTON_PS] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
-        
+
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
 }
@@ -1136,7 +1136,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
     // register flight loop callback
     XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
-    
+
     // create menu-entries
     int subMenuItem = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 1);
     XPLMMenuID menu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
@@ -1182,7 +1182,7 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
     if (inMessage == XPLM_MSG_PLANE_LOADED || inMessage == XPLM_MSG_AIRPORT_LOADED)
     {
         switchTo3DCommandLook = 0;
-        
+
         if (Has2DPanel() == 0)
             switchTo3DCommandLook = 1;
     }
