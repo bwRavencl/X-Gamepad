@@ -19,7 +19,7 @@ DEFINES = -DAPL=0 -DIBM=0 -DLIN=1 -DXPLM200=1
 
 
 VPATH = $(SRC_BASE)
-        
+
 CSOURCES        := $(filter %.c, $(SOURCES))
 CXXSOURCES      := $(filter %.cpp, $(SOURCES))
 
@@ -99,8 +99,8 @@ clean:
 # Include any dependency turds, but don't error out if they don't exist.
 # On the first build, every .c is dirty anyway.  On future builds, if the
 # .c changes, it is rebuilt (as is its dep) so who cares if dependencies
-# are stale.  If the .c is the same but a header has changed, this 
-# declares the header to be changed.  If a primary header includes a 
+# are stale.  If the .c is the same but a header has changed, this
+# declares the header to be changed.  If a primary header includes a
 # utility header and the primary header is changed, the dependency
 # needs a rebuild because EVERY header is included.  And if the secondary
 # header is changed, the primary header had it before (and is unchanged)
