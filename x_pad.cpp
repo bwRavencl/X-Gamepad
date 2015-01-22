@@ -199,7 +199,7 @@ static int Has2DPanel(void)
 #endif
 
     // check if the path to the '.acf' file matches one of the hardcoded aircraft that have no 2D panel and for which the check below fails
-    for (int i = 0; i < sizeof(ACF_WITHOUT2D_PANEL); i++)
+    for (int i = 0; i < sizeof(ACF_WITHOUT2D_PANEL) / sizeof(char*); i++)
     {
         if (strstr(aircraftFilePath, ACF_WITHOUT2D_PANEL[i]) != NULL)
             return 0;
