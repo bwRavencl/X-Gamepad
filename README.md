@@ -42,7 +42,7 @@ X-pad's default mappings for a DualShock 3 controller:
 | Circle     | x_pad/mixture_control_modifier             |
 | Triangle   | x_pad/prop_pitch_modifier                  |
 | Cross      | x_pad/cowl_flap_modifier                   |
-| Start      | sim/autopilot/servos_toggle                |
+| Start      | x_pad//toggle_autopilot                    |
 | Select     | sim/engines/thrust_reverse_toggle          |
 | L1         | x_pad/trim_modifier                        |
 | R1         | x_pad/view_modifier                        |
