@@ -125,7 +125,7 @@ static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifi
 
 static float lastAxisAssignment = 0.0f;
 
-#ifdef LIN
+#if LIN
 static Display *display = NULL;
 #endif
 
@@ -1195,7 +1195,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMMenuID menu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
     XPLMAppendMenuItem(menu, "Set Default Assignments", (void*) 0, 1);
 
-#ifdef LIN
+#if LIN
     display = XOpenDisplay(NULL);
     if(display != NULL)
     {
@@ -1214,7 +1214,7 @@ PLUGIN_API void	XPluginStop(void)
     while (!buttonAssignmentsStack.empty())
         PopButtonAssignments();
 
-#ifdef LIN
+#if LIN
     if(display != NULL)
         XCloseDisplay(display);
 #endif
