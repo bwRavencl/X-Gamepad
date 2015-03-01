@@ -32,22 +32,22 @@ X-pad's default mappings for a DualShock 3 controller:
 | Right Joystick X-Axis | roll    |
 | Right Joystick Y-Axis | pitch   |
 
-| Button     | Command                                    |
-| ---------- | -------------------------------------------|
-| DPAD Left  | sim/flight_controls/flap_up                |
-| DPAD Right | sim/flight_controls/flap_down              |
-| DPAD Up    | x_pad/speed_brake_and_carb_heat_toggle_arm |
-| DPAD Down  | sim/flight_controls/gear_toggle            |
-| Square     | x_pad/cycle_reset_view                     |
-| Circle     | x_pad/mixture_control_modifier             |
-| Triangle   | x_pad/prop_pitch_modifier                  |
-| Cross      | x_pad/cowl_flap_modifier                   |
-| Start      | x_pad//toggle_autopilot                    |
-| Select     | sim/engines/thrust_reverse_toggle          |
-| L1         | x_pad/trim_modifier                        |
-| R1         | x_pad/view_modifier                        |
-| L2         | x_pad/push_to_talk (mapped to Insert key)  |
-| R2         | sim/flight_controls/brakes_toggle_regular  |
-| L3         | sim/general/zoom_out                       |
-| R3         | sim/general/zoom_in                        |
-| PS         | x_pad/toggle_mouse_pointer_control         |
+| Button     | Command                                        |
+| ---------- | -----------------------------------------------|
+| DPAD Left  | sim/flight_controls/flap_up                    |
+| DPAD Right | sim/flight_controls/flap_down                  |
+| DPAD Up    | x_pad/speed_brake_and_carb_heat_toggle_arm     |
+| DPAD Down  | sim/flight_controls/gear_toggle                |
+| Square     | x_pad/cycle_reset_view                         |
+| Circle     | x_pad/mixture_control_modifier                 |
+| Triangle   | x_pad/prop_pitch_modifier                      |
+| Cross      | x_pad/cowl_flap_modifier                       |
+| Start      | x_pad/toggle_autopilot_disable_flight_director |
+| Select     | sim/engines/thrust_reverse_toggle              |
+| L1         | x_pad/trim_modifier                            |
+| R1         | x_pad/view_modifier                            |
+| L2         | x_pad/push_to_talk (mapped to Insert key)      |
+| R2         | sim/flight_controls/brakes_toggle_regular      |
+| L3         | sim/general/zoom_out                           |
+| R3         | sim/general/zoom_in                            |
+| PS         | x_pad/toggle_mouse_pointer_control             |

@@ -94,7 +94,7 @@
 // define custom command names
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
 #define SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND NAME_LOWERCASE "/speed_brake_and_carb_heat_toggle_arm"
-#define TOOGLE_AUTOPILOT_COMMAND NAME_LOWERCASE "/toggle_autopilot"
+#define TOOGLE_AUTOPILOT_DISABLE_FLIGHT_DIRECTOR_COMMAND NAME_LOWERCASE "/toggle_autopilot_disable_flight_director"
 #define VIEW_MODIFIER_COMMAND NAME_LOWERCASE "/view_modifier"
 #define PROP_PITCH_MODIFIER_COMMAND NAME_LOWERCASE "/prop_pitch_modifier"
 #define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE "/mixture_control_modifier"
@@ -133,7 +133,7 @@ static Display *display = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 
 // global commandref variables
-static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, toggleAutopilotCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, toggleAutopilotDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL;
 
 // global dataref variables
 static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
@@ -365,46 +365,79 @@ static int isPluginEnabled(const char* pluginSignature)
     return XPLMIsPluginEnabled(pluginId);
 }
 
-// command-handler that handles the toggle autopilot command depending on the aircraft custom commands are invoked instead of the default ones
-static int ToggleAutopilotCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+// command-handler that handles the toggle autopilot / disable flight director command - depending on the aircraft custom commands are invoked instead of the default ones
+static int ToggleAutopilotDisableFlightDirectorCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
+    static float beginTime = 0.0f;
+
     if (inPhase == xplm_CommandBegin)
+        beginTime = XPLMGetElapsedTime();
+    else if (inPhase == xplm_CommandContinue)
     {
-        // custom handling of QPAC A320
-        if (isPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
+        // disable flight director
+        if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
         {
-            XPLMDataRef ap1EngageDataRef = XPLMFindDataRef("AirbusFBW/AP1Engage");
-            XPLMDataRef ap2EngageDataRef = XPLMFindDataRef("AirbusFBW/AP2Engage");
-
-            if (ap1EngageDataRef != NULL && ap2EngageDataRef != NULL)
-            {
-                if (XPLMGetDatai(ap1EngageDataRef) == 0 && XPLMGetDatai(ap2EngageDataRef) == 0)
-                    XPLMCommandOnce(XPLMFindCommand("airbus_qpac/ap1_push"));
-                else
+            // custom handling of QPAC A320
+            if (isPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
                     XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
-            }
-        }
-        // custom handling of x737
-        else if (isPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
-        {
-            XPLMDataRef cmdADataRef = XPLMFindDataRef("x737/systems/afds/CMD_A");
-            XPLMDataRef cmdBDataRef = XPLMFindDataRef("x737/systems/afds/CMD_B");
-
-            if (cmdADataRef != NULL && cmdBDataRef != NULL)
+            // custom handling of x737
+            else if (isPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
             {
-                if (XPLMGetDatai(cmdADataRef) == 0 && XPLMGetDatai(cmdBDataRef) == 0)
-                    XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDA_ON"));
-                else
+                XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_A_OFF"));
+                XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_B_OFF"));
+            }
+            // default handling
+            else
+                XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_fdir_off"));
+
+            beginTime = MAXFLOAT;
+        }
+    }
+    else if (inPhase == xplm_CommandEnd)
+    {
+        // toggle autopilot
+        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+        {
+            // custom handling of QPAC A320
+            if (isPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
+            {
+                XPLMDataRef ap1EngageDataRef = XPLMFindDataRef("AirbusFBW/AP1Engage");
+                XPLMDataRef ap2EngageDataRef = XPLMFindDataRef("AirbusFBW/AP2Engage");
+
+                if (ap1EngageDataRef != NULL && ap2EngageDataRef != NULL)
                 {
-                    XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDA_OFF"));
-                    XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDB_OFF"));
+                    if (XPLMGetDatai(ap1EngageDataRef) == 0 && XPLMGetDatai(ap2EngageDataRef) == 0)
+                        XPLMCommandOnce(XPLMFindCommand("airbus_qpac/ap1_push"));
+                    else
+                        XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
                 }
             }
+            // custom handling of x737
+            else if (isPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
+            {
+                XPLMDataRef cmdADataRef = XPLMFindDataRef("x737/systems/afds/CMD_A");
+                XPLMDataRef cmdBDataRef = XPLMFindDataRef("x737/systems/afds/CMD_B");
+
+                if (cmdADataRef != NULL && cmdBDataRef != NULL)
+                {
+                    if (XPLMGetDatai(cmdADataRef) == 0 && XPLMGetDatai(cmdBDataRef) == 0)
+                        XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDA_ON"));
+                    else
+                    {
+                        XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDA_OFF"));
+                        XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDB_OFF"));
+                    }
+                }
+            }
+            // default handling
+            else
+                XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_toggle"));
         }
-        // default handling
-        else
-            XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_toggle"));
+
+        beginTime = 0.0f;
     }
+
+    return 0;
 }
 
 // command-handler that handles the view modifier command
@@ -1107,7 +1140,7 @@ static void SetDefaultAssignments(void)
         joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand(PROP_PITCH_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
-        joystickButtonAssignments[JOYSTICK_BUTTON_START] = (std::size_t) XPLMFindCommand(TOOGLE_AUTOPILOT_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_START] = (std::size_t) XPLMFindCommand(TOOGLE_AUTOPILOT_DISABLE_FLIGHT_DIRECTOR_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_SELECT] = (std::size_t) XPLMFindCommand("sim/engines/thrust_reverse_toggle");
         joystickButtonAssignments[JOYSTICK_BUTTON_L1] = (std::size_t) XPLMFindCommand(TRIM_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_R1] = (std::size_t) XPLMFindCommand(VIEW_MODIFIER_COMMAND);
@@ -1166,7 +1199,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // create custom commands
     cycleResetViewCommand = XPLMCreateCommand(CYCLE_RESET_VIEW_COMMAND, "Cycle/Reset View");
     speedBrakeAndCarbHeatToggleArmCommand = XPLMCreateCommand(SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND, "Toggle/Arm Speedbrake/Carb Heat");
-    toggleAutopilotCommand = XPLMCreateCommand(TOOGLE_AUTOPILOT_COMMAND, "Toggle Autopilot");
+    toggleAutopilotDisableFlightDirectorCommand = XPLMCreateCommand(TOOGLE_AUTOPILOT_DISABLE_FLIGHT_DIRECTOR_COMMAND, "Toggle/Disable Autopilot/Flight Director");
     viewModifierCommand = XPLMCreateCommand(VIEW_MODIFIER_COMMAND, "View Modifier");
     propPitchModifierCommand = XPLMCreateCommand(PROP_PITCH_MODIFIER_COMMAND, "Prop Pitch Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(MIXTURE_CONTROL_MODIFIER_COMMAND, "Mixture Control Modifier");
@@ -1178,7 +1211,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // register custom commands
     XPLMRegisterCommandHandler(cycleResetViewCommand, CycleResetViewCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(speedBrakeAndCarbHeatToggleArmCommand, SpeedBrakeAndCarbHeatToggleArmCommandHandler, 1, NULL);
-    XPLMRegisterCommandHandler(toggleAutopilotCommand, ToggleAutopilotCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleAutopilotDisableFlightDirectorCommand, ToggleAutopilotDisableFlightDirectorCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(propPitchModifierCommand, PropPitchModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
