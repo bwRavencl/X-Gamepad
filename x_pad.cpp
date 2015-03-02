@@ -16,6 +16,7 @@
  */
 
 #include "XPLMDataAccess.h"
+#include "XPLMDisplay.h"
 #include "XPLMMenus.h"
 #include "XPLMPlanes.h"
 #include "XPLMPlugin.h"
@@ -90,6 +91,10 @@
 #define QPAC_A320_PLUGIN_SIGNATURE "QPAC.airbus.fbw"
 #define X737_PLUGIN_SIGNATURE "bs.x737.plugin"
 #define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
+#define XP_SCROLL_WHEEL_PLUGIN_SIGNATURE "thranda.window.scrollwheel"
+
+// define XPScrollWheel scrollIndex array size
+#define XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE 512
 
 // define custom command names
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
@@ -106,6 +111,9 @@
 // define long press time
 #define BUTTON_LONG_PRESS_TIME 1.0f
 
+// define disable view heading time
+#define DISABLE_VIEW_HEADING_TIME 3.0f
+
 // define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.0f
 
@@ -120,17 +128,13 @@
 // hardcoded '.acf' files that have no 2-d panel
 static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf"};
 
-// global variables
-static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0;
-
-static float lastAxisAssignment = 0.0f;
-
+// global internal variables
+static int viewModifierDown = 0, propPitchModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastScrollindex[XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE] = {0}, lastMouseX = 0, lastMouseY = 0;
+static float lastAxisAssignment = 0.0f, lastMouseUsageTime = 0.0f;
+static std::stack <int*> buttonAssignmentsStack;
 #if LIN
 static Display *display = NULL;
 #endif
-
-// global assignments stack
-static std::stack <int*> buttonAssignmentsStack;
 
 // global commandref variables
 static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, toggleAutopilotDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL;
@@ -673,9 +677,75 @@ static float Normalize(float value, float inMin, float inMax, float outMin, floa
     return (outMax - outMin) / (inMax - inMin) * (value - inMax) + (outMax - outMin);
 }
 
+// check if either the left or right mouse button is down or the XPScrollWheel plugin has been active - the right button is only checked if checkRightButton is not zero
+static int IsMouseInUse(int checkRightButton)
+{
+    // check if mouse buttons are down
+    int mouseButtonDown[2] = {0};
+#if APL
+    mouseButtonDown[0] = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft);
+    mouseButtonDown[1] = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight);
+#elif IBM
+    // if the most significant bit is set, the key is down
+    mouseButtonDown[0] = (int) GetAsyncKeyState(VK_LBUTTON) >> 15;
+    mouseButtonDown[1] = (int) GetAsyncKeyState(VK_RBUTTON) >> 15;
+#elif LIN
+    if (display == NULL)
+        display = XOpenDisplay(NULL);
+    if (display != NULL)
+    {
+        Window root, child;
+        int rootX, rootY, winX, winY;
+        unsigned int mask;
+        XQueryPointer(display, DefaultRootWindow(display), &root, &child, &rootX, &rootY, &winX, &winY, &mask);
+        mouseButtonDown[0] = (mask & Button1Mask) >> 8;
+        mouseButtonDown[1] = (mask & Button2Mask) >> 8;
+    }
+#endif
+
+    if (mouseButtonDown[0] != 0)
+        return 1;
+
+    if (checkRightButton != 0 && mouseButtonDown[1] != 0)
+        return 1;
+
+    // check if the XPScrollWheel plugin has modified a DataRef since the last call
+    XPLMPluginID pluginId = XPLMFindPluginBySignature(XP_SCROLL_WHEEL_PLUGIN_SIGNATURE);
+    if (XPLMIsPluginEnabled(pluginId) != 0)
+    {
+        XPLMDataRef scrollindexDataRef = XPLMFindDataRef("thranda/scrollindex");
+        int scrollindex[XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE];
+        XPLMGetDatavi(scrollindexDataRef, scrollindex, 0, XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE);
+
+        for (int i = 0; i < XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE; i++)
+        {
+            if (scrollindex[i] != lastScrollindex[i])
+            {
+                memcpy(lastScrollindex, scrollindex, XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE);
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
+    int mouseInUse = IsMouseInUse(1);
+
+    int currentMouseX, currentMouseY;
+    XPLMGetMouseLocation(&currentMouseX, &currentMouseY);
+
+    if (mouseInUse != 0 || currentMouseX != lastMouseX || currentMouseY != lastMouseY)
+    {
+        lastMouseX = currentMouseX;
+        lastMouseY = currentMouseY;
+
+        lastMouseUsageTime = XPLMGetElapsedTime();
+    }
+
     // handle switch to 3D command look
     if (switchTo3DCommandLook != 0)
     {
@@ -1003,8 +1073,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             {
                 static float normalizedViewHeading = 0.0f;
 
+                float elapsedTime = XPLMGetElapsedTime() - lastMouseUsageTime;
+
                 // handle view heading when the joystick has been calibrated, the aircraft is on ground and the current view is 3D cockpit command look
-                if (joystickAxisLeftXCalibrated > 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
+                if (joystickAxisLeftXCalibrated > 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && elapsedTime >= DISABLE_VIEW_HEADING_TIME)
                 {
                     float joystickHeadingNullzone = XPLMGetDataf(joystickHeadingNullzoneDataRef);
 
