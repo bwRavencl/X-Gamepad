@@ -117,6 +117,10 @@
 // define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.0f
 
+// define mouse buttons
+#define MOUSE_BUTTON_LEFT 0
+#define MOUSE_BUTTON_RIGHT 1
+
 // define mouse pointer sensitivity
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 25.0f
 
@@ -577,6 +581,41 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
     return 0;
 }
 
+// toggle mouse button state
+static void ToggleMouseButton(int button, int down)
+{
+#if APL
+            CGEventRef getLocationEvent = CGEventCreate(NULL);
+            CGPoint location = CGEventGetLocation(getLocationEvent);
+            CFRelease(getLocationEvent);
+
+            CGEventType mouseType = 0;
+            CGMouseButton mouseButton = 0;
+            if (button == MOUSE_BUTTON_LEFT)
+            {
+                mouseType = (down == 0 ? kCGEventLeftMouseUp, kCGEventLeftMouseDown)
+                mouseButton = kCGMouseButtonLeft;
+            }
+            else
+            {
+                mouseType = (down == 0 ? kCGEventRightMouseUp, kCGEventRightMouseDown)
+                mouseButton = kCGMouseButtonRight;
+            }
+
+            if (CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, mouseButton) != 0)
+            {
+                CGEventRef event = CGEventCreateMouseEvent(NULL, mouseType, location, mouseButton);
+                CGEventPost(kCGHIDEventTap, event);
+            }
+#elif LIN
+            if (display != NULL)
+            {
+                XTestFakeButtonEvent(display, (button == MOUSE_BUTTON_LEFT ? 1 : 3), (down == 0 ? False : True), CurrentTime);
+                XFlush(display);
+            }
+#endif
+}
+
 // command-handler that handles the toggle mouse pointer control command
 static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
@@ -610,29 +649,8 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
             mousePointerControlEnabled = 0;
 
             // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
-#if APL
-            CGEventRef getLocationEvent = CGEventCreate(NULL);
-            CGPoint location = CGEventGetLocation(getLocationEvent);
-            CFRelease(getLocationEvent);
-
-            if (CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft) != 0)
-            {
-                CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, location, kCGMouseButtonLeft);
-                CGEventPost(kCGHIDEventTap, event);
-            }
-            if (CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight) != 0)
-            {
-                CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseUp, location, kCGMouseButtonRight);
-                CGEventPost(kCGHIDEventTap, event);
-            }
-#elif LIN
-            if (display != NULL)
-            {
-                XTestFakeButtonEvent(display, 1, False, CurrentTime);
-                XTestFakeButtonEvent(display, 2, False, CurrentTime);
-                XFlush(display);
-            }
-#endif
+            ToggleMouseButton(MOUSE_BUTTON_LEFT, 0);
+            ToggleMouseButton(MOUSE_BUTTON_RIGHT, 0);
 
             // assign the default controls to the left joystick's axis
             joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_YAW;
@@ -977,97 +995,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 int joystickButtonValues[1600];
                 XPLMGetDatavi(joystickButtonValuesDataRef, joystickButtonValues, 0, 1600);
 
-                // get mouse button status
-                int leftMouseButtonDown = 0, rightMouseButtonDown = 0;
-#if APL
-                leftMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft);
-                rightMouseButtonDown = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight);
-
-                // update mouse pointer location since we need the current location to create a mouse up/down event
-                getLocationEvent = CGEventCreate(NULL);
-                newLocation = CGEventGetLocation(getLocationEvent);
-                CFRelease(getLocationEvent);
-#elif LIN
-                if (display != NULL)
-                {
-                    Window root, child;
-                    int rootX, rootY, winX, winY;
-                    unsigned int mask;
-                    XQueryPointer(display, DefaultRootWindow(display), &root, &child, &rootX, &rootY, &winX, &winY, &mask);
-                    leftMouseButtonDown = (mask & Button1Mask) >> 8;
-                    rightMouseButtonDown = (mask & Button2Mask) >> 8;
-                }
-#endif
-
-                if (joystickButtonValues[JOYSTICK_BUTTON_CROSS] != 0)
-                {
-                    // press left mouse button down
-#if APL
-                    if (leftMouseButtonDown == 0)
-                    {
-                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, newLocation, kCGMouseButtonLeft);
-                        CGEventPost(kCGHIDEventTap, event);
-                    }
-#elif LIN
-                    if (display != NULL)
-                    {
-                        XTestFakeButtonEvent(display, 1, True, CurrentTime);
-                        XFlush(display);
-                    }
-#endif
-                }
-                else
-                {
-                    // release left mouse button
-#if APL
-                    if (leftMouseButtonDown != 0)
-                    {
-                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, newLocation, kCGMouseButtonLeft);
-                        CGEventPost(kCGHIDEventTap, event);
-                    }
-#elif LIN
-                    if (display != NULL)
-                    {
-                        XTestFakeButtonEvent(display, 1, False, CurrentTime);
-                        XFlush(display);
-                    }
-#endif
-                }
-
-                if (joystickButtonValues[JOYSTICK_BUTTON_CIRCLE] != 0)
-                {
-                    // press right mouse button down
-#if APL
-                    if (rightMouseButtonDown == 0)
-                    {
-                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseDown, newLocation, kCGMouseButtonRight);
-                        CGEventPost(kCGHIDEventTap, event);
-                    }
-#elif LIN
-                    if (display != NULL)
-                    {
-                        XTestFakeButtonEvent(display, 2, True, CurrentTime);
-                        XFlush(display);
-                    }
-#endif
-                }
-                else
-                {
-                    // release right mouse button
-#if APL
-                    if (rightMouseButtonDown != 0)
-                    {
-                        CGEventRef event = CGEventCreateMouseEvent(NULL, kCGEventRightMouseUp, newLocation, kCGMouseButtonRight);
-                        CGEventPost(kCGHIDEventTap, event);
-                    }
-#elif LIN
-                    if (display != NULL)
-                    {
-                        XTestFakeButtonEvent(display, 2, False, CurrentTime);
-                        XFlush(display);
-                    }
-#endif
-                }
+                // handle left and right mouse button presses
+                ToggleMouseButton(MOUSE_BUTTON_LEFT, joystickButtonValues[JOYSTICK_BUTTON_CROSS] != 0 ? 1 : 0);
+                ToggleMouseButton(MOUSE_BUTTON_RIGHT, joystickButtonValues[JOYSTICK_BUTTON_CIRCLE] != 0 ? 1 : 0);
             }
             else
             {
