@@ -43,7 +43,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "0.5"
+#define VERSION "0.6"
 
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 0
@@ -1093,18 +1093,17 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     }
                 }
 
-                // apply brakes
-                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] == 1.0f)
-                {
+                // handle left brake
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.9f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] <= 0.6f)
                     XPLMSetDataf(leftBrakeRatioDataRef, 1.0f);
-                    XPLMSetDataf(rightBrakeRatioDataRef, 1.0f);
-                }
-                // don't apply brakes
                 else
-                {
                     XPLMSetDataf(leftBrakeRatioDataRef, 0.0f);
+
+                // handle right brake
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.9f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] >= 0.4f)
+                    XPLMSetDataf(rightBrakeRatioDataRef, 1.0f);
+                else
                     XPLMSetDataf(rightBrakeRatioDataRef, 0.0f);
-                }
             }
         }
 
