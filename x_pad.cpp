@@ -117,6 +117,9 @@
 // define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.0f
 
+// define collective control multiplier
+#define COLLECTIVE_CONTROL_MULTIPLIER 0.3f
+
 // define mouse buttons
 #define MOUSE_BUTTON_LEFT 0
 #define MOUSE_BUTTON_RIGHT 1
@@ -144,7 +147,7 @@ static Display *display = NULL;
 static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, toggleAutopilotDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // push the current button assignments to the stack
 static void PushButtonAssignments(void)
@@ -366,7 +369,7 @@ static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef inCommand
 }
 
 // check if a plugin with a given signature is enabled
-static int isPluginEnabled(const char* pluginSignature)
+static int IsPluginEnabled(const char* pluginSignature)
 {
     XPLMPluginID pluginId = XPLMFindPluginBySignature(pluginSignature);
 
@@ -386,10 +389,10 @@ static int ToggleAutopilotDisableFlightDirectorCommandHandler(XPLMCommandRef inC
         if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
         {
             // custom handling of QPAC A320
-            if (isPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
+            if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
                     XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
             // custom handling of x737
-            else if (isPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
+            else if (IsPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
             {
                 XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_A_OFF"));
                 XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_B_OFF"));
@@ -407,7 +410,7 @@ static int ToggleAutopilotDisableFlightDirectorCommandHandler(XPLMCommandRef inC
         if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
         {
             // custom handling of QPAC A320
-            if (isPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
+            if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
             {
                 XPLMDataRef ap1EngageDataRef = XPLMFindDataRef("AirbusFBW/AP1Engage");
                 XPLMDataRef ap2EngageDataRef = XPLMFindDataRef("AirbusFBW/AP2Engage");
@@ -421,7 +424,7 @@ static int ToggleAutopilotDisableFlightDirectorCommandHandler(XPLMCommandRef inC
                 }
             }
             // custom handling of x737
-            else if (isPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
+            else if (IsPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
             {
                 XPLMDataRef cmdADataRef = XPLMFindDataRef("x737/systems/afds/CMD_A");
                 XPLMDataRef cmdBDataRef = XPLMFindDataRef("x737/systems/afds/CMD_B");
@@ -674,7 +677,7 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
     if (inPhase != xplm_CommandContinue)
     {
         // only do push-to-talk if X-IvAp is enabled
-        if (display != NULL && isPluginEnabled(X_IVAP_PLUGIN_SIGNATURE) != 0)
+        if (display != NULL && IsPluginEnabled(X_IVAP_PLUGIN_SIGNATURE) != 0)
         {
 #if APL
             // TODO: OS X implementation
@@ -687,12 +690,6 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
     }
 
     return 0;
-}
-
-// normalizes a value of a range [inMin, inMax] to a value of the range [outMin, outMax]
-static float Normalize(float value, float inMin, float inMax, float outMin, float outMax)
-{
-    return (outMax - outMin) / (inMax - inMin) * (value - inMax) + (outMax - outMin);
 }
 
 // check if either the left or right mouse button is down or the XPScrollWheel plugin has been active - the right button is only checked if checkRightButton is not zero
@@ -748,10 +745,35 @@ static int IsMouseInUse(int checkRightButton)
     return 0;
 }
 
+// check if the player's aircraft is a helicopter
+static int IsHelicopter()
+{
+    if (XPLMGetDatai(acfCockpitTypeDataRef) == 5)
+        return 1;
+
+    float acfVertCant[8];
+    XPLMGetDatavf(acfVertCantDataRef, acfVertCant, 0, 8);
+
+    for (int i = 0; i < 8; i++)
+    {
+        if (acfVertCant[i] > 45.0f)
+            return 1;
+    }
+
+    return 0;
+}
+
+// normalizes a value of a range [inMin, inMax] to a value of the range [outMin, outMax]
+static float Normalize(float value, float inMin, float inMax, float outMin, float outMax)
+{
+    return (outMax - outMin) / (inMax - inMin) * (value - inMax) + (outMax - outMin);
+}
+
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
     int mouseInUse = IsMouseInUse(1);
+    int isHelicopter = IsHelicopter();
 
     int currentMouseX, currentMouseY;
     XPLMGetMouseLocation(&currentMouseX, &currentMouseY);
@@ -803,8 +825,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
         if (viewModifierDown == 0)
         {
-
-            if (propPitchModifierDown != 0)
+            if (isHelicopter == 0 && propPitchModifierDown != 0)
             {
                 float acfRSCMingovPrp = XPLMGetDataf(acfRSCMingovPrpDataRef);
                 float acfRSCRedlinePrp = XPLMGetDataf(acfRSCRedlinePrpDataRef);
@@ -1001,112 +1022,156 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             }
             else
             {
-                static float normalizedViewHeading = 0.0f;
-
-                float elapsedTime = XPLMGetElapsedTime() - lastMouseUsageTime;
-
-                // handle view heading when the joystick has been calibrated, the aircraft is on ground and the current view is 3D cockpit command look
-                if (joystickAxisLeftXCalibrated > 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && elapsedTime >= DISABLE_VIEW_HEADING_TIME)
+                if (isHelicopter == 0)
                 {
-                    float joystickHeadingNullzone = XPLMGetDataf(joystickHeadingNullzoneDataRef);
+                    static float normalizedViewHeading = 0.0f;
 
-                    // handle nullzone
-                    if(fabs(joystickAxisValues[JOYSTICK_AXIS_LEFT_X] - 0.5f) > joystickHeadingNullzone)
+                    float elapsedTime = XPLMGetElapsedTime() - lastMouseUsageTime;
+
+                    // handle view heading when the joystick has been calibrated, the aircraft is on ground and the current view is 3D cockpit command look
+                    if (joystickAxisLeftXCalibrated > 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && elapsedTime >= DISABLE_VIEW_HEADING_TIME)
                     {
-                        // normalize axis deflection
-                        if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.5f)
-                            normalizedViewHeading = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f + joystickHeadingNullzone, 1.0f, 0.0f, 1.0f);
+                        float joystickHeadingNullzone = XPLMGetDataf(joystickHeadingNullzoneDataRef);
+
+                        // handle nullzone
+                        if(fabs(joystickAxisValues[JOYSTICK_AXIS_LEFT_X] - 0.5f) > joystickHeadingNullzone)
+                        {
+                            // normalize axis deflection
+                            if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.5f)
+                                normalizedViewHeading = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f + joystickHeadingNullzone, 1.0f, 0.0f, 1.0f);
+                            else
+                                normalizedViewHeading = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f - joystickHeadingNullzone, 0.0f, 0.0f, -1.0f);
+
+                            float groundspeed = XPLMGetDataf(groundspeedDataRef);
+
+                            // clamp absolute groundspeed to 15 m/s
+                            groundspeed = fabs(groundspeed < 15.0f ?  groundspeed : 15.0f);
+
+                            // apply acceleration function (y = x^2) and fade-out with increasing groundspeed
+                            float newPilotsHeadPsi = normalizedViewHeading * powf(joystickAxisValues[JOYSTICK_AXIS_LEFT_X] - 0.5f, 2.0f) * 2.0f * Normalize(groundspeed, 15.0f, 0.0f, -1.0f, 0.0f) * 90.0f;
+
+                            XPLMSetDataf(pilotsHeadPsiDataRef, newPilotsHeadPsi);
+                        }
+                        // reset the view if the axis deflection has jumped from a large value right into the nullzone
+                        else if (normalizedViewHeading != 0.0f)
+                        {
+                            XPLMSetDataf(pilotsHeadPsiDataRef, 0.0f);
+                            normalizedViewHeading = 0.0f;
+                        }
+                    }
+                }
+
+                if (isHelicopter != 0 && propPitchModifierDown == 0)
+                {
+                    float acfMinPitch[8];
+                    XPLMGetDatavf(acfMinPitchDataRef, acfMinPitch, 0, 8);
+                    float acfMaxPitch[8];
+                    XPLMGetDatavf(acfMaxPitchDataRef, acfMaxPitch, 0, 8);
+                    float propPitchDeg[acfNumEngines];
+                    XPLMGetDatavf(propPitchDegDataRef, propPitchDeg, 0, acfNumEngines);
+
+                    for (int i = 0; i < acfNumEngines; i++)
+                    {
+                        // increase prop pitch
+                        if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+                        {
+                            // normalize range [0.5, 0.0] to [acfMinPitch, acfMaxPitch]
+                            float d = COLLECTIVE_CONTROL_MULTIPLIER * sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, acfMinPitch[i], acfMaxPitch[i]);
+
+                            float newPropPitchDeg = propPitchDeg[i] + d;
+
+                            // ensure we don't set values larger than 1.0
+                            propPitchDeg[i] = newPropPitchDeg < acfMaxPitch[i] ? newPropPitchDeg : acfMaxPitch[i];
+                        }
+                        // decrease prop pitch
+                        else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+                        {
+                            // normalize range [0.5, 1.0] to [acfMinPitch, acfMaxPitch]
+                            float d = COLLECTIVE_CONTROL_MULTIPLIER * sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, acfMinPitch[i], acfMaxPitch[i]);
+
+                            float newPropPitchDeg = propPitchDeg[i] - d;
+
+                            // ensure we don't set values smaller than 0.0
+                            propPitchDeg[i] = newPropPitchDeg > acfMinPitch[i] ? newPropPitchDeg : acfMinPitch[i];
+                        }
+                    }
+
+                    XPLMSetDatavf(propPitchDegDataRef, propPitchDeg, 0, acfNumEngines);
+                }
+                else
+                {
+                    float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
+
+                    float thrustReverserDeployRatio[acfNumEngines];
+                    XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
+
+                    float averageThrustReverserDeployRatio = 0.0f;
+                    for (int i = 0; i < acfNumEngines; i++)
+                        averageThrustReverserDeployRatio += thrustReverserDeployRatio[i];
+                    averageThrustReverserDeployRatio /= acfNumEngines;
+
+                    // increase throttle setting
+                    if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+                    {
+                        // normalize range [0.5, 0.0] to [0.0, 1.0]
+                        float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+
+                        // invert d if thrust reversers are engaged
+                        if (averageThrustReverserDeployRatio > 0.5f)
+                        {
+                            float newThrottleRatioAll = throttleRatioAll - d;
+
+                            // ensure we don't set values smaller than 0.0
+                            XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
+                        }
                         else
-                            normalizedViewHeading = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f - joystickHeadingNullzone, 0.0f, 0.0f, -1.0f);
+                        {
+                            float newThrottleRatioAll = throttleRatioAll + d;
 
-                        float groundspeed = XPLMGetDataf(groundspeedDataRef);
-
-                        // clamp absolute groundspeed to 15 m/s
-                        groundspeed = fabs(groundspeed < 15.0f ?  groundspeed : 15.0f);
-
-                        // apply acceleration function (y = x^2) and fade-out with increasing groundspeed
-                        float newPilotsHeadPsi = normalizedViewHeading * powf(joystickAxisValues[JOYSTICK_AXIS_LEFT_X] - 0.5f, 2.0f) * 2.0f * Normalize(groundspeed, 15.0f, 0.0f, -1.0f, 0.0f) * 90.0f;
-
-                        XPLMSetDataf(pilotsHeadPsiDataRef, newPilotsHeadPsi);
+                            // ensure we don't set values larger than 1.0
+                            XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                        }
                     }
-                    // reset the view if the axis deflection has jumped from a large value right into the nullzone
-                    else if (normalizedViewHeading != 0.0f)
+                    // decrease throttle setting
+                    else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                     {
-                        XPLMSetDataf(pilotsHeadPsiDataRef, 0.0f);
-                        normalizedViewHeading = 0.0f;
+                        // normalize range [0.5, 1.0] to [0.0, 1.0]
+                        float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+
+                        // invert d if thrust reversers are engaged
+                        if (averageThrustReverserDeployRatio > 0.5f)
+                        {
+                            float newThrottleRatioAll = throttleRatioAll + d;
+
+                            // ensure we don't set values larger than 1.0
+                            XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                        }
+                        else
+                        {
+                            float newThrottleRatioAll = throttleRatioAll - d;
+
+                            // ensure we don't set values smaller than 0.0
+                            XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
+                        }
                     }
                 }
 
-
-                float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
-
-                float thrustReverserDeployRatio[acfNumEngines];
-                XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
-
-                float averageThrustReverserDeployRatio = 0.0f;
-                for (int i = 0; i < acfNumEngines; i++)
-                    averageThrustReverserDeployRatio += thrustReverserDeployRatio[i];
-                averageThrustReverserDeployRatio /= acfNumEngines;
-
-                // increase throttle setting
-                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+                if (isHelicopter == 0 || (isHelicopter != 0 && propPitchModifierDown == 0))
                 {
-                    // normalize range [0.5, 0.0] to [0.0, 1.0]
-                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
-
-                    // invert d if thrust reversers are engaged
-                    if (averageThrustReverserDeployRatio > 0.5f)
-                    {
-                        float newThrottleRatioAll = throttleRatioAll - d;
-
-                        // ensure we don't set values smaller than 0.0
-                        XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
-                    }
+                    // handle left brake
+                    if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.9f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] <= 0.6f)
+                        XPLMSetDataf(leftBrakeRatioDataRef, 1.0f);
                     else
-                    {
-                        float newThrottleRatioAll = throttleRatioAll + d;
+                        XPLMSetDataf(leftBrakeRatioDataRef, 0.0f);
 
-                        // ensure we don't set values larger than 1.0
-                        XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
-                    }
-                }
-                // decrease throttle setting
-                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
-                {
-                    // normalize range [0.5, 1.0] to [0.0, 1.0]
-                    float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
-
-                    // invert d if thrust reversers are engaged
-                    if (averageThrustReverserDeployRatio > 0.5f)
-                    {
-                        float newThrottleRatioAll = throttleRatioAll + d;
-
-                        // ensure we don't set values larger than 1.0
-                        XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
-                    }
+                    // handle right brake
+                    if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.9f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] >= 0.4f)
+                        XPLMSetDataf(rightBrakeRatioDataRef, 1.0f);
                     else
-                    {
-                        float newThrottleRatioAll = throttleRatioAll - d;
-
-                        // ensure we don't set values smaller than 0.0
-                        XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
-                    }
+                        XPLMSetDataf(rightBrakeRatioDataRef, 0.0f);
                 }
-
-                // handle left brake
-                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.9f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] <= 0.6f)
-                    XPLMSetDataf(leftBrakeRatioDataRef, 1.0f);
-                else
-                    XPLMSetDataf(leftBrakeRatioDataRef, 0.0f);
-
-                // handle right brake
-                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.9f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] >= 0.4f)
-                    XPLMSetDataf(rightBrakeRatioDataRef, 1.0f);
-                else
-                    XPLMSetDataf(rightBrakeRatioDataRef, 0.0f);
             }
         }
-
     }
 
     return -1.0f;
@@ -1171,10 +1236,14 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     strcpy(outDesc, NAME" allows flying X-Plane by gamepad!");
 
     // obtain datarefs
+    acfCockpitTypeDataRef = XPLMFindDataRef("sim/aircraft/view/acf_cockpit_type");
     acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
     acfSbrkEQDataRef = XPLMFindDataRef("sim/aircraft/parts/acf_sbrkEQ");
+    acfMinPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_min_pitch");
+    acfMaxPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_max_pitch");
+    acfVertCantDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_vertcant");
     ongroundAnyDataRef = XPLMFindDataRef("sim/flightmodel/failures/onground_any");
     groundspeedDataRef = XPLMFindDataRef("sim/flightmodel/position/groundspeed");
     pilotsHeadPsiDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_psi");
@@ -1191,6 +1260,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     rightBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/right_brake_ratio");
     speedbrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/speedbrake_ratio");
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
+    propPitchDegDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_pitch_deg");
     propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
     carbHeatRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/carb_heat_ratio");
