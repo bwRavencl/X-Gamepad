@@ -181,48 +181,23 @@ static const char* GetDirectorySeparator()
     return (strcmp(directorySeperator, ":") == 0 ?  "/" : directorySeperator);
 }
 
-// convert an OS X path with ':' directory seperators to a POSIX path with '/' seperators
-#if APL
-static void CarbonPathToPOSIXPath(char *path)
-{
-    // replace ':' with '/'
-    for(int i = 0; i < strlen(path); i++)
-        if(path[i] == ':') path[i] = '/';
-
-    // prepend '/Volumes/' prefix
-    const char *prefix = "/Volumes/";
-    size_t len = strlen(prefix);
-
-    memmove(path + len, path, strlen(path) + 1);
-
-    for (int i = 0; i < len; i++)
-        path[i] = prefix[i];
-}
-#endif
-
 // returns 1 if the current aircraft does have a 2D panel, otherwise 0 is returned - for non-parseable sub 1004 version '.acf' files 1 is returned
 static int Has2DPanel(void)
 {
     char fileName[256], path[512];
     XPLMGetNthAircraftModel(0, fileName, path);
 
-    // under OS X replace the ':' seperator with the POSIX '/'
-    char *aircraftFilePath = path;
-#if APL
-    CarbonPathToPOSIXPath(aircraftFilePath);
-#endif
-
     // check if the path to the '.acf' file matches one of the hardcoded aircraft that have no 2D panel and for which the check below fails
     for (int i = 0; i < sizeof(ACF_WITHOUT2D_PANEL) / sizeof(char*); i++)
     {
-        if (strstr(aircraftFilePath, ACF_WITHOUT2D_PANEL[i]) != NULL)
+        if (strstr(path, ACF_WITHOUT2D_PANEL[i]) != NULL)
             return 0;
     }
 
     int has2DPanel = 1;
 
     // search the '.acf' file for a special string which indicates that the aircraft shows the 3D cockpit object in the 2D forward panel view
-    FILE *file = fopen(aircraftFilePath, "r");
+    FILE *file = fopen(path, "r");
     if(file != NULL)
     {
         char temp[512];
@@ -1234,6 +1209,9 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     strcpy(outName, NAME);
     strcpy(outSig, "de.bwravencl."NAME_LOWERCASE);
     strcpy(outDesc, NAME" allows flying X-Plane by gamepad!");
+
+    // get paths in POSIX format
+    XPLMEnableFeature("XPLM_USE_NATIVE_PATHS", 1);
 
     // obtain datarefs
     acfCockpitTypeDataRef = XPLMFindDataRef("sim/aircraft/view/acf_cockpit_type");
