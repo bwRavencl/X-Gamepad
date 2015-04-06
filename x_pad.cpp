@@ -88,7 +88,9 @@
 #define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
 
 // define plugin signatures
+#define DREAMFOIL_AS350_PLUGIN_SIGNATURE "DreamFoil.AS350"
 #define QPAC_A320_PLUGIN_SIGNATURE "QPAC.airbus.fbw"
+#define ROTORSIM_EC135_PLUGIN_SIGNATURE "rotorsim.ec135.management"
 #define X737_PLUGIN_SIGNATURE "bs.x737.plugin"
 #define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
 #define XP_SCROLL_WHEEL_PLUGIN_SIGNATURE "thranda.window.scrollwheel"
@@ -118,7 +120,7 @@
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.0f
 
 // define collective control multiplier
-#define COLLECTIVE_CONTROL_MULTIPLIER 0.3f
+#define COLLECTIVE_CONTROL_MULTIPLIER 0.2f
 
 // define mouse buttons
 #define MOUSE_BUTTON_LEFT 0
@@ -539,10 +541,21 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_left");
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_right");
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_down");
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_up");
+        // custom handling of DreamFoil AS350
+        if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE) != 0)
+            XPLMCommandBegin(XPLMFindCommand("AS350/Trim/Force_Trim"));
+        // custom handling of RotorSim EC135
+        else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
+            XPLMCommandBegin(XPLMFindCommand("ec135/autopilot/force_trim_release"));
+        // default handling
+        else
+        {
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_left");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_right");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_down");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_up");
+        }
+
         joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
         joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_right");
 
@@ -554,6 +567,13 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
         // restore the default button assignments
         PopButtonAssignments();
+
+        // custom handling of DreamFoil AS350
+        if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE) != 0)
+            XPLMCommandEnd(XPLMFindCommand("AS350/Trim/Force_Trim"));
+        // custom handling of RotorSim EC135
+        else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
+            XPLMCommandEnd(XPLMFindCommand("ec135/autopilot/force_trim_release"));
     }
 
     return 0;
