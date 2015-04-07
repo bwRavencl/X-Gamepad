@@ -374,6 +374,9 @@ static int ToggleAutopilotDisableFlightDirectorCommandHandler(XPLMCommandRef inC
                 XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_A_OFF"));
                 XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_B_OFF"));
             }
+            // custom handling of RotorSim EC135
+            else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
+                XPLMCommandOnce(XPLMFindCommand("ec135/autopilot/apmd_dcpl"));
             // default handling
             else
                 XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_fdir_off"));
@@ -417,6 +420,9 @@ static int ToggleAutopilotDisableFlightDirectorCommandHandler(XPLMCommandRef inC
                     }
                 }
             }
+            // custom handling of RotorSim EC135
+            else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
+                XPLMCommandOnce(XPLMFindCommand("ec135/autopilot/ap_on"));
             // default handling
             else
                 XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_toggle"));
@@ -543,10 +549,22 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
         // custom handling of DreamFoil AS350
         if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE) != 0)
+        {
+            joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+            joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_right");
+
             XPLMCommandBegin(XPLMFindCommand("AS350/Trim/Force_Trim"));
+        }
         // custom handling of RotorSim EC135
         else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
+        {
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_left");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_right");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_fwd");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_aft");
+
             XPLMCommandBegin(XPLMFindCommand("ec135/autopilot/force_trim_release"));
+        }
         // default handling
         else
         {
@@ -554,10 +572,9 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_right");
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_down");
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_up");
+            joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+            joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_right");
         }
-
-        joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
-        joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_right");
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
