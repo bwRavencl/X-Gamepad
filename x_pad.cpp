@@ -562,8 +562,6 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_right");
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_fwd");
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_aft");
-
-            XPLMCommandBegin(XPLMFindCommand("ec135/autopilot/force_trim_release"));
         }
         // default handling
         else
@@ -588,9 +586,6 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         // custom handling of DreamFoil AS350
         if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE) != 0)
             XPLMCommandEnd(XPLMFindCommand("AS350/Trim/Force_Trim"));
-        // custom handling of RotorSim EC135
-        else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
-            XPLMCommandEnd(XPLMFindCommand("ec135/autopilot/force_trim_release"));
     }
 
     return 0;
