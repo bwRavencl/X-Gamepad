@@ -43,7 +43,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "0.6"
+#define VERSION "0.7"
 
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 0
@@ -93,10 +93,6 @@
 #define ROTORSIM_EC135_PLUGIN_SIGNATURE "rotorsim.ec135.management"
 #define X737_PLUGIN_SIGNATURE "bs.x737.plugin"
 #define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
-#define XP_SCROLL_WHEEL_PLUGIN_SIGNATURE "thranda.window.scrollwheel"
-
-// define XPScrollWheel scrollIndex array size
-#define XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE 512
 
 // define custom command names
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
@@ -138,8 +134,9 @@
 static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf"};
 
 // global internal variables
-static int viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastScrollindex[XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE] = {0}, lastMouseX = 0, lastMouseY = 0;
+static int viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0;
 static float lastAxisAssignment = 0.0f, lastMouseUsageTime = 0.0f;
+static XPLMWindowID fakeWindow = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 #if LIN
 static Display *display = NULL;
@@ -150,6 +147,25 @@ static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleA
 
 // global dataref variables
 static XPLMDataRef acfCockpitTypeDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+
+// flightloop-callback that resizes and brings the fake window back to the front if needed
+static float UpdateFakeWindowCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
+{
+    if (fakeWindow != NULL)
+    {
+        int x = 0, y = 0;
+        XPLMGetScreenSize(&x, &y);
+        XPLMSetWindowGeometry(fakeWindow, 0, y, x, 0);
+
+        if (bringFakeWindowToFront == 0)
+        {
+            XPLMBringWindowToFront(fakeWindow);
+            bringFakeWindowToFront = 1;
+        }
+    }
+
+    return -1.0f;
+}
 
 // push the current button assignments to the stack
 static void PushButtonAssignments(void)
@@ -699,59 +715,6 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
     return 0;
 }
 
-// check if either the left or right mouse button is down or the XPScrollWheel plugin has been active - the right button is only checked if checkRightButton is not zero
-static int IsMouseInUse(int checkRightButton)
-{
-    // check if mouse buttons are down
-    int mouseButtonDown[2] = {0};
-#if APL
-    mouseButtonDown[0] = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft);
-    mouseButtonDown[1] = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonRight);
-#elif IBM
-    // if the most significant bit is set, the key is down
-    mouseButtonDown[0] = (int) GetAsyncKeyState(VK_LBUTTON) >> 15;
-    mouseButtonDown[1] = (int) GetAsyncKeyState(VK_RBUTTON) >> 15;
-#elif LIN
-    if (display == NULL)
-        display = XOpenDisplay(NULL);
-    if (display != NULL)
-    {
-        Window root, child;
-        int rootX, rootY, winX, winY;
-        unsigned int mask;
-        XQueryPointer(display, DefaultRootWindow(display), &root, &child, &rootX, &rootY, &winX, &winY, &mask);
-        mouseButtonDown[0] = (mask & Button1Mask) >> 8;
-        mouseButtonDown[1] = (mask & Button2Mask) >> 8;
-    }
-#endif
-
-    if (mouseButtonDown[0] != 0)
-        return 1;
-
-    if (checkRightButton != 0 && mouseButtonDown[1] != 0)
-        return 1;
-
-    // check if the XPScrollWheel plugin has modified a DataRef since the last call
-    XPLMPluginID pluginId = XPLMFindPluginBySignature(XP_SCROLL_WHEEL_PLUGIN_SIGNATURE);
-    if (XPLMIsPluginEnabled(pluginId) != 0)
-    {
-        XPLMDataRef scrollindexDataRef = XPLMFindDataRef("thranda/scrollindex");
-        int scrollindex[XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE];
-        XPLMGetDatavi(scrollindexDataRef, scrollindex, 0, XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE);
-
-        for (int i = 0; i < XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE; i++)
-        {
-            if (scrollindex[i] != lastScrollindex[i])
-            {
-                memcpy(lastScrollindex, scrollindex, XP_SCROLL_WHEEL_PLUGIN_SCROLL_INDEX_SIZE);
-                return 1;
-            }
-        }
-    }
-
-    return 0;
-}
-
 // check if the player's aircraft is a helicopter
 static int IsHelicopter()
 {
@@ -779,19 +742,10 @@ static float Normalize(float value, float inMin, float inMax, float outMin, floa
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
-    int mouseInUse = IsMouseInUse(1);
     int isHelicopter = IsHelicopter();
 
     int currentMouseX, currentMouseY;
     XPLMGetMouseLocation(&currentMouseX, &currentMouseY);
-
-    if (mouseInUse != 0 || currentMouseX != lastMouseX || currentMouseY != lastMouseY)
-    {
-        lastMouseX = currentMouseX;
-        lastMouseY = currentMouseY;
-
-        lastMouseUsageTime = XPLMGetElapsedTime();
-    }
 
     // handle switch to 3D command look
     if (switchTo3DCommandLook != 0)
@@ -1235,6 +1189,42 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
         SetDefaultAssignments();
 }
 
+static void DrawWindow(XPLMWindowID inWindowID, void *inRefcon)
+{
+}
+
+static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus)
+{
+}
+
+static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
+{
+    lastMouseUsageTime = XPLMGetElapsedTime();
+    
+    return 0;
+}
+
+static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon)
+{
+    static int lastX = x, lastY = y;
+    
+    if (x != lastX || y != lastY)
+    {
+        lastMouseUsageTime = XPLMGetElapsedTime();
+        lastX = x;
+        lastY = y;
+    }
+
+    return xplm_CursorDefault;
+}
+
+static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, int clicks, void *inRefcon)
+{
+    lastMouseUsageTime = XPLMGetElapsedTime();
+
+    return 0;
+}
+
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 {
     // set plugin info
@@ -1301,7 +1291,26 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(pushToTalkCommand, PushToTalkCommandHandler, 1, NULL);
 
-    // register flight loop callback
+    // create fake window
+    XPLMCreateWindow_t fakeWindowParameters;
+    memset(&fakeWindowParameters, 0, sizeof(fakeWindowParameters));
+    fakeWindowParameters.structSize = sizeof(fakeWindowParameters);
+    fakeWindowParameters.left = 0;
+    int x = 0, y = 0;
+    XPLMGetScreenSize(&x, &y);
+    fakeWindowParameters.top = y;
+    fakeWindowParameters.right = x;
+    fakeWindowParameters.bottom = 0;
+    fakeWindowParameters.visible = 1;
+    fakeWindowParameters.drawWindowFunc = DrawWindow;
+    fakeWindowParameters.handleKeyFunc = HandleKey;
+    fakeWindowParameters.handleMouseClickFunc = HandleMouseClick;
+    fakeWindowParameters.handleCursorFunc = HandleCursor;
+    fakeWindowParameters.handleMouseWheelFunc = HandleMouseWheel;
+    fakeWindow = XPLMCreateWindowEx(&fakeWindowParameters);
+
+    // register flight loop callbacks
+    XPLMRegisterFlightLoopCallback(UpdateFakeWindowCallback, -1, NULL);
     XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
 
     // create menu-entries
@@ -1345,12 +1354,15 @@ PLUGIN_API int XPluginEnable(void)
 
 PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, void *inParam)
 {
-    // if another plane or airport is loaded and the plane has no 2D panel, automatically switch the view to the 3D cockpit in the next flightloop
-    if (inMessage == XPLM_MSG_PLANE_LOADED || inMessage == XPLM_MSG_AIRPORT_LOADED)
+    switch (inMessage)
     {
-        switchTo3DCommandLook = 0;
-
-        if (Has2DPanel() == 0)
-            switchTo3DCommandLook = 1;
+        case XPLM_MSG_PLANE_LOADED:
+            bringFakeWindowToFront = 0; 
+        case XPLM_MSG_AIRPORT_LOADED:
+            // schedule a switch to the 3D cockpit view during the next flight-loop
+            switchTo3DCommandLook = 0;
+            if (Has2DPanel() == 0)
+                switchTo3DCommandLook = 1;
+            break;
     }
 }
