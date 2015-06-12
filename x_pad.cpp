@@ -96,13 +96,14 @@
 
 // define custom command names
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
-#define SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND NAME_LOWERCASE "/speed_brake_and_carb_heat_toggle_arm"
-#define TOOGLE_AUTOPILOT_DISABLE_FLIGHT_DIRECTOR_COMMAND NAME_LOWERCASE "/toggle_autopilot_disable_flight_director"
+#define TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND NAME_LOWERCASE "/toggle_arm_speed_brake_or_toggle_carb_heat"
+#define TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND NAME_LOWERCASE "/toggle_autopilot_or_disable_flight_director"
 #define VIEW_MODIFIER_COMMAND NAME_LOWERCASE "/view_modifier"
 #define PROP_PITCH_THROTTLE_MODIFIER_COMMAND NAME_LOWERCASE "/prop_pitch_throttle_modifier"
 #define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE "/mixture_control_modifier"
 #define COWL_FLAP_MODIFIER_COMMAND NAME_LOWERCASE "/cowl_flap_modifier"
 #define TRIM_MODIFIER_COMMAND NAME_LOWERCASE "/trim_modifier"
+#define TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND NAME_LOWERCASE "/toggle_beta_or_toggle_reverse"
 #define TOGGLE_MOUSE_POINTER_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_pointer_control"
 #define PUSH_TO_TALK_COMMAND NAME_LOWERCASE "/push_to_talk"
 
@@ -143,10 +144,10 @@ static Display *display = NULL;
 #endif
 
 // global commandref variables
-static XPLMCommandRef cycleResetViewCommand = NULL, speedBrakeAndCarbHeatToggleArmCommand = NULL, toggleAutopilotDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // flightloop-callback that resizes and brings the fake window back to the front if needed
 static float UpdateFakeWindowCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
@@ -300,7 +301,7 @@ static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPha
 }
 
 // command-handler that handles the speedbrake toggle / arm command or the carb heat, if the plane has no speedbrake
-static int SpeedBrakeAndCarbHeatToggleArmCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     // if a speedbrake exists this command controls it
     if (XPLMGetDatai(acfSbrkEQDataRef) != 0)
@@ -370,7 +371,7 @@ static int IsPluginEnabled(const char* pluginSignature)
 }
 
 // command-handler that handles the toggle autopilot / disable flight director command - depending on the aircraft custom commands are invoked instead of the default ones
-static int ToggleAutopilotDisableFlightDirectorCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     static float beginTime = 0.0f;
 
@@ -516,7 +517,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 }
 
 // command-handler that handles the prop pitch modifier command for fixed-wing airplanes or the throttle modifier command for helicopters
-static int PropPitchThrottleModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+static int PropPitchOrThrottleModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
         propPitchThrottleModifierDown = 1;
@@ -602,6 +603,36 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         // custom handling of DreamFoil AS350
         if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE) != 0)
             XPLMCommandEnd(XPLMFindCommand("AS350/Trim/Force_Trim"));
+    }
+
+    return 0;
+}
+
+// command-handler that handles the toggle beta or toggle reverse command
+static int ToggleBetaOrToggleReverseCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    static float beginTime = 0.0f;
+
+    if (inPhase == xplm_CommandBegin)
+        beginTime = XPLMGetElapsedTime();
+    else if (inPhase == xplm_CommandContinue)
+    {
+        // toggle beta
+        if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
+        {
+            if (XPLMGetDatai(acfHasBetaDataRef) != 0)
+                XPLMCommandOnce(XPLMFindCommand("sim/engines/beta_toggle"));
+
+            beginTime = MAXFLOAT;
+        }
+    }
+    else if (inPhase == xplm_CommandEnd)
+    {
+        // toggle reverse
+        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+            XPLMCommandOnce(XPLMFindCommand("sim/engines/thrust_reverse_toggle"));
+
+        beginTime = 0.0f;
     }
 
     return 0;
@@ -1161,14 +1192,14 @@ static void SetDefaultAssignments(void)
 
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_up");
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_RIGHT] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_down");
-        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand(SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_UP] = (std::size_t) XPLMFindCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
         joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand(CYCLE_RESET_VIEW_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
-        joystickButtonAssignments[JOYSTICK_BUTTON_START] = (std::size_t) XPLMFindCommand(TOOGLE_AUTOPILOT_DISABLE_FLIGHT_DIRECTOR_COMMAND);
-        joystickButtonAssignments[JOYSTICK_BUTTON_SELECT] = (std::size_t) XPLMFindCommand("sim/engines/thrust_reverse_toggle");
+        joystickButtonAssignments[JOYSTICK_BUTTON_START] = (std::size_t) XPLMFindCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND);
+        joystickButtonAssignments[JOYSTICK_BUTTON_SELECT] = (std::size_t) XPLMFindCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_L1] = (std::size_t) XPLMFindCommand(TRIM_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_R1] = (std::size_t) XPLMFindCommand(VIEW_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_L2] = (std::size_t) XPLMFindCommand(PUSH_TO_TALK_COMMAND);
@@ -1240,6 +1271,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
+    acfHasBetaDataRef = XPLMFindDataRef("sim/aircraft/overflow/acf_has_beta");
     acfSbrkEQDataRef = XPLMFindDataRef("sim/aircraft/parts/acf_sbrkEQ");
     acfMinPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_min_pitch");
     acfMaxPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_max_pitch");
@@ -1268,26 +1300,28 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     thrustReverserDeployRatioDataRef = XPLMFindDataRef("sim/flightmodel2/engines/thrust_reverser_deploy_ratio");
 
     // create custom commands
-    cycleResetViewCommand = XPLMCreateCommand(CYCLE_RESET_VIEW_COMMAND, "Cycle/Reset View");
-    speedBrakeAndCarbHeatToggleArmCommand = XPLMCreateCommand(SPEED_BRAKE_AND_CARB_HEAT_TOGGLE_ARM_COMMAND, "Toggle/Arm Speedbrake/Carb Heat");
-    toggleAutopilotDisableFlightDirectorCommand = XPLMCreateCommand(TOOGLE_AUTOPILOT_DISABLE_FLIGHT_DIRECTOR_COMMAND, "Toggle/Disable Autopilot/Flight Director");
+    cycleResetViewCommand = XPLMCreateCommand(CYCLE_RESET_VIEW_COMMAND, "Cycle / Reset View");
+    toggleArmSpeedBrakeOrToggleCarbHeatCommand = XPLMCreateCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND, "Toggle / Arm Speedbrake / Toggle Carb Heat");
+    toggleAutopilotOrDisableFlightDirectorCommand = XPLMCreateCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND, "Toggle Autopilot / Disable Flight Director");
     viewModifierCommand = XPLMCreateCommand(VIEW_MODIFIER_COMMAND, "View Modifier");
-    propPitchThrottleModifierCommand = XPLMCreateCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND, "Prop Pitch/Throttle Modifier");
+    propPitchOrThrottleModifierCommand = XPLMCreateCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND, "Prop Pitch / Throttle Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(MIXTURE_CONTROL_MODIFIER_COMMAND, "Mixture Control Modifier");
     cowlFlapModifierCommand = XPLMCreateCommand(COWL_FLAP_MODIFIER_COMMAND, "Cowl Flap Modifier");
     trimModifierCommand = XPLMCreateCommand(TRIM_MODIFIER_COMMAND, "Trim Modifier");
+    toggleBetaOrToggleReverseCommand = XPLMCreateCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND, "Toggle Beta / Toggle Reverse");
     toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND, "Toggle Mouse Pointer Control");
     pushToTalkCommand = XPLMCreateCommand(PUSH_TO_TALK_COMMAND, "Push-To-Talk");
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleResetViewCommand, CycleResetViewCommandHandler, 1, NULL);
-    XPLMRegisterCommandHandler(speedBrakeAndCarbHeatToggleArmCommand, SpeedBrakeAndCarbHeatToggleArmCommandHandler, 1, NULL);
-    XPLMRegisterCommandHandler(toggleAutopilotDisableFlightDirectorCommand, ToggleAutopilotDisableFlightDirectorCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleAutopilotOrDisableFlightDirectorCommand, ToggleAutopilotOrDisableFlightDirectorCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
-    XPLMRegisterCommandHandler(propPitchThrottleModifierCommand, PropPitchThrottleModifierCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(propPitchOrThrottleModifierCommand, PropPitchOrThrottleModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(trimModifierCommand, TrimModifierCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleBetaOrToggleReverseCommand, ToggleBetaOrToggleReverseCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(pushToTalkCommand, PushToTalkCommandHandler, 1, NULL);
 
