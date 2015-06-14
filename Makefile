@@ -7,7 +7,7 @@ TARGET_64   := 64
 SOURCES = \
         x_pad.cpp
 
-LIBS = -lX11 -lXtst
+LIBS = -lXtst
 
 INCLUDES = \
         -I$(SRC_BASE)/SDK/CHeaders/XPLM \
