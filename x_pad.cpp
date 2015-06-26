@@ -105,6 +105,7 @@
 #define TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND NAME_LOWERCASE "/toggle_beta_or_toggle_reverse"
 #define TOGGLE_MOUSE_POINTER_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_pointer_control"
 #define PUSH_TO_TALK_COMMAND NAME_LOWERCASE "/push_to_talk"
+#define TOGGLE_BRAKES_COMMAND NAME_LOWERCASE "/toggle_brakes"
 
 // define long press time
 #define BUTTON_LONG_PRESS_TIME 1.0f
@@ -143,7 +144,7 @@ static Display *display = NULL;
 #endif
 
 // global commandref variables
-static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL;
 
 // global dataref variables
 static XPLMDataRef acfCockpitTypeDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
@@ -245,20 +246,20 @@ static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPha
         {
             switch (XPLMGetDatai(viewTypeDataRef))
             {
-                case VIEW_TYPE_FORWARDS_WITH_PANEL:
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
-                    break;
+            case VIEW_TYPE_FORWARDS_WITH_PANEL:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+                break;
 
-                case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-                    break;
+            case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+                break;
 
-                case VIEW_TYPE_CHASE:
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/circle"));
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
-                    break;
+            case VIEW_TYPE_CHASE:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/circle"));
+                XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
+                break;
             }
 
             beginTime = MAXFLOAT;
@@ -271,25 +272,25 @@ static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPha
         {
             switch (XPLMGetDatai(viewTypeDataRef))
             {
-                case VIEW_TYPE_FORWARDS_WITH_PANEL:
+            case VIEW_TYPE_FORWARDS_WITH_PANEL:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+                break;
+
+            case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_hud"));
+                break;
+
+            case VIEW_TYPE_FORWARDS_WITH_HUD:
+                XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
+                break;
+
+            case VIEW_TYPE_CHASE:
+            default:
+                if (Has2DPanel())
+                    XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+                else
                     XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-                    break;
-
-                case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_hud"));
-                    break;
-
-                case VIEW_TYPE_FORWARDS_WITH_HUD:
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
-                    break;
-
-                case VIEW_TYPE_CHASE:
-                default:
-                    if (Has2DPanel())
-                        XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
-                    else
-                        XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-                    break;
+                break;
             }
         }
 
@@ -381,16 +382,16 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
         // disable flight director
         if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
         {
-            // custom handling of QPAC A320
+            // custom handling for QPAC A320
             if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
-                    XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
-            // custom handling of x737
+                XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
+            // custom handling for x737
             else if (IsPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
             {
                 XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_A_OFF"));
                 XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_B_OFF"));
             }
-            // custom handling of RotorSim EC135
+            // custom handling for RotorSim EC135
             else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
                 XPLMCommandOnce(XPLMFindCommand("ec135/autopilot/apmd_dcpl"));
             // default handling
@@ -405,7 +406,7 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
         // toggle autopilot
         if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
         {
-            // custom handling of QPAC A320
+            // custom handling for QPAC A320
             if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
             {
                 XPLMDataRef ap1EngageDataRef = XPLMFindDataRef("AirbusFBW/AP1Engage");
@@ -419,7 +420,7 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
                         XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
                 }
             }
-            // custom handling of x737
+            // custom handling for x737
             else if (IsPluginEnabled(X737_PLUGIN_SIGNATURE) != 0)
             {
                 XPLMDataRef cmdADataRef = XPLMFindDataRef("x737/systems/afds/CMD_A");
@@ -436,7 +437,7 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
                     }
                 }
             }
-            // custom handling of RotorSim EC135
+            // custom handling for RotorSim EC135
             else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
                 XPLMCommandOnce(XPLMFindCommand("ec135/autopilot/ap_on"));
             // default handling
@@ -563,7 +564,7 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        // custom handling of DreamFoil AS350
+        // custom handling for DreamFoil AS350
         if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE) != 0)
         {
             joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
@@ -571,7 +572,7 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
             XPLMCommandBegin(XPLMFindCommand("AS350/Trim/Force_Trim"));
         }
-        // custom handling of RotorSim EC135
+        // custom handling for RotorSim EC135
         else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE) != 0)
         {
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_LEFT] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_left");
@@ -599,7 +600,7 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         // restore the default button assignments
         PopButtonAssignments();
 
-        // custom handling of DreamFoil AS350
+        // custom handling for DreamFoil AS350
         if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE) != 0)
             XPLMCommandEnd(XPLMFindCommand("AS350/Trim/Force_Trim"));
     }
@@ -650,12 +651,12 @@ static void ToggleMouseButton(int button, int down)
     if (button == MOUSE_BUTTON_LEFT)
     {
         mouseType = (down == 0 ? kCGEventLeftMouseUp, kCGEventLeftMouseDown)
-        mouseButton = kCGMouseButtonLeft;
+                    mouseButton = kCGMouseButtonLeft;
     }
     else
     {
         mouseType = (down == 0 ? kCGEventRightMouseUp, kCGEventRightMouseDown)
-        mouseButton = kCGMouseButtonRight;
+                    mouseButton = kCGMouseButtonRight;
     }
 
     if (CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, mouseButton) != 0)
@@ -740,6 +741,22 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
             XFlush(display);
 #endif
         }
+    }
+
+    return 0;
+}
+
+// command-handler that handles the toggling of brakes
+static int ToggleBrakesCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase == xplm_CommandBegin)
+    {
+        // custom handling for QPAC A320
+        if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE))
+            XPLMCommandOnce(XPLMFindCommand("airbus_qpac/park_brake_toggle"));
+        // default handling
+        else
+            XPLMCommandOnce(XPLMFindCommand("sim/flight_controls/brakes_toggle_regular"));
     }
 
     return 0;
@@ -1202,7 +1219,7 @@ static void SetDefaultAssignments(void)
         joystickButtonAssignments[JOYSTICK_BUTTON_L1] = (std::size_t) XPLMFindCommand(TRIM_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_R1] = (std::size_t) XPLMFindCommand(VIEW_MODIFIER_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_L2] = (std::size_t) XPLMFindCommand(PUSH_TO_TALK_COMMAND);
-        joystickButtonAssignments[JOYSTICK_BUTTON_R2] = (std::size_t) XPLMFindCommand("sim/flight_controls/brakes_toggle_regular");
+        joystickButtonAssignments[JOYSTICK_BUTTON_R2] = (std::size_t) XPLMFindCommand(TOGGLE_BRAKES_COMMAND);
         joystickButtonAssignments[JOYSTICK_BUTTON_L3] = (std::size_t) XPLMFindCommand("sim/general/zoom_out");
         joystickButtonAssignments[JOYSTICK_BUTTON_R3] = (std::size_t) XPLMFindCommand("sim/general/zoom_in");
         joystickButtonAssignments[JOYSTICK_BUTTON_PS] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
@@ -1230,14 +1247,14 @@ static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags,
 static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
 {
     lastMouseUsageTime = XPLMGetElapsedTime();
-    
+
     return 0;
 }
 
 static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon)
 {
     static int lastX = x, lastY = y;
-    
+
     if (x != lastX || y != lastY)
     {
         lastMouseUsageTime = XPLMGetElapsedTime();
@@ -1310,6 +1327,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     toggleBetaOrToggleReverseCommand = XPLMCreateCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND, "Toggle Beta / Toggle Reverse");
     toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND, "Toggle Mouse Pointer Control");
     pushToTalkCommand = XPLMCreateCommand(PUSH_TO_TALK_COMMAND, "Push-To-Talk");
+    toggleBrakesCommand = XPLMCreateCommand(TOGGLE_BRAKES_COMMAND, "Toggle Brakes");
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleResetViewCommand, CycleResetViewCommandHandler, 1, NULL);
@@ -1323,6 +1341,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterCommandHandler(toggleBetaOrToggleReverseCommand, ToggleBetaOrToggleReverseCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(pushToTalkCommand, PushToTalkCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommandHandler, 1, NULL);
 
     // create fake window
     XPLMCreateWindow_t fakeWindowParameters;
@@ -1389,13 +1408,13 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
 {
     switch (inMessage)
     {
-        case XPLM_MSG_PLANE_LOADED:
-            bringFakeWindowToFront = 0; 
-        case XPLM_MSG_AIRPORT_LOADED:
-            // schedule a switch to the 3D cockpit view during the next flight-loop
-            switchTo3DCommandLook = 0;
-            if (Has2DPanel() == 0)
-                switchTo3DCommandLook = 1;
-            break;
+    case XPLM_MSG_PLANE_LOADED:
+        bringFakeWindowToFront = 0;
+    case XPLM_MSG_AIRPORT_LOADED:
+        // schedule a switch to the 3D cockpit view during the next flight-loop
+        switchTo3DCommandLook = 0;
+        if (Has2DPanel() == 0)
+            switchTo3DCommandLook = 1;
+        break;
     }
 }

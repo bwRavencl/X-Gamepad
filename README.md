@@ -47,7 +47,7 @@ X-pad's default mappings for a DualShock 3 controller:
 | L1         | x_pad/trim_modifier                                |
 | R1         | x_pad/view_modifier                                |
 | L2         | x_pad/push_to_talk (mapped to Insert key)          |
-| R2         | sim/flight_controls/brakes_toggle_regular          |
+| R2         | x_pad/toggle_brakes                                |
 | L3         | sim/general/zoom_out                               |
 | R3         | sim/general/zoom_in                                |
 | PS         | x_pad/toggle_mouse_pointer_control                 |
