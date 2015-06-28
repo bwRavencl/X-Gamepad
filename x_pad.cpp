@@ -26,7 +26,8 @@
 #include <stack>
 
 #if APL
-#include "ApplicationServices/ApplicationServices.h"
+#include <ApplicationServices/ApplicationServices.h>
+#include <Carbon/Carbon.h>
 #elif LIN
 #include <float.h>
 #include <math.h>
@@ -642,27 +643,32 @@ static int ToggleBetaOrToggleReverseCommandHandler(XPLMCommandRef inCommand, XPL
 static void ToggleMouseButton(int button, int down)
 {
 #if APL
-    CGEventRef getLocationEvent = CGEventCreate(NULL);
-    CGPoint location = CGEventGetLocation(getLocationEvent);
-    CFRelease(getLocationEvent);
-
     CGEventType mouseType = 0;
     CGMouseButton mouseButton = 0;
     if (button == MOUSE_BUTTON_LEFT)
     {
-        mouseType = (down == 0 ? kCGEventLeftMouseUp, kCGEventLeftMouseDown)
-                    mouseButton = kCGMouseButtonLeft;
+        mouseType = (down == 0 ? kCGEventLeftMouseUp : kCGEventLeftMouseDown);
+        mouseButton = kCGMouseButtonLeft;
     }
     else
     {
-        mouseType = (down == 0 ? kCGEventRightMouseUp, kCGEventRightMouseDown)
-                    mouseButton = kCGMouseButtonRight;
+        mouseType = (down == 0 ? kCGEventRightMouseUp : kCGEventRightMouseDown);
+        mouseButton = kCGMouseButtonRight;
     }
 
-    if (CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, mouseButton) != 0)
+    int state = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, mouseButton);
+    
+    if ((down == 0 && state) || (down != 0 && !state))
     {
+        CGEventRef getLocationEvent = CGEventCreate(NULL);
+        CGPoint location = CGEventGetLocation(getLocationEvent);
+        if (getLocationEvent != NULL)
+            CFRelease(getLocationEvent);
+        
         CGEventRef event = CGEventCreateMouseEvent(NULL, mouseType, location, mouseButton);
         CGEventPost(kCGHIDEventTap, event);
+        if (event != NULL)
+            CFRelease(event);
     }
 #elif LIN
     if (display != NULL)
@@ -728,21 +734,28 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
 // command-handler that handles the push-to-talk command
 static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase != xplm_CommandContinue)
+    // only do push-to-talk if X-IvAp is enabled
+    if (IsPluginEnabled(X_IVAP_PLUGIN_SIGNATURE) != 0)
     {
-        // only do push-to-talk if X-IvAp is enabled
-        if (display != NULL && IsPluginEnabled(X_IVAP_PLUGIN_SIGNATURE) != 0)
+        if (inPhase != xplm_CommandContinue)
         {
 #if APL
-            // TODO: OS X implementation
+            static CGEventSourceRef eventSource = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+            CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode) kVK_ANSI_K, inPhase == xplm_CommandBegin);
+            CGEventPost(kCGHIDEventTap, event);
+            if (event != NULL)
+                CFRelease(event);
 #elif LIN
-            KeyCode keycode = XKeysymToKeycode(display, XK_Insert);
-            XTestFakeKeyEvent(display, keycode, inPhase == xplm_CommandBegin, CurrentTime);
-            XFlush(display);
+            if (display != NULL)
+            {
+                KeyCode keycode = XKeysymToKeycode(display, XK_K);
+                XTestFakeKeyEvent(display, keycode, inPhase == xplm_CommandBegin, CurrentTime);
+                XFlush(display);
+            }
 #endif
         }
     }
-
+    
     return 0;
 }
 
@@ -969,7 +982,8 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 // get current mouse pointer location
                 CGEventRef getLocationEvent = CGEventCreate(NULL);
                 CGPoint oldLocation = CGEventGetLocation(getLocationEvent);
-                CFRelease(getLocationEvent);
+                if (getLocationEvent)
+                    CFRelease(getLocationEvent);
 
                 CGPoint newLocation;
                 newLocation.x = oldLocation.x + distX;
@@ -1012,7 +1026,8 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 // move mouse pointer by distX and distY pixels
                 CGEventRef moveMouseEvent = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, newLocation, kCGMouseButtonLeft);
                 CGEventPost(kCGHIDEventTap, moveMouseEvent);
-                CFRelease(moveMouseEvent);
+                if (moveMouseEvent != NULL)
+                    CFRelease(moveMouseEvent);
 #elif LIN
                 if (display != NULL)
                 {
