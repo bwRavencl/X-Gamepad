@@ -1182,13 +1182,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 if (isHelicopter == 0 || (isHelicopter != 0 && propPitchThrottleModifierDown == 0))
                 {
                     // handle left brake
-                    if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.9f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] <= 0.6f)
+                    if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.8f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] <= 0.7f)
                         XPLMSetDataf(leftBrakeRatioDataRef, 1.0f);
                     else
                         XPLMSetDataf(leftBrakeRatioDataRef, 0.0f);
 
                     // handle right brake
-                    if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.9f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] >= 0.4f)
+                    if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] >= 0.8f && joystickAxisValues[JOYSTICK_AXIS_LEFT_X] >= 0.3f)
                         XPLMSetDataf(rightBrakeRatioDataRef, 1.0f);
                     else
                         XPLMSetDataf(rightBrakeRatioDataRef, 0.0f);
