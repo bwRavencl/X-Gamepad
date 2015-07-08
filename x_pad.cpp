@@ -127,11 +127,6 @@
 // define mouse pointer sensitivity
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 25.0f
 
-// define MAXFLOAT
-#if LIN
-#define MAXFLOAT FLT_MAX
-#endif
-
 // hardcoded '.acf' files that have no 2-d panel
 static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf"};
 
@@ -263,13 +258,13 @@ static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPha
                 break;
             }
 
-            beginTime = MAXFLOAT;
+            beginTime = FLT_MAX;
         }
     }
     else if (inPhase == xplm_CommandEnd)
     {
         // cycle view
-        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
         {
             switch (XPLMGetDatai(viewTypeDataRef))
             {
@@ -322,13 +317,13 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCo
 
                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
 
-                beginTime = MAXFLOAT;
+                beginTime = FLT_MAX;
             }
         }
         else if (inPhase == xplm_CommandEnd)
         {
             // toggle speedbrake
-            if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+            if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
             {
                 float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
 
@@ -399,13 +394,13 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
             else
                 XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_fdir_off"));
 
-            beginTime = MAXFLOAT;
+            beginTime = FLT_MAX;
         }
     }
     else if (inPhase == xplm_CommandEnd)
     {
         // toggle autopilot
-        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
         {
             // custom handling for QPAC A320
             if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE) != 0)
@@ -624,13 +619,13 @@ static int ToggleBetaOrToggleReverseCommandHandler(XPLMCommandRef inCommand, XPL
             if (XPLMGetDatai(acfHasBetaDataRef) != 0)
                 XPLMCommandOnce(XPLMFindCommand("sim/engines/beta_toggle"));
 
-            beginTime = MAXFLOAT;
+            beginTime = FLT_MAX;
         }
     }
     else if (inPhase == xplm_CommandEnd)
     {
         // toggle reverse
-        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != MAXFLOAT)
+        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
             XPLMCommandOnce(XPLMFindCommand("sim/engines/thrust_reverse_toggle"));
 
         beginTime = 0.0f;

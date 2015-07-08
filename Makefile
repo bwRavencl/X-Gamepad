@@ -4,14 +4,11 @@ TARGET      := x_pad
 TARGET_32   := 32
 TARGET_64   := 64
 
-SOURCES = \
-        x_pad.cpp
+SOURCES = x_pad.cpp
 
 LIBS = -lXtst
 
-INCLUDES = \
-        -I$(SRC_BASE)/SDK/CHeaders/XPLM \
-        -I$(SRC_BASE)/SDK/CHeaders/Widgets
+INCLUDES = -I$(SRC_BASE)/SDK/CHeaders/XPLM -I$(SRC_BASE)/SDK/CHeaders/Widgets
 
 DEFINES = -DAPL=0 -DIBM=0 -DLIN=1 -DXPLM200=1
 
