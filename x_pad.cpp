@@ -43,7 +43,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "0.7"
+#define VERSION "0.8"
 
 // define joystick axis
 #define JOYSTICK_AXIS_LEFT_X 0
@@ -88,6 +88,7 @@
 #define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
 
 // define plugin signatures
+#define BLU_FX_PLUGIN_SIGNATURE "de.bwravencl.blu_fx"
 #define DREAMFOIL_AS350_PLUGIN_SIGNATURE "DreamFoil.AS350"
 #define QPAC_A320_PLUGIN_SIGNATURE "QPAC.airbus.fbw"
 #define ROTORSIM_EC135_PLUGIN_SIGNATURE "rotorsim.ec135.management"
@@ -143,7 +144,7 @@ static Display *display = NULL;
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // flightloop-callback that resizes and brings the fake window back to the front if needed
 static float UpdateFakeWindowCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
@@ -450,7 +451,7 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
 // command-handler that handles the view modifier command
 static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase != xplm_CommandContinue)
+    if (inPhase != xplm_CommandContinue && trimModifierDown == 0  && mousePointerControlEnabled == 0)
     {
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
@@ -459,7 +460,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         XPLMGetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
 
         // only apply the modifier if no other modifier is down which can alter any assignments
-        if (inPhase == xplm_CommandBegin && trimModifierDown == 0  && mousePointerControlEnabled == 0)
+        if (inPhase == xplm_CommandBegin)
         {
             viewModifierDown = 1;
 
@@ -488,7 +489,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         }
-        else if (inPhase == xplm_CommandEnd && trimModifierDown == 0 && mousePointerControlEnabled == 0)
+        else if (inPhase == xplm_CommandEnd)
         {
             viewModifierDown = 0;
 
@@ -652,14 +653,14 @@ static void ToggleMouseButton(int button, int down)
     }
 
     int state = CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, mouseButton);
-    
+
     if ((down == 0 && state) || (down != 0 && !state))
     {
         CGEventRef getLocationEvent = CGEventCreate(NULL);
         CGPoint location = CGEventGetLocation(getLocationEvent);
         if (getLocationEvent != NULL)
             CFRelease(getLocationEvent);
-        
+
         CGEventRef event = CGEventCreateMouseEvent(NULL, mouseType, location, mouseButton);
         CGEventPost(kCGHIDEventTap, event);
         if (event != NULL)
@@ -674,13 +675,28 @@ static void ToggleMouseButton(int button, int down)
 #endif
 }
 
+// override control cinema verite function of BLU-fx - returns 1 if it fails
+static int SetOverrideControlCinemaVeriteDataRefCallback(int overrideEnabled)
+{
+    if (IsPluginEnabled(BLU_FX_PLUGIN_SIGNATURE) != 0)
+    {
+        XPLMSetDatai(XPLMFindDataRef("blu_fx/override_control_cinema_verite"), overrideEnabled == 0 ? 0 : 1);
+
+        return 0;
+    }
+
+    return 1;
+}
+
 // command-handler that handles the toggle mouse pointer control command
 static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase == xplm_CommandBegin)
+    if (inPhase == xplm_CommandBegin && viewModifierDown == 0 && trimModifierDown == 0)
     {
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+
+        static int overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0;
 
         if (mousePointerControlEnabled == 0)
         {
@@ -701,6 +717,14 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
             joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/none/none");
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+            // enable the control cinema verite override of BLU-fx
+            overrideControlCinemaVeriteFailed = SetOverrideControlCinemaVeriteDataRefCallback(1);
+
+            // disable cinema verite if it is enabled and store its status
+            lastCinemaVerite = XPLMGetDatai(cinemaVeriteDataRef);
+            if (lastCinemaVerite != 0)
+                XPLMSetDatai(cinemaVeriteDataRef, 0);
         }
         else
         {
@@ -716,6 +740,14 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
 
             // restore the default button assignments
             PopButtonAssignments();
+
+            // disable the control cinema verite override of BLU-fx if we enabled it before
+            if (overrideControlCinemaVeriteFailed == 0)
+                SetOverrideControlCinemaVeriteDataRefCallback(0);
+
+            // restore cinema verite to its old status
+            if (lastCinemaVerite != 0)
+                XPLMSetDatai(cinemaVeriteDataRef, 1);
         }
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
@@ -750,7 +782,7 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
 #endif
         }
     }
-    
+
     return 0;
 }
 
@@ -1304,6 +1336,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     acfVertCantDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_vertcant");
     ongroundAnyDataRef = XPLMFindDataRef("sim/flightmodel/failures/onground_any");
     groundspeedDataRef = XPLMFindDataRef("sim/flightmodel/position/groundspeed");
+    cinemaVeriteDataRef = XPLMFindDataRef("sim/graphics/view/cinema_verite");
     pilotsHeadPsiDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_psi");
     viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
     hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
@@ -1398,6 +1431,24 @@ PLUGIN_API void	XPluginStop(void)
     // revert any remaining button assignments
     while (!buttonAssignmentsStack.empty())
         PopButtonAssignments();
+
+    // unregister custom commands
+    XPLMUnregisterCommandHandler(cycleResetViewCommand, CycleResetViewCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(toggleAutopilotOrDisableFlightDirectorCommand, ToggleAutopilotOrDisableFlightDirectorCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(propPitchOrThrottleModifierCommand, PropPitchOrThrottleModifierCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(trimModifierCommand, TrimModifierCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(toggleBetaOrToggleReverseCommand, ToggleBetaOrToggleReverseCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(pushToTalkCommand, PushToTalkCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommandHandler, 1, NULL);
+
+    // register flight loop callbacks
+    XPLMUnregisterFlightLoopCallback(UpdateFakeWindowCallback, NULL);
+    XPLMUnregisterFlightLoopCallback(FlightLoopCallback, NULL);
 
 #if LIN
     if(display != NULL)
