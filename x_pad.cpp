@@ -109,6 +109,9 @@
 #define PUSH_TO_TALK_COMMAND NAME_LOWERCASE "/push_to_talk"
 #define TOGGLE_BRAKES_COMMAND NAME_LOWERCASE "/toggle_brakes"
 
+// define auto-center view limit
+#define AUTO_CENTER_VIEW_LIMIT 6.0f
+
 // define long press time
 #define BUTTON_LONG_PRESS_TIME 1.0f
 
@@ -125,15 +128,16 @@
 #define MOUSE_BUTTON_LEFT 0
 #define MOUSE_BUTTON_RIGHT 1
 
-// define mouse pointer sensitivity
+// define joystick sensitivity values
+#define JOYSTICK_VIEW_SENSITIVITY 3.5f
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 25.0f
 
 // hardcoded '.acf' files that have no 2-d panel
 static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf"};
 
 // global internal variables
-static int viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0;
-static float lastAxisAssignment = 0.0f, lastMouseUsageTime = 0.0f;
+static int viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0;
+static float lastAxisAssignment = 0.0f, lastMouseUsageTime = 0.0f, defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static XPLMWindowID fakeWindow = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 #if LIN
@@ -144,7 +148,7 @@ static Display *display = NULL;
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // flightloop-callback that resizes and brings the fake window back to the front if needed
 static float UpdateFakeWindowCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
@@ -188,13 +192,6 @@ static void PopButtonAssignments(void)
         }
         buttonAssignmentsStack.pop();
     }
-}
-
-// returns the directory seperator - overrides XPLMGetDirectorySeparator() to return the POSIX '/' instead of ':' OS X
-static const char* GetDirectorySeparator()
-{
-    const char *directorySeperator = XPLMGetDirectorySeparator();
-    return (strcmp(directorySeperator, ":") == 0 ?  "/" : directorySeperator);
 }
 
 // returns 1 if the current aircraft does have a 2D panel, otherwise 0 is returned - for non-parseable sub 1004 version '.acf' files 1 is returned
@@ -448,6 +445,43 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
     return 0;
 }
 
+// override control cinema verite function of BLU-fx - returns 1 if it fails
+static int SetOverrideControlCinemaVeriteDataRefCallback(int overrideEnabled)
+{
+    if (IsPluginEnabled(BLU_FX_PLUGIN_SIGNATURE) != 0)
+    {
+        XPLMSetDatai(XPLMFindDataRef("blu_fx/override_control_cinema_verite"), overrideEnabled == 0 ? 0 : 1);
+
+        return 0;
+    }
+
+    return 1;
+}
+
+// Disables cinema verite and also overrides the control cinema verite function of BLU-fx
+static void DisableCinemaVerite(void)
+{
+    // enable the control cinema verite override of BLU-fx
+    overrideControlCinemaVeriteFailed = SetOverrideControlCinemaVeriteDataRefCallback(1);
+
+    // disable cinema verite if it is enabled and store its status
+    lastCinemaVerite = XPLMGetDatai(cinemaVeriteDataRef);
+    if (lastCinemaVerite != 0)
+        XPLMSetDatai(cinemaVeriteDataRef, 0);
+}
+
+// Restores cinema verite and removes the override of the control cinema verite function of BLU-fx
+static void RestoreCinemaVerite(void)
+{
+    // disable the control cinema verite override of BLU-fx if we enabled it before
+    if (overrideControlCinemaVeriteFailed == 0)
+        SetOverrideControlCinemaVeriteDataRefCallback(0);
+
+    // restore cinema verite to its old status
+    if (lastCinemaVerite != 0)
+        XPLMSetDatai(cinemaVeriteDataRef, 1);
+}
+
 // command-handler that handles the view modifier command
 static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
@@ -456,20 +490,14 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
 
-        int joystickAxisReverse[100];
-        XPLMGetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
-
         // only apply the modifier if no other modifier is down which can alter any assignments
         if (inPhase == xplm_CommandBegin)
         {
             viewModifierDown = 1;
 
-            // assign the view controls to the left joystick's axis
-            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT;
-            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_VIEW_UP_DOWN;
-
-            // reverse the left joystick's y axis while the view modifier is applied
-            joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 1;
+            // unassign the left joystick's axis
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
 
             // store the default button assignments
             PushButtonAssignments();
@@ -488,24 +516,37 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand("sim/general/rot_down");
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+            // temporarily disable cinema verite
+            DisableCinemaVerite();
         }
         else if (inPhase == xplm_CommandEnd)
         {
             viewModifierDown = 0;
 
+            // auto-center 3D cockpit view if it is only the defined number of degrees off from the center anyways
+            if (XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
+            {
+                float pilotsHeadPsi = XPLMGetDataf(pilotsHeadPsiDataRef);
+                if ((pilotsHeadPsi >= 360.0f - AUTO_CENTER_VIEW_LIMIT || pilotsHeadPsi <= AUTO_CENTER_VIEW_LIMIT) && fabs(XPLMGetDataf(pilotsHeadTheDataRef)) <= AUTO_CENTER_VIEW_LIMIT && XPLMGetDataf(acfPeXDataRef) == defaultHeadPositionX && XPLMGetDataf(acfPeYDataRef) == defaultHeadPositionY && XPLMGetDataf(acfPeZDataRef) == defaultHeadPositionZ)
+                {
+                    XPLMSetDataf(pilotsHeadPsiDataRef, 0.0f);
+                    XPLMSetDataf(pilotsHeadTheDataRef, 0.0f);
+                }
+            }
+
             // assign the default controls to the left joystick's axis
             joystickAxisAssignments[JOYSTICK_AXIS_LEFT_X] = AXIS_ASSIGNMENT_YAW;
             joystickAxisAssignments[JOYSTICK_AXIS_LEFT_Y] = AXIS_ASSIGNMENT_NONE;
 
-            // disable the axis reversing when the view modifier is not applied anymore
-            joystickAxisReverse[JOYSTICK_AXIS_LEFT_Y] = 0;
-
             // restore the default button assignments
             PopButtonAssignments();
+
+            // restore cinema verite
+            RestoreCinemaVerite();
         }
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-        XPLMSetDatavi(joystickAxisReverseDataRef, joystickAxisReverse, 0, 100);
 
         lastAxisAssignment = XPLMGetElapsedTime();
     }
@@ -675,19 +716,6 @@ static void ToggleMouseButton(int button, int down)
 #endif
 }
 
-// override control cinema verite function of BLU-fx - returns 1 if it fails
-static int SetOverrideControlCinemaVeriteDataRefCallback(int overrideEnabled)
-{
-    if (IsPluginEnabled(BLU_FX_PLUGIN_SIGNATURE) != 0)
-    {
-        XPLMSetDatai(XPLMFindDataRef("blu_fx/override_control_cinema_verite"), overrideEnabled == 0 ? 0 : 1);
-
-        return 0;
-    }
-
-    return 1;
-}
-
 // command-handler that handles the toggle mouse pointer control command
 static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
@@ -695,8 +723,6 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
     {
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-
-        static int overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0;
 
         if (mousePointerControlEnabled == 0)
         {
@@ -718,13 +744,8 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-            // enable the control cinema verite override of BLU-fx
-            overrideControlCinemaVeriteFailed = SetOverrideControlCinemaVeriteDataRefCallback(1);
-
-            // disable cinema verite if it is enabled and store its status
-            lastCinemaVerite = XPLMGetDatai(cinemaVeriteDataRef);
-            if (lastCinemaVerite != 0)
-                XPLMSetDatai(cinemaVeriteDataRef, 0);
+            // temporarily disable cinema verite
+            DisableCinemaVerite();
         }
         else
         {
@@ -741,13 +762,8 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
             // restore the default button assignments
             PopButtonAssignments();
 
-            // disable the control cinema verite override of BLU-fx if we enabled it before
-            if (overrideControlCinemaVeriteFailed == 0)
-                SetOverrideControlCinemaVeriteDataRefCallback(0);
-
-            // restore cinema verite to its old status
-            if (lastCinemaVerite != 0)
-                XPLMSetDatai(cinemaVeriteDataRef, 1);
+            // restore cinema verite
+            RestoreCinemaVerite();
         }
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
@@ -829,6 +845,14 @@ static float Normalize(float value, float inMin, float inMax, float outMin, floa
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
+    // update the default head position when required
+    if (defaultHeadPositionX == FLT_MAX || defaultHeadPositionY == FLT_MAX || defaultHeadPositionZ == FLT_MAX)
+    {
+        defaultHeadPositionX = XPLMGetDataf(acfPeXDataRef);
+        defaultHeadPositionY = XPLMGetDataf(acfPeYDataRef);
+        defaultHeadPositionZ = XPLMGetDataf(acfPeZDataRef);
+    }
+
     int isHelicopter = IsHelicopter();
 
     int currentMouseX, currentMouseY;
@@ -871,7 +895,71 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
         int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
 
-        if (viewModifierDown == 0)
+        if (viewModifierDown != 0)
+        {
+            if (XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
+            {
+                float deltaPsi = 0.0f, deltaThe = 0.0f;
+
+                // turn head to the left
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] < 0.5f - joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 0.0] to [0.0, 1.0]
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 0.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^4)
+                    deltaPsi -= powf(d * JOYSTICK_VIEW_SENSITIVITY, 4.0f) * inElapsedSinceLastCall;
+                }
+                // turn head to the right
+                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.5f + joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 1.0] to [0.0, 1.0]
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 1.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^4)
+                    deltaPsi += powf(d * JOYSTICK_VIEW_SENSITIVITY, 4.0f) * inElapsedSinceLastCall;
+                }
+
+                // turn head upwards
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 0.0] to [0.0, 1.0]
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^4)
+                    deltaThe += powf(d * JOYSTICK_VIEW_SENSITIVITY, 4.0f) * inElapsedSinceLastCall;
+                }
+                // turn head downwards
+                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 1.0] to [0.0, 1.0]
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^4)
+                    deltaThe -= powf(d * JOYSTICK_VIEW_SENSITIVITY, 4.0f) * inElapsedSinceLastCall;
+                }
+
+                float pilotsHeadPsi = XPLMGetDataf(pilotsHeadPsiDataRef);
+                float pilotsHeadThe = XPLMGetDataf(pilotsHeadTheDataRef);
+
+                float newPilotsHeadPsi = pilotsHeadPsi + deltaPsi;
+                float newPilotsHeadThe = pilotsHeadThe + deltaThe;
+
+                if (pilotsHeadPsi < 180.0f && newPilotsHeadPsi > 179.9f)
+                    newPilotsHeadPsi = 179.9f;
+                if (pilotsHeadPsi > 180.0f && newPilotsHeadPsi < 190.1f)
+                    newPilotsHeadPsi = 180.1f;
+
+                if (newPilotsHeadThe < -89.9f)
+                    newPilotsHeadThe = -89.9f;
+                if (newPilotsHeadThe > 89.9f)
+                    newPilotsHeadThe = 89.9f;
+
+                XPLMSetDataf(pilotsHeadPsiDataRef, newPilotsHeadPsi);
+                XPLMSetDataf(pilotsHeadTheDataRef, newPilotsHeadThe);
+            }
+        }
+        else
         {
             if (isHelicopter == 0 && propPitchThrottleModifierDown != 0)
             {
@@ -1326,6 +1414,9 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
     // obtain datarefs
     acfCockpitTypeDataRef = XPLMFindDataRef("sim/aircraft/view/acf_cockpit_type");
+    acfPeXDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peX");
+    acfPeYDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peY");
+    acfPeZDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peZ");
     acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
@@ -1338,6 +1429,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     groundspeedDataRef = XPLMFindDataRef("sim/flightmodel/position/groundspeed");
     cinemaVeriteDataRef = XPLMFindDataRef("sim/graphics/view/cinema_verite");
     pilotsHeadPsiDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_psi");
+    pilotsHeadTheDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_the");
     viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
     hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
@@ -1471,8 +1563,12 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
     {
     case XPLM_MSG_PLANE_LOADED:
         bringFakeWindowToFront = 0;
+        // reset the default head position if a new plane is loaded so that it is updated during the next flight loop
+        defaultHeadPositionX = FLT_MAX;
+        defaultHeadPositionY = FLT_MAX;
+        defaultHeadPositionZ = FLT_MAX;
     case XPLM_MSG_AIRPORT_LOADED:
-        // schedule a switch to the 3D cockpit view during the next flight-loop
+        // schedule a switch to the 3D cockpit view during the next flight loop
         switchTo3DCommandLook = 0;
         if (Has2DPanel() == 0)
             switchTo3DCommandLook = 1;
