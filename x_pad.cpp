@@ -110,7 +110,8 @@
 #define TOGGLE_BRAKES_COMMAND NAME_LOWERCASE "/toggle_brakes"
 
 // define auto-center view limit
-#define AUTO_CENTER_VIEW_LIMIT 6.0f
+#define AUTO_CENTER_VIEW_DISTANCE_LIMIT 0.05f
+#define AUTO_CENTER_VIEW_ANGLE_LIMIT 6.0f
 
 // define long press time
 #define BUTTON_LONG_PRESS_TIME 1.0f
@@ -124,20 +125,20 @@
 // define collective control multiplier
 #define COLLECTIVE_CONTROL_MULTIPLIER 0.2f
 
-// define mouse buttons
-#define MOUSE_BUTTON_LEFT 0
-#define MOUSE_BUTTON_RIGHT 1
-
 // define joystick sensitivity values
 #define JOYSTICK_VIEW_SENSITIVITY 3.5f
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 25.0f
+
+// define mouse buttons
+#define MOUSE_BUTTON_LEFT 0
+#define MOUSE_BUTTON_RIGHT 1
 
 // hardcoded '.acf' files that have no 2-d panel
 static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf"};
 
 // global internal variables
 static int viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0;
-static float lastAxisAssignment = 0.0f, lastMouseUsageTime = 0.0f, defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
+static float lastMouseUsageTime = 0.0f, defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static XPLMWindowID fakeWindow = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 #if LIN
@@ -458,7 +459,7 @@ static int SetOverrideControlCinemaVeriteDataRefCallback(int overrideEnabled)
     return 1;
 }
 
-// Disables cinema verite and also overrides the control cinema verite function of BLU-fx
+// disables cinema verite and also overrides the control cinema verite function of BLU-fx
 static void DisableCinemaVerite(void)
 {
     // enable the control cinema verite override of BLU-fx
@@ -470,7 +471,7 @@ static void DisableCinemaVerite(void)
         XPLMSetDatai(cinemaVeriteDataRef, 0);
 }
 
-// Restores cinema verite and removes the override of the control cinema verite function of BLU-fx
+// restores cinema verite and removes the override of the control cinema verite function of BLU-fx
 static void RestoreCinemaVerite(void)
 {
     // disable the control cinema verite override of BLU-fx if we enabled it before
@@ -512,8 +513,8 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             joystickButtonAssignments[JOYSTICK_BUTTON_DPAD_DOWN] = (std::size_t) XPLMFindCommand("sim/general/down");
             joystickButtonAssignments[JOYSTICK_BUTTON_SQUARE] = (std::size_t) XPLMFindCommand("sim/general/rot_left");
             joystickButtonAssignments[JOYSTICK_BUTTON_CIRCLE] = (std::size_t) XPLMFindCommand("sim/general/rot_right");
-            joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand("sim/general/rot_up");
-            joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand("sim/general/rot_down");
+            joystickButtonAssignments[JOYSTICK_BUTTON_TRIANGLE] = (std::size_t) XPLMFindCommand("sim/general/forward");
+            joystickButtonAssignments[JOYSTICK_BUTTON_CROSS] = (std::size_t) XPLMFindCommand("sim/general/backward");
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
@@ -524,11 +525,16 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         {
             viewModifierDown = 0;
 
-            // auto-center 3D cockpit view if it is only the defined number of degrees off from the center anyways
-            if (XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
+            // auto-center 3D cockpit view if it is only the defined distance or angle off from the center anyways
+            if (XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && fabs(defaultHeadPositionX - XPLMGetDataf(acfPeXDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT && fabs(defaultHeadPositionY - XPLMGetDataf(acfPeYDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT && fabs(defaultHeadPositionZ - XPLMGetDataf(acfPeZDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT)
             {
+                XPLMSetDataf(acfPeXDataRef, defaultHeadPositionX);
+                XPLMSetDataf(acfPeYDataRef, defaultHeadPositionY);
+                XPLMSetDataf(acfPeZDataRef, defaultHeadPositionZ);
+
                 float pilotsHeadPsi = XPLMGetDataf(pilotsHeadPsiDataRef);
-                if ((pilotsHeadPsi >= 360.0f - AUTO_CENTER_VIEW_LIMIT || pilotsHeadPsi <= AUTO_CENTER_VIEW_LIMIT) && fabs(XPLMGetDataf(pilotsHeadTheDataRef)) <= AUTO_CENTER_VIEW_LIMIT && XPLMGetDataf(acfPeXDataRef) == defaultHeadPositionX && XPLMGetDataf(acfPeYDataRef) == defaultHeadPositionY && XPLMGetDataf(acfPeZDataRef) == defaultHeadPositionZ)
+
+                if ((pilotsHeadPsi >= 360.0f - AUTO_CENTER_VIEW_ANGLE_LIMIT || pilotsHeadPsi <= AUTO_CENTER_VIEW_ANGLE_LIMIT) && fabs(XPLMGetDataf(pilotsHeadTheDataRef)) <= AUTO_CENTER_VIEW_ANGLE_LIMIT)
                 {
                     XPLMSetDataf(pilotsHeadPsiDataRef, 0.0f);
                     XPLMSetDataf(pilotsHeadTheDataRef, 0.0f);
@@ -547,8 +553,6 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         }
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-
-        lastAxisAssignment = XPLMGetElapsedTime();
     }
 
     return 0;
@@ -767,8 +771,6 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
         }
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-
-        lastAxisAssignment = XPLMGetElapsedTime();
     }
 
     return 0;
@@ -865,10 +867,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         switchTo3DCommandLook = 0;
     }
 
-    float elapsedSinceLastAxisAssignment = XPLMGetElapsedTime() - lastAxisAssignment;
-
-    // only handle the left joystick's axis if at least 750 ms have passed since the last axis assignment has occured, so that the user has time to center the joystick after releasing a modifier key
-    if (XPLMGetDatai(hasJostickDataRef) &&  elapsedSinceLastAxisAssignment > 0.75f)
+    if (XPLMGetDatai(hasJostickDataRef))
     {
         float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
 
@@ -897,7 +896,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
         if (viewModifierDown != 0)
         {
-            if (XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
+            int viewType = XPLMGetDatai(viewTypeDataRef);
+
+            if (viewType == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
             {
                 float deltaPsi = 0.0f, deltaThe = 0.0f;
 
@@ -947,7 +948,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
                 if (pilotsHeadPsi < 180.0f && newPilotsHeadPsi > 179.9f)
                     newPilotsHeadPsi = 179.9f;
-                if (pilotsHeadPsi > 180.0f && newPilotsHeadPsi < 190.1f)
+                if (pilotsHeadPsi > 180.0f && newPilotsHeadPsi < 180.1f)
                     newPilotsHeadPsi = 180.1f;
 
                 if (newPilotsHeadThe < -89.9f)
@@ -957,6 +958,62 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
                 XPLMSetDataf(pilotsHeadPsiDataRef, newPilotsHeadPsi);
                 XPLMSetDataf(pilotsHeadTheDataRef, newPilotsHeadThe);
+            }
+            else if (viewType == VIEW_TYPE_FORWARDS_WITH_PANEL || viewType == VIEW_TYPE_CHASE)
+            {
+                // move camera to the left
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] < 0.5f - joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 0.0] to [0.0, 1.0]
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 0.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^2) and round to integer
+                    int n = (int) (powf(2.0f * d, 2.0f) + 0.5f);
+
+                    // apply the command
+                    for (int i = 0; i < n; i++)
+                        XPLMCommandOnce(XPLMFindCommand("sim/general/left"));
+                }
+                // move camera to the right
+                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.5f + joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 1.0] to [0.0, 1.0]
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f, 1.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^2) and round to integer
+                    int n = (int) (powf(2.0f * d, 2.0f) + 0.5f);
+
+                    // apply the command
+                    for (int i = 0; i < n; i++)
+                        XPLMCommandOnce(XPLMFindCommand("sim/general/right"));
+                }
+
+                // move camera up
+                if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 0.0] to [0.0, 1.0]
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^2) and round to integer
+                    int n = (int) (powf(2.0f * d, 2.0f) + 0.5f);
+
+                    // apply the command
+                    for (int i = 0; i < n; i++)
+                        XPLMCommandOnce(XPLMFindCommand("sim/general/up"));
+                }
+                // move camera down
+                else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+                {
+                    // normalize range [0.5, 1.0] to [0.0, 1.0]
+                    float d = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+
+                    // apply acceleration function (y = x^2) and round to integer
+                    int n = (int) (powf(2.0f * d, 2.0f) + 0.5f);
+
+                    // apply the command
+                    for (int i = 0; i < n; i++)
+                        XPLMCommandOnce(XPLMFindCommand("sim/general/down"));
+                }
             }
         }
         else
