@@ -138,7 +138,7 @@ static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "72
 
 // global internal variables
 static int viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0;
-static float lastMouseUsageTime = 0.0f, defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
+static float lastMouseUsageTime = 0.0f, lastViewModifierUsageTime = 0.0f, defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static XPLMWindowID fakeWindow = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 #if LIN
@@ -554,6 +554,8 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
     }
+
+    lastViewModifierUsageTime = XPLMGetElapsedTime();
 
     return 0;
 }
@@ -1221,16 +1223,22 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 {
                     static float normalizedViewHeading = 0.0f;
 
-                    float elapsedTime = XPLMGetElapsedTime() - lastMouseUsageTime;
+                    float elapsedTime = XPLMGetElapsedTime() - (lastMouseUsageTime > lastViewModifierUsageTime ? lastMouseUsageTime : lastViewModifierUsageTime);
 
                     // handle view heading when the joystick has been calibrated, the aircraft is on ground and the current view is 3D cockpit command look
-                    if (joystickAxisLeftXCalibrated > 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && elapsedTime >= DISABLE_VIEW_HEADING_TIME)
+                    if (joystickAxisLeftXCalibrated != 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && elapsedTime >= DISABLE_VIEW_HEADING_TIME)
                     {
                         float joystickHeadingNullzone = XPLMGetDataf(joystickHeadingNullzoneDataRef);
 
                         // handle nullzone
                         if(fabs(joystickAxisValues[JOYSTICK_AXIS_LEFT_X] - 0.5f) > joystickHeadingNullzone)
                         {
+                            // center head position except view heading
+                            XPLMSetDataf(acfPeXDataRef, defaultHeadPositionX);
+                            XPLMSetDataf(acfPeYDataRef, defaultHeadPositionY);
+                            XPLMSetDataf(acfPeZDataRef, defaultHeadPositionZ);
+                            XPLMSetDataf(pilotsHeadTheDataRef, 0.0f);
+
                             // normalize axis deflection
                             if (joystickAxisValues[JOYSTICK_AXIS_LEFT_X] > 0.5f)
                                 normalizedViewHeading = Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_X], 0.5f + joystickHeadingNullzone, 1.0f, 0.0f, 1.0f);
