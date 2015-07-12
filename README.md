@@ -14,7 +14,7 @@ At this point the supported button and axis layout is very much dictated by X-pa
 In order to install the plugin, place the 'x_pad' folder in your 'X-Plane 10/Resources/plugins' folder.
 After installing the plugin you should start X-Plane and click X-pad's 'Set Default Assignments' menu entry to let X-pad set up X-Plane correctly.
 Please refer to the section 'Default Mappings' below in order to see which changes will be made to your joystick configuration.
-Furthermore it is recommended that you adjust the nullzone in X-Plane's 'Joystick & Equipment' screen to a value of 15%.
+Furthermore your joystick's nullzone will be set to a value of 15%.
 
 #####Disclaimer:
 This plugin currently only supports DualShock 3 controllers connected via Bluetooth under Mac OS X and Linux.
