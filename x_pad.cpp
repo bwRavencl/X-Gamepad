@@ -791,14 +791,14 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
         {
 #if APL
             static CGEventSourceRef eventSource = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-            CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode) kVK_ANSI_K, inPhase == xplm_CommandBegin);
+            CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode) kVK_ANSI_O, inPhase == xplm_CommandBegin);
             CGEventPost(kCGHIDEventTap, event);
             if (event != NULL)
                 CFRelease(event);
 #elif LIN
             if (display != NULL)
             {
-                KeyCode keycode = XKeysymToKeycode(display, XK_K);
+                KeyCode keycode = XKeysymToKeycode(display, XK_O);
                 XTestFakeKeyEvent(display, keycode, inPhase == xplm_CommandBegin, CurrentTime);
                 XFlush(display);
             }

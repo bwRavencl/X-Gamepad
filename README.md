@@ -46,7 +46,7 @@ X-pad's default mappings for a DualShock 3 controller:
 | Select     | sim/engines//toggle_beta_or_toggle_reverse         |
 | L1         | x_pad/trim_modifier                                |
 | R1         | x_pad/view_modifier                                |
-| L2         | x_pad/push_to_talk (mapped to 'K' key)             |
+| L2         | x_pad/push_to_talk (mapped to 'O' key)             |
 | R2         | x_pad/toggle_brakes                                |
 | L3         | sim/general/zoom_out                               |
 | R3         | sim/general/zoom_in                                |
