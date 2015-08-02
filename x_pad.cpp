@@ -1306,58 +1306,96 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 }
                 else
                 {
-                    float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
-
-                    float thrustReverserDeployRatio[acfNumEngines];
-                    XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
-
-                    float averageThrustReverserDeployRatio = 0.0f;
-                    for (int i = 0; i < acfNumEngines; i++)
-                        averageThrustReverserDeployRatio += thrustReverserDeployRatio[i];
-                    averageThrustReverserDeployRatio /= acfNumEngines;
-
-                    // increase throttle setting
-                    if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
+                    if (acfNumEngines == 0 && XPLMGetDatai(acfSbrkEQDataRef) != 0)
                     {
-                        // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+                        float speedbrakeRatio = XPLMGetDataf(speedbrakeRatioDataRef);
 
-                        // invert d if thrust reversers are engaged
-                        if (averageThrustReverserDeployRatio > 0.5f)
+                        // decrease speedbrake ratio
+                        if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                         {
-                            float newThrottleRatioAll = throttleRatioAll - d;
+                            // de-arm speedbrake if armed
+                            if (speedbrakeRatio == -0.5f)
+                                speedbrakeRatio = 0.0f;
+
+                            // normalize range [0.5, 0.0] to [0.0, 1.0]
+                            float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
+
+                            float newSpeedbrakeRatio = speedbrakeRatio - d;
 
                             // ensure we don't set values smaller than 0.0
-                            XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
+                            XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio > 0.0f ? newSpeedbrakeRatio : 0.0f);
                         }
-                        else
+                        // increase speedbrake ratio
+                        else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                         {
-                            float newThrottleRatioAll = throttleRatioAll + d;
+                            // de-arm speedbrake if armed
+                            if (speedbrakeRatio == -0.5f)
+                                speedbrakeRatio = 0.0f;
+
+                            // normalize range [0.5, 1.0] to [0.0, 1.0]
+                            float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+
+                            float newSpeedbrakeRatio = speedbrakeRatio + d;
 
                             // ensure we don't set values larger than 1.0
-                            XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                            XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio < 1.0f ? newSpeedbrakeRatio : 1.0f);
                         }
                     }
-                    // decrease throttle setting
-                    else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
+                    else
                     {
-                        // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
+                        float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
 
-                        // invert d if thrust reversers are engaged
-                        if (averageThrustReverserDeployRatio > 0.5f)
+                        float thrustReverserDeployRatio[acfNumEngines];
+                        XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
+
+                        float averageThrustReverserDeployRatio = 0.0f;
+                        for (int i = 0; i < acfNumEngines; i++)
+                            averageThrustReverserDeployRatio += thrustReverserDeployRatio[i];
+                        averageThrustReverserDeployRatio /= acfNumEngines;
+
+                        // increase throttle setting
+                        if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] < 0.5f - joystickPitchNullzone)
                         {
-                            float newThrottleRatioAll = throttleRatioAll + d;
+                            // normalize range [0.5, 0.0] to [0.0, 1.0]
+                            float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 0.0f, 0.0f, 1.0f);
 
-                            // ensure we don't set values larger than 1.0
-                            XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                            // invert d if thrust reversers are engaged
+                            if (averageThrustReverserDeployRatio > 0.5f)
+                            {
+                                float newThrottleRatioAll = throttleRatioAll - d;
+
+                                // ensure we don't set values smaller than 0.0
+                                XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
+                            }
+                            else
+                            {
+                                float newThrottleRatioAll = throttleRatioAll + d;
+
+                                // ensure we don't set values larger than 1.0
+                                XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                            }
                         }
-                        else
+                        // decrease throttle setting
+                        else if (joystickAxisValues[JOYSTICK_AXIS_LEFT_Y] > 0.5f + joystickPitchNullzone)
                         {
-                            float newThrottleRatioAll = throttleRatioAll - d;
+                            // normalize range [0.5, 1.0] to [0.0, 1.0]
+                            float d = sensitivityMultiplier * Normalize(joystickAxisValues[JOYSTICK_AXIS_LEFT_Y], 0.5f, 1.0f, 0.0f, 1.0f);
 
-                            // ensure we don't set values smaller than 0.0
-                            XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
+                            // invert d if thrust reversers are engaged
+                            if (averageThrustReverserDeployRatio > 0.5f)
+                            {
+                                float newThrottleRatioAll = throttleRatioAll + d;
+
+                                // ensure we don't set values larger than 1.0
+                                XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                            }
+                            else
+                            {
+                                float newThrottleRatioAll = throttleRatioAll - d;
+
+                                // ensure we don't set values smaller than 0.0
+                                XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
+                            }
                         }
                     }
                 }
