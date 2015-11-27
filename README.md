@@ -34,12 +34,12 @@ When using Linux and a DualShock 3 controller you will need either a patched bui
 #####Default Mappings:
 Default mappings for a DualShock 3 controller:
 
-| Axis                  | Control                       |
-| --------------------- | ----------------------------- |
-| Left Joystick X-Axis  | Yaw                           |
-| Left Joystick Y-Axis  | Throttle / Brake / Collective |
-| Right Joystick X-Axis | Roll                          |
-| Right Joystick Y-Axis | Pitch                         |
+| Axis                  | Control               |
+| --------------------- | ----------------------|
+| Left Joystick X-Axis  | Yaw                   |
+| Left Joystick Y-Axis  | Throttle / Collective |
+| Right Joystick X-Axis | Roll                  |
+| Right Joystick Y-Axis | Pitch                 |
 
 | Button     | Command                             |
 | ---------- | ------------------------------------|
@@ -55,8 +55,8 @@ Default mappings for a DualShock 3 controller:
 | Select     | Beta / Reverser                     |
 | L1         | Trim modifier                       |
 | R1         | View modifier                       |
-| L2         | Push-to-Talk (mapped to 'O' key)    |
-| R2         | Brakes                              |
+| L2         | Brakes                              |
+| R2         | Push-to-Talk (mapped to 'O' key)    |
 | L3         | Zoom out                            |
 | R3         | Zoom in                             |
 | PS         | Mouse mode                          |
@@ -67,11 +67,11 @@ Default mappings for an Xbox 360 controller:
 | Axis                  | Control                                 |
 | --------------------- | --------------------------------------- |
 | Left Joystick X-Axis  | Yaw                                     |
-| Left Joystick Y-Axis  | Throttle / Brake / Collective           |
+| Left Joystick Y-Axis  | Throttle / Collective                   |
 | Right Joystick X-Axis | Roll                                    |
 | Right Joystick Y-Axis | Pitch                                   |
-| Left Trigger          | None / Push-to-Talk (mapped to 'O' key) |
-| Right Trigger         | Brake                                   |
+| Left Trigger          | Brake                                   |
+| Right Trigger         | None / Push-to-Talk (mapped to 'O' key) |
 
 | Button       | Command                             |
 | -------------| ------------------------------------|

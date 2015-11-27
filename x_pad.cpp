@@ -1180,6 +1180,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         float joystickAxisValues[100];
         XPLMGetDatavf(joystickAxisValuesDataRef, joystickAxisValues, 0, 100);
 
+        int joystickButtonValues[1600];
+        XPLMGetDatavi(joystickButtonValuesDataRef, joystickButtonValues, 0, 1600);
+
         static int joystickAxisLeftXCalibrated = 0;
         if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] > 0.0f)
             joystickAxisLeftXCalibrated = 1;
@@ -1198,28 +1201,64 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
         int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
 
-        static int leftTriggerDown = 0, rightTriggerDown = 0;
-        if (controllerType == CONTROLLER_TYPE_XBOX360 && joystickAxisLeftXCalibrated)
+        if (joystickAxisLeftXCalibrated)
         {
-            if (leftTriggerDown == 0 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.85f)
+            static int brakeMode = 0;
+
+            // handle brakes
+            float leftBrakeRatio = 0.0f, rightBrakeRatio = 0.0f;
+            if ((controllerType == CONTROLLER_TYPE_DS3 && joystickButtonValues[JOYSTICK_BUTTON_DS3_L2 + buttonOffset] != 0.0f) || (controllerType == CONTROLLER_TYPE_XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.75f))
             {
-                leftTriggerDown = 1;
-                XPLMCommandBegin(pushToTalkCommand);
+                if (brakeMode == 0 && viewModifierDown == 0)
+                {
+                    PushButtonAssignments();
+
+                    int joystickButtonAssignments[1600];
+                    XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+                    joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t) XPLMFindCommand(TOGGLE_BRAKES_COMMAND);
+
+                    XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+                    brakeMode = 1;
+                }
+
+                if (controllerType == CONTROLLER_TYPE_DS3)
+                    leftBrakeRatio = rightBrakeRatio = 1.0f;
+                else if (controllerType == CONTROLLER_TYPE_XBOX360)
+                    leftBrakeRatio = rightBrakeRatio = Normalize(joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset], 0.75f, 1.0f, 0.0f, 1.0f);
+
+                // handle only left brake
+                if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] <= 0.3f)
+                    rightBrakeRatio = 0.0f;
+                // handle only right brake
+                else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] >= 0.7f)
+                    leftBrakeRatio = 0.0f;
             }
-            else if (leftTriggerDown == 0 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= 0.15f)
+            else if (brakeMode != 0)
             {
-                rightTriggerDown = 1;
-                XPLMCommandBegin(toggleBrakesCommand);
+                PopButtonAssignments();
+                brakeMode = 0;
             }
-            else if (leftTriggerDown == 1 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] < 0.85f)
+            XPLMSetDataf(leftBrakeRatioDataRef, leftBrakeRatio);
+            XPLMSetDataf(rightBrakeRatioDataRef, rightBrakeRatio);
+
+            static int leftTriggerDown = 0, rightTriggerDown = 0;
+            if (controllerType == CONTROLLER_TYPE_XBOX360 && joystickAxisLeftXCalibrated)
             {
-                leftTriggerDown = 0;
-                XPLMCommandEnd(pushToTalkCommand);
-            }
-            else if (leftTriggerDown == 0 && rightTriggerDown == 1 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] > 0.15f)
-            {
-                rightTriggerDown = 0;
-                XPLMCommandEnd(toggleBrakesCommand);
+                if (leftTriggerDown == 0 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.85f)
+                    leftTriggerDown = 1;
+                else if (leftTriggerDown == 0 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= 0.15f)
+                {
+                    rightTriggerDown = 1;
+                    XPLMCommandBegin(pushToTalkCommand);
+                }
+                else if (leftTriggerDown == 1 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] < 0.85f)
+                    leftTriggerDown = 0;
+                else if (leftTriggerDown == 0 && rightTriggerDown == 1 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] > 0.15f)
+                {
+                    rightTriggerDown = 0;
+                    XPLMCommandEnd(pushToTalkCommand);
+                }
             }
         }
 
@@ -1546,9 +1585,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 }
 #endif
 
-                int joystickButtonValues[1600];
-                XPLMGetDatavi(joystickButtonValuesDataRef, joystickButtonValues, 0, 1600);
-
                 // handle left and right mouse button presses
                 ToggleMouseButton(MOUSE_BUTTON_LEFT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] != 0 ? 1 : 0);
                 ToggleMouseButton(MOUSE_BUTTON_RIGHT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] != 0 ? 1 : 0);
@@ -1736,21 +1772,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                         free(thrustReverserDeployRatio);
                     }
                 }
-
-                if (isHelicopter == 0 || (isHelicopter != 0 && propPitchThrottleModifierDown == 0))
-                {
-                    // handle left brake
-                    if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] >= 0.8f && joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] <= 0.7f)
-                        XPLMSetDataf(leftBrakeRatioDataRef, 1.0f);
-                    else
-                        XPLMSetDataf(leftBrakeRatioDataRef, 0.0f);
-
-                    // handle right brake
-                    if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] >= 0.8f && joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] >= 0.3f)
-                        XPLMSetDataf(rightBrakeRatioDataRef, 1.0f);
-                    else
-                        XPLMSetDataf(rightBrakeRatioDataRef, 0.0f);
-                }
             }
         }
     }
@@ -1796,8 +1817,7 @@ static void SetDefaultAssignments(void)
         if (controllerType == CONTROLLER_TYPE_DS3)
         {
             joystickButtonAssignments[JOYSTICK_BUTTON_DS3_PS + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS3_L2 + buttonOffset] = (std::size_t) XPLMFindCommand(PUSH_TO_TALK_COMMAND);
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS3_R2 + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_BRAKES_COMMAND);
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS3_R2 + buttonOffset] = (std::size_t) XPLMFindCommand(PUSH_TO_TALK_COMMAND);
         }
 #if !IBM
         else if (controllerType == CONTROLLER_TYPE_XBOX360)
