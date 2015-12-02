@@ -79,18 +79,27 @@ struct ControllerStruct
 #define JOYSTICK_AXIS_ABSTRACT_RIGHT_X 2
 #define JOYSTICK_AXIS_ABSTRACT_RIGHT_Y 3
 
-// define dualshock 3 joystick buttons
+// define dualshock 3 joystick axis
 #define JOYSTICK_AXIS_DS3_LEFT_X 0
 #define JOYSTICK_AXIS_DS3_LEFT_Y 1
 #define JOYSTICK_AXIS_DS3_RIGHT_X 2
 #define JOYSTICK_AXIS_DS3_RIGHT_Y 3
 
-// define xbox 360 joystick buttons
+// define xbox 360 joystick axis
+#if IBM
 #define JOYSTICK_AXIS_XBOX360_LEFT_X 1
 #define JOYSTICK_AXIS_XBOX360_LEFT_Y 0
 #define JOYSTICK_AXIS_XBOX360_RIGHT_X 3
 #define JOYSTICK_AXIS_XBOX360_RIGHT_Y 2
 #define JOYSTICK_AXIS_XBOX360_TRIGGERS 4
+#else
+#define JOYSTICK_AXIS_XBOX360_LEFT_X 0
+#define JOYSTICK_AXIS_XBOX360_LEFT_Y 1
+#define JOYSTICK_AXIS_XBOX360_RIGHT_X 3
+#define JOYSTICK_AXIS_XBOX360_RIGHT_Y 4
+#define JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER 2
+#define JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER 5
+#endif
 
 // define abstract joystick buttons
 #define JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT 0
@@ -128,6 +137,7 @@ struct ControllerStruct
 #define JOYSTICK_BUTTON_DS3_R3 2
 
 // define xbox 360 joystick buttons
+#if IBM
 #define JOYSTICK_BUTTON_XBOX360_DPAD_LEFT 16
 #define JOYSTICK_BUTTON_XBOX360_DPAD_RIGHT 12
 #define JOYSTICK_BUTTON_XBOX360_DPAD_UP 10
@@ -137,14 +147,28 @@ struct ControllerStruct
 #define JOYSTICK_BUTTON_XBOX360_Y 3
 #define JOYSTICK_BUTTON_XBOX360_A 0
 #define JOYSTICK_BUTTON_XBOX360_START 7
-#if !IBM
-#define JOYSTICK_BUTTON_XBOX360_GUIDE 17
-#endif
 #define JOYSTICK_BUTTON_XBOX360_BACK 6
 #define JOYSTICK_BUTTON_XBOX360_LEFT_BUMPER 4
 #define JOYSTICK_BUTTON_XBOX360_RIGHT_BUMPER 5
 #define JOYSTICK_BUTTON_XBOX360_LEFT_STICK 8
 #define JOYSTICK_BUTTON_XBOX360_RIGHT_STICK 9
+#else
+#define JOYSTICK_BUTTON_XBOX360_DPAD_LEFT 17
+#define JOYSTICK_BUTTON_XBOX360_DPAD_RIGHT 13
+#define JOYSTICK_BUTTON_XBOX360_DPAD_UP 11
+#define JOYSTICK_BUTTON_XBOX360_DPAD_DOWN 15
+#define JOYSTICK_BUTTON_XBOX360_X 2
+#define JOYSTICK_BUTTON_XBOX360_B 1
+#define JOYSTICK_BUTTON_XBOX360_Y 3
+#define JOYSTICK_BUTTON_XBOX360_A 0
+#define JOYSTICK_BUTTON_XBOX360_START 7
+#define JOYSTICK_BUTTON_XBOX360_BACK 6
+#define JOYSTICK_BUTTON_XBOX360_LEFT_BUMPER 4
+#define JOYSTICK_BUTTON_XBOX360_RIGHT_BUMPER 5
+#define JOYSTICK_BUTTON_XBOX360_LEFT_STICK 9
+#define JOYSTICK_BUTTON_XBOX360_RIGHT_STICK 10
+#define JOYSTICK_BUTTON_XBOX360_GUIDE 8
+#endif
 
 // define view types
 #define VIEW_TYPE_FORWARDS_WITH_PANEL 1000
@@ -1207,7 +1231,14 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
             // handle brakes
             float leftBrakeRatio = 0.0f, rightBrakeRatio = 0.0f;
-            if ((controllerType == CONTROLLER_TYPE_DS3 && joystickButtonValues[JOYSTICK_BUTTON_DS3_L2 + buttonOffset] != 0.0f) || (controllerType == CONTROLLER_TYPE_XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.75f))
+
+            if ((controllerType == CONTROLLER_TYPE_DS3 && joystickButtonValues[JOYSTICK_BUTTON_DS3_L2 + buttonOffset] != 0.0f) ||
+#if IBM
+                    (controllerType == CONTROLLER_TYPE_XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.75f)
+#else
+                    (controllerType == CONTROLLER_TYPE_XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER + axisOffset] >= 0.5f)
+#endif
+               )
             {
                 if (brakeMode == 0 && viewModifierDown == 0)
                 {
@@ -1225,7 +1256,11 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 if (controllerType == CONTROLLER_TYPE_DS3)
                     leftBrakeRatio = rightBrakeRatio = 1.0f;
                 else if (controllerType == CONTROLLER_TYPE_XBOX360)
+#if IBM
                     leftBrakeRatio = rightBrakeRatio = Normalize(joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset], 0.75f, 1.0f, 0.0f, 1.0f);
+#else
+                    leftBrakeRatio = rightBrakeRatio = Normalize(joystickAxisValues[JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER + axisOffset], 0.5f, 1.0f, 0.0f, 1.0f);
+#endif
 
                 // handle only left brake
                 if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] <= 0.3f)
@@ -1245,6 +1280,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             static int leftTriggerDown = 0, rightTriggerDown = 0;
             if (controllerType == CONTROLLER_TYPE_XBOX360 && joystickAxisLeftXCalibrated)
             {
+#if IBM
                 if (leftTriggerDown == 0 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.85f)
                     leftTriggerDown = 1;
                 else if (leftTriggerDown == 0 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= 0.15f)
@@ -1259,6 +1295,12 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     rightTriggerDown = 0;
                     XPLMCommandEnd(pushToTalkCommand);
                 }
+#else
+                if (joystickAxisValues[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + axisOffset] >= 0.5f)
+                    XPLMCommandBegin(pushToTalkCommand);
+                else
+                    XPLMCommandEnd(pushToTalkCommand);
+#endif
             }
         }
 

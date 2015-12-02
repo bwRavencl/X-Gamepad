@@ -10,7 +10,7 @@ LIBS = -lXtst
 
 INCLUDES = -I$(SRC_BASE)/SDK/CHeaders/XPLM -I$(SRC_BASE)/SDK/CHeaders/Widgets
 
-DEFINES = -DAPL=0 -DIBM=0 -DLIN=1 -DXPLM200=1
+DEFINES = -DAPL=0 -DIBM=0 -DLIN=1 -DXPLM200=1 -D_GLIBCXX_USE_CXX11_ABI=0
 
 ############################################################################
 
