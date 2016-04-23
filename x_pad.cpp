@@ -187,6 +187,12 @@ struct ControllerStruct
 // define default nullzone
 #define DEFAULT_NULLZONE 0.15f
 
+// define default sensitivities
+
+#define DEFAULT_PITCH_SENSITIVITY 0.5f
+#define DEFAULT_ROLL_SENSITIVITY 0.5f
+#define DEFAULT_HEADING_SENSITIVITY 1.0f
+
 // define '.acf' file 'show cockpit object in: 2-d forward panel views' string
 #define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
 
@@ -259,7 +265,7 @@ static Display *display = NULL;
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // global widget variables
 static XPWidgetID settingsWidget = NULL, dualShock3ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, axisOffsetCaption = NULL, buttonOffsetCaption = NULL, axisOffsetSlider = NULL, buttonOffsetSlider = NULL, setDefaultAssignmentsButton = NULL;
@@ -340,69 +346,129 @@ static int Has2DPanel(void)
     return has2DPanel;
 }
 
-// command-handler that handles the switch / reset view command
-static int CycleResetViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+// converts an abstract button index to an actual index of the selected controller while respecting the selected button offset
+static int ButtonIndex(int abstractButtonIndex)
+{
+    if (controllerType == CONTROLLER_TYPE_DS3)
+    {
+        switch (abstractButtonIndex)
+        {
+        case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT:
+            return JOYSTICK_BUTTON_DS3_DPAD_LEFT + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT:
+            return JOYSTICK_BUTTON_DS3_DPAD_RIGHT + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_DPAD_UP:
+            return JOYSTICK_BUTTON_DS3_DPAD_UP + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN:
+            return JOYSTICK_BUTTON_DS3_DPAD_DOWN + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT:
+            return JOYSTICK_BUTTON_DS3_SQUARE + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT:
+            return JOYSTICK_BUTTON_DS3_CIRCLE + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_FACE_UP:
+            return JOYSTICK_BUTTON_DS3_TRIANGLE + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN:
+            return JOYSTICK_BUTTON_DS3_CROSS + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT:
+            return JOYSTICK_BUTTON_DS3_SELECT + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT:
+            return JOYSTICK_BUTTON_DS3_START + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT:
+            return JOYSTICK_BUTTON_DS3_L1 + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT:
+            return JOYSTICK_BUTTON_DS3_R1 + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT:
+            return JOYSTICK_BUTTON_DS3_L3 + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT:
+            return JOYSTICK_BUTTON_DS3_R3 + buttonOffset;
+        default:
+            return -1;
+        }
+    }
+    else if (controllerType == CONTROLLER_TYPE_XBOX360)
+    {
+        switch (abstractButtonIndex)
+        {
+        case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT:
+            return JOYSTICK_BUTTON_XBOX360_DPAD_LEFT + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT:
+            return JOYSTICK_BUTTON_XBOX360_DPAD_RIGHT + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_DPAD_UP:
+            return JOYSTICK_BUTTON_XBOX360_DPAD_UP + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN:
+            return JOYSTICK_BUTTON_XBOX360_DPAD_DOWN + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT:
+            return JOYSTICK_BUTTON_XBOX360_X + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT:
+            return JOYSTICK_BUTTON_XBOX360_B + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_FACE_UP:
+            return JOYSTICK_BUTTON_XBOX360_Y + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN:
+            return JOYSTICK_BUTTON_XBOX360_A + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT:
+            return JOYSTICK_BUTTON_XBOX360_BACK + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT:
+            return JOYSTICK_BUTTON_XBOX360_START + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT:
+            return JOYSTICK_BUTTON_XBOX360_LEFT_BUMPER + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT:
+            return JOYSTICK_BUTTON_XBOX360_RIGHT_BUMPER + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT:
+            return JOYSTICK_BUTTON_XBOX360_LEFT_STICK + buttonOffset;
+        case JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT:
+            return JOYSTICK_BUTTON_XBOX360_RIGHT_STICK + buttonOffset;
+        default:
+            return -1;
+        }
+    }
+    else
+        return -1;
+}
+
+// command-handler that hadles the reset view command / view switching modifier command
+static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     static float beginTime = 0.0f;
 
     if (inPhase == xplm_CommandBegin)
-        beginTime = XPLMGetElapsedTime();
-    else if (inPhase == xplm_CommandContinue)
     {
         // reset view
-        if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
+        switch (XPLMGetDatai(viewTypeDataRef))
         {
-            switch (XPLMGetDatai(viewTypeDataRef))
-            {
-            case VIEW_TYPE_FORWARDS_WITH_PANEL:
-                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
-                break;
+        case VIEW_TYPE_FORWARDS_WITH_PANEL:
+            XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+            XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+            break;
 
-            case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
-                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
-                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-                break;
+        case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
+            XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+            XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
+            break;
 
-            case VIEW_TYPE_CHASE:
-                XPLMCommandOnce(XPLMFindCommand("sim/view/circle"));
-                XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
-                break;
-            }
-
-            beginTime = FLT_MAX;
+        case VIEW_TYPE_CHASE:
+            XPLMCommandOnce(XPLMFindCommand("sim/view/circle"));
+            XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
+            break;
         }
+
+        // store the default button assignments
+        PushButtonAssignments();
+
+        // assign view controls to face buttons
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/view/chase");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/view/forward_with_hud");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(Has2DPanel() ? "sim/view/forward_with_panel" : "sim/view/3d_cockpit_cmnd_look");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(Has2DPanel() ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_panel");
+
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
     else if (inPhase == xplm_CommandEnd)
     {
-        // cycle view
-        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
-        {
-            switch (XPLMGetDatai(viewTypeDataRef))
-            {
-            case VIEW_TYPE_FORWARDS_WITH_PANEL:
-                XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-                break;
-
-            case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
-                XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_hud"));
-                break;
-
-            case VIEW_TYPE_FORWARDS_WITH_HUD:
-                XPLMCommandOnce(XPLMFindCommand("sim/view/chase"));
-                break;
-
-            case VIEW_TYPE_CHASE:
-            default:
-                if (Has2DPanel())
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
-                else
-                    XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-                break;
-            }
-        }
-
-        beginTime = 0.0f;
+        // restore the default button assignments
+        PopButtonAssignments();
     }
 
     return 0;
@@ -628,85 +694,6 @@ static int AxisIndex(int abstractAxisIndex)
             return JOYSTICK_AXIS_XBOX360_RIGHT_X + axisOffset;
         case JOYSTICK_AXIS_ABSTRACT_RIGHT_Y:
             return JOYSTICK_AXIS_XBOX360_RIGHT_Y + axisOffset;
-        default:
-            return -1;
-        }
-    }
-    else
-        return -1;
-}
-
-// converts an abstract button index to an actual index of the selected controller while respecting the selected button offset
-static int ButtonIndex(int abstractButtonIndex)
-{
-    if (controllerType == CONTROLLER_TYPE_DS3)
-    {
-        switch (abstractButtonIndex)
-        {
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT:
-            return JOYSTICK_BUTTON_DS3_DPAD_LEFT + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT:
-            return JOYSTICK_BUTTON_DS3_DPAD_RIGHT + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_UP:
-            return JOYSTICK_BUTTON_DS3_DPAD_UP + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN:
-            return JOYSTICK_BUTTON_DS3_DPAD_DOWN + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT:
-            return JOYSTICK_BUTTON_DS3_SQUARE + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT:
-            return JOYSTICK_BUTTON_DS3_CIRCLE + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_UP:
-            return JOYSTICK_BUTTON_DS3_TRIANGLE + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN:
-            return JOYSTICK_BUTTON_DS3_CROSS + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT:
-            return JOYSTICK_BUTTON_DS3_SELECT + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT:
-            return JOYSTICK_BUTTON_DS3_START + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT:
-            return JOYSTICK_BUTTON_DS3_L1 + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT:
-            return JOYSTICK_BUTTON_DS3_R1 + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT:
-            return JOYSTICK_BUTTON_DS3_L3 + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT:
-            return JOYSTICK_BUTTON_DS3_R3 + buttonOffset;
-        default:
-            return -1;
-        }
-    }
-    else if (controllerType == CONTROLLER_TYPE_XBOX360)
-    {
-        switch (abstractButtonIndex)
-        {
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_DPAD_LEFT + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_DPAD_RIGHT + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_UP:
-            return JOYSTICK_BUTTON_XBOX360_DPAD_UP + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN:
-            return JOYSTICK_BUTTON_XBOX360_DPAD_DOWN + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_X + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_B + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_UP:
-            return JOYSTICK_BUTTON_XBOX360_Y + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN:
-            return JOYSTICK_BUTTON_XBOX360_A + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_BACK + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_START + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_LEFT_BUMPER + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_RIGHT_BUMPER + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_LEFT_STICK + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_RIGHT_STICK + buttonOffset;
         default:
             return -1;
         }
@@ -1872,6 +1859,11 @@ static void SetDefaultAssignments(void)
         XPLMSetDataf(joystickPitchNullzoneDataRef, DEFAULT_NULLZONE);
         XPLMSetDataf(joystickRollNullzoneDataRef, DEFAULT_NULLZONE);
         XPLMSetDataf(joystickHeadingNullzoneDataRef, DEFAULT_NULLZONE);
+
+        // set default sensitivity
+        XPLMSetDataf(joystickPitchSensitivityDataRef, DEFAULT_PITCH_SENSITIVITY);
+        XPLMSetDataf(joystickRollSensitivityDataRef, DEFAULT_ROLL_SENSITIVITY);
+        XPLMSetDataf(joystickHeadingSensitivityDataRef, DEFAULT_HEADING_SENSITIVITY);
     }
 }
 
@@ -2156,6 +2148,9 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
     joystickRollNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_roll_nullzone");
     joystickHeadingNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_heading_nullzone");
+    joystickPitchSensitivityDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_sensitivity");
+    joystickRollSensitivityDataRef = XPLMFindDataRef("sim/joystick/joystick_roll_sensitivity");
+    joystickHeadingSensitivityDataRef = XPLMFindDataRef("sim/joystick/joystick_heading_sensitivity");
     joystickAxisAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_assignments");
     joystickButtonAssignmentsDataRef = XPLMFindDataRef("sim/joystick/joystick_button_assignments");
     joystickAxisValuesDataRef = XPLMFindDataRef("sim/joystick/joystick_axis_values");
@@ -2191,7 +2186,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     toggleBrakesCommand = XPLMCreateCommand(TOGGLE_BRAKES_COMMAND, "Toggle Brakes");
 
     // register custom commands
-    XPLMRegisterCommandHandler(cycleResetViewCommand, CycleResetViewCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleAutopilotOrDisableFlightDirectorCommand, ToggleAutopilotOrDisableFlightDirectorCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
@@ -2255,7 +2250,7 @@ PLUGIN_API void	XPluginStop(void)
         PopButtonAssignments();
 
     // unregister custom commands
-    XPLMUnregisterCommandHandler(cycleResetViewCommand, CycleResetViewCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(toggleAutopilotOrDisableFlightDirectorCommand, ToggleAutopilotOrDisableFlightDirectorCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
