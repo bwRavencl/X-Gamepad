@@ -17,6 +17,7 @@
 
 #include "XPLMDataAccess.h"
 #include "XPLMDisplay.h"
+#include "XPLMGraphics.h"
 #include "XPLMMenus.h"
 #include "XPLMPlanes.h"
 #include "XPLMPlugin.h"
@@ -30,16 +31,19 @@
 #include <stack>
 
 #if IBM
+#include "GLee.h"
 #include <Windows.h>
 #elif APL
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
+#include <OpenGL/gl.h>
 #elif LIN
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <GL/gl.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
 #endif
@@ -49,7 +53,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "0.9"
+#define VERSION "1.0"
 
 // define config file path
 #if IBM
@@ -245,12 +249,46 @@ struct ControllerStruct
 #define MOUSE_BUTTON_LEFT 0
 #define MOUSE_BUTTON_RIGHT 1
 
+// define indicator size
+#define INDICATOR_LEVER_WIDTH 16.0f
+#define INDICATOR_LEVER_HEIGHT 120.0f
+
+// fragment-shader code
+#define FRAGMENT_SHADER "#version 130\n"\
+                        "uniform float throttle;"\
+                        "uniform float prop;"\
+                        "uniform float mixture;"\
+                        "uniform vec2 size;"\
+                        "uniform vec2 resolution;"\
+                        "void main()"\
+                        "{"\
+                            "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.1);"\
+                            "if (round(gl_FragCoord.x) == round(resolution.x - size.x) || round(gl_FragCoord.x) == round(resolution.x) || round(gl_FragCoord.y) == round(size.y) || round(gl_FragCoord.y) == 0.0 || round(mod(gl_FragCoord.y, (size.y / 5.0))) == 0)"\
+                                "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.5);"\
+                            "else"\
+                            "{"\
+                                "float segments = 3.0;"\
+                                "if (prop < -0.5)"\
+                                    "segments -= 1.0;"\
+                                "if (mixture < -0.5)"\
+                                    "segments -= 1.0;"\
+                                "float segmentWidth = size.x / segments;"\
+                                "if (gl_FragCoord.x < resolution.x - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + 1.0)"\
+                                    "gl_FragColor = vec4(0.0, 0.0, 0.0, 0.5);"\
+                                "else if (gl_FragCoord.x >= resolution.x - (segments - 1.0) * segmentWidth && gl_FragCoord.x < resolution.x - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * prop) + 1.0)"\
+                                    "gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);"\
+                                "else if (gl_FragCoord.x >= resolution.x - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + 1.0)"\
+                                    "gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);"\
+                            "}"\
+                        "}"
+
 // hardcoded '.acf' files that have no 2-d panel
 static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf"};
 
 // global internal variables
-static int controllerType = CONTROLLER_TYPE_XBOX360, axisOffset = 0, buttonOffset = 0, viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0;
+static int controllerType = CONTROLLER_TYPE_XBOX360, axisOffset = 0, buttonOffset = 0, viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1;
 static float lastMouseUsageTime = 0.0f, lastViewModifierUsageTime = 0.0f, defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
+static GLuint textureId = 0, program = 0, fragmentShader = 0;
 static XPLMWindowID fakeWindow = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 #if IBM
@@ -265,10 +303,10 @@ static Display *display = NULL;
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // global widget variables
-static XPWidgetID settingsWidget = NULL, dualShock3ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, axisOffsetCaption = NULL, buttonOffsetCaption = NULL, axisOffsetSlider = NULL, buttonOffsetSlider = NULL, setDefaultAssignmentsButton = NULL;
+static XPWidgetID settingsWidget = NULL, dualShock3ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, axisOffsetCaption = NULL, buttonOffsetCaption = NULL, axisOffsetSlider = NULL, buttonOffsetSlider = NULL, setDefaultAssignmentsButton = NULL, showIndicatorsCheckbox = NULL;
 
 // flightloop-callback that resizes and brings the fake window back to the front if needed
 static float UpdateFakeWindowCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
@@ -460,8 +498,8 @@ static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
 
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/view/chase");
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/view/forward_with_hud");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(Has2DPanel() ? "sim/view/forward_with_panel" : "sim/view/3d_cockpit_cmnd_look");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(Has2DPanel() ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_panel");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(Has2DPanel() != 0 ? "sim/view/forward_with_panel" : "sim/view/3d_cockpit_cmnd_look");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(Has2DPanel() != 0 ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_panel");
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
@@ -1808,6 +1846,163 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
     return -1.0f;
 }
 
+// draw-callback that performs the drawing of the indicator overlay
+static int DrawCallback(XPLMDrawingPhase inPhase, int inIsBefore, void *inRefcon)
+{
+    int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
+
+    if (acfNumEngines > 0)
+    {
+        XPLMSetGraphicsState(0, 0, 0, 0, 0,  0, 0);
+
+        glUseProgram(program);
+
+        int numPropLevers = 0, numMixtureLevers = 0;
+        int acfPropType[8];
+        XPLMGetDatavi(acfPropTypeDataRef, acfPropType, 0, 8);
+        int acfEnType[8];
+        XPLMGetDatavi(acfEnTypeDataRef, acfEnType, 0, 8);
+        for (int i = 0; i < acfNumEngines; i++)
+        {
+            if (acfPropType[i] >= 1 && acfPropType[i] <= 3)
+                numPropLevers++;
+
+            if (acfEnType[i] <  3 || acfEnType[i] == 8)
+                numMixtureLevers++;
+        }
+
+        int throttleLocation = glGetUniformLocation(program, "throttle");
+        glUniform1f(throttleLocation, XPLMGetDataf(throttleRatioAllDataRef));
+
+        int propLocation = glGetUniformLocation(program, "prop");
+        float propRatio = 0.0f;
+        if (IsHelicopter() == 0)
+            propRatio = Normalize(XPLMGetDataf(propRotationSpeedRadSecAllDataRef), XPLMGetDataf(acfRSCMingovPrpDataRef), XPLMGetDataf(acfRSCRedlinePrpDataRef), 0.0f, 1.0f);
+        else
+        {
+            float acfMinPitch[8];
+            XPLMGetDatavf(acfMinPitchDataRef, acfMinPitch, 0, 8);
+            float acfMaxPitch[8];
+            XPLMGetDatavf(acfMaxPitchDataRef, acfMaxPitch, 0, 8);
+            float* propPitchDeg = (float*) malloc(acfNumEngines * sizeof(float));
+            XPLMGetDatavf(propPitchDegDataRef, propPitchDeg, 0, acfNumEngines);
+
+            for (int i = 0; i < acfNumEngines; i++)
+                propRatio += Normalize(propPitchDeg[i], acfMinPitch[i], acfMaxPitch[i], 0.0f, 1.0f);
+
+            propRatio /= (float) acfNumEngines;
+            free(propPitchDeg);
+        }
+        glUniform1f(propLocation, numPropLevers == 0 ? -1.0f : propRatio);
+
+        int mixtureLocation = glGetUniformLocation(program, "mixture");
+        glUniform1f(mixtureLocation, numMixtureLevers == 0 ? -1.0f : XPLMGetDataf(mixtureRatioAllDataRef));
+
+        float width = INDICATOR_LEVER_WIDTH;
+        if (numPropLevers != 0)
+            width += INDICATOR_LEVER_WIDTH;
+        if (numMixtureLevers != 0)
+            width += INDICATOR_LEVER_WIDTH;
+
+        int sizeLocation = glGetUniformLocation(program, "size");
+        glUniform2f(sizeLocation, width, INDICATOR_LEVER_HEIGHT);
+
+        int x = 0, y = 0;
+        XPLMGetScreenSize(&x, &y);
+        int resolutionLocation = glGetUniformLocation(program, "resolution");
+        glUniform2f(resolutionLocation, (float) x, (float) y);
+
+        glPushAttrib(GL_VIEWPORT_BIT);
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0.0f, x, 0.0f, y, -1.0f, 1.0f);
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        glViewport(0, 0, x, y);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0f, 0.0f);
+        glVertex2f((float) x - width, 0.0f);
+        glTexCoord2f(0.0f, 1.0f);
+        glVertex2f((float) x - width, INDICATOR_LEVER_HEIGHT);
+        glTexCoord2f(1.0f, 1.0f);
+        glVertex2f((GLfloat) x, INDICATOR_LEVER_HEIGHT);
+        glTexCoord2f(1.0f, 0.0f);
+        glVertex2f((GLfloat) x, 0.0f);
+        glEnd();
+
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+        glPopAttrib();
+
+        glUseProgram(0);
+    }
+
+    return 1;
+}
+
+// removes the fragment-shader from video memory, if deleteProgram is set the shader-program is also removed
+static void CleanupShader(int deleteProgram = 0)
+{
+    glDetachShader(program, fragmentShader);
+    glDeleteShader(fragmentShader);
+
+    if (deleteProgram != 0)
+        glDeleteProgram(program);
+}
+
+// function to load, compile and link the fragment-shader
+static void InitShader(const char *fragmentShaderString)
+{
+    program = glCreateProgram();
+
+    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentShader, 1, &fragmentShaderString, 0);
+    glCompileShader(fragmentShader);
+    glAttachShader(program, fragmentShader);
+    GLint isFragmentShaderCompiled = GL_FALSE;
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &isFragmentShaderCompiled);
+    if (isFragmentShaderCompiled == GL_FALSE)
+    {
+        GLsizei maxLength = 2048;
+        GLchar *log = new GLchar[maxLength];
+        glGetShaderInfoLog(fragmentShader, maxLength, &maxLength, log);
+        XPLMDebugString(NAME": The following error occured while compiling the fragment shader:\n");
+        XPLMDebugString(log);
+        delete[] log;
+
+        CleanupShader(1);
+
+        return;
+    }
+
+    glLinkProgram(program);
+    GLint isProgramLinked = GL_FALSE;
+    glGetProgramiv(program, GL_LINK_STATUS, &isProgramLinked);
+    if (isProgramLinked == GL_FALSE)
+    {
+        GLsizei maxLength = 2048;
+        GLchar *log = new GLchar[maxLength];
+        glGetShaderInfoLog(fragmentShader, maxLength, &maxLength, log);
+        XPLMDebugString(NAME": The following error occured while linking the shader program:\n");
+        XPLMDebugString(log);
+        delete[] log;
+
+        CleanupShader(1);
+
+        return;
+    }
+
+    CleanupShader(0);
+}
+
 // set the default axis and button assignments
 static void SetDefaultAssignments(void)
 {
@@ -1883,6 +2078,8 @@ static void UpdateSettingsWidgets(void)
 
     XPSetWidgetProperty(axisOffsetSlider, xpProperty_ScrollBarSliderPosition, (intptr_t) axisOffset);
     XPSetWidgetProperty(buttonOffsetSlider, xpProperty_ScrollBarSliderPosition, (intptr_t) buttonOffset);
+
+    XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, showIndicators);
 }
 
 // saves current settings to the config file
@@ -1896,6 +2093,7 @@ static void SaveSettings(void)
         file << "controllerType=" << controllerType << std::endl;
         file << "axisOffset=" << axisOffset << std::endl;
         file << "buttonOffset=" << buttonOffset << std::endl;
+        file << "showIndicators=" << showIndicators << std::endl;
 
         file.close();
     }
@@ -1930,6 +2128,15 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
                 UpdateSettingsWidgets();
             }
         }
+        else if (inParam1 == (long) showIndicatorsCheckbox)
+        {
+            showIndicators = (int) XPGetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, 0);
+
+            if (showIndicators == 0)
+                XPLMUnregisterDrawCallback(DrawCallback, xplm_Phase_Window, 1, NULL);
+            else
+                XPLMRegisterDrawCallback(DrawCallback, xplm_Phase_Window, 1, NULL);
+        }
     }
     else if (inMessage == xpMsg_ScrollBarSliderPositionChanged)
     {
@@ -1958,7 +2165,7 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
         if (settingsWidget == NULL)
         {
             // create settings widget
-            int x = 10, y = 0, w = 350, h = 355;
+            int x = 10, y = 0, w = 350, h = 420;
             XPLMGetScreenSize(NULL, &y);
             y -= 100;
 
@@ -2023,13 +2230,24 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
             setDefaultAssignmentsButton = XPCreateWidget(x + 30, y - 250, x2 - 120, y - 265, 1, "Set Default Assignments", 0, settingsWidget, xpWidgetClass_Button);
             XPSetWidgetProperty(setDefaultAssignmentsButton, xpProperty_ButtonType, xpPushButton);
 
+            // add indicators sub window
+            XPCreateWidget(x + 10, y - 290, x2 - 10, y - 335 - 10, 1, "Indicators:", 0, settingsWidget, xpWidgetClass_SubWindow);
+
+            // add indicators caption
+            XPCreateWidget(x + 10, y - 290, x2 - 20, y - 305, 1, "Indicators:", 0, settingsWidget, xpWidgetClass_Caption);
+
+            // add show indicators radio button
+            showIndicatorsCheckbox = XPCreateWidget(x + 20, y - 320, x2 - 20, y - 335, 1, "Show Indicators", 0, settingsWidget, xpWidgetClass_Button);
+            XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonType, xpRadioButton);
+            XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
+
             // add about sub window
-            XPCreateWidget(x + 10, y - 290, x2 - 10, y - 335 - 10, 1, "About:", 0, settingsWidget, xpWidgetClass_SubWindow);
+            XPCreateWidget(x + 10, y - 355, x2 - 10, y - 400 - 10, 1, "About:", 0, settingsWidget, xpWidgetClass_SubWindow);
 
             // add about caption
-            XPCreateWidget(x + 10, y - 290, x2 - 20, y - 305, 1, NAME " " VERSION, 0, settingsWidget, xpWidgetClass_Caption);
-            XPCreateWidget(x + 10, y - 305, x2 - 20, y - 320, 1, "Thank you for using " NAME " by Matteo Hausner", 0, settingsWidget, xpWidgetClass_Caption);
-            XPCreateWidget(x + 10, y - 320, x2 - 20, y - 335, 1, "Contact: matteo.hausner@gmail.com or www.bwravencl.de", 0, settingsWidget, xpWidgetClass_Caption);
+            XPCreateWidget(x + 10, y - 355, x2 - 20, y - 370, 1, NAME " " VERSION, 0, settingsWidget, xpWidgetClass_Caption);
+            XPCreateWidget(x + 10, y - 370, x2 - 20, y - 385, 1, "Thank you for using " NAME " by Matteo Hausner", 0, settingsWidget, xpWidgetClass_Caption);
+            XPCreateWidget(x + 10, y - 385, x2 - 20, y - 400, 1, "Contact: matteo.hausner@gmail.com or www.bwravencl.de", 0, settingsWidget, xpWidgetClass_Caption);
 
             // init checkbox and slider positions
             UpdateSettingsWidgets();
@@ -2103,6 +2321,9 @@ static void LoadSettings(void)
                 iss >> axisOffset;
             else if (line.find("buttonOffset") != -1)
                 iss >> buttonOffset;
+            else if (line.find("showIndicators") != -1)
+                iss >> showIndicators;
+;
         }
 
         file.close();
@@ -2125,6 +2346,9 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // get paths in POSIX format
     XPLMEnableFeature("XPLM_USE_NATIVE_PATHS", 1);
 
+    // prepare fragment-shader
+    InitShader(FRAGMENT_SHADER);
+
     // obtain datarefs
     acfCockpitTypeDataRef = XPLMFindDataRef("sim/aircraft/view/acf_cockpit_type");
     acfPeXDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peX");
@@ -2135,6 +2359,8 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
     acfHasBetaDataRef = XPLMFindDataRef("sim/aircraft/overflow/acf_has_beta");
     acfSbrkEQDataRef = XPLMFindDataRef("sim/aircraft/parts/acf_sbrkEQ");
+    acfEnTypeDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_en_type");
+    acfPropTypeDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_prop_type");
     acfMinPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_min_pitch");
     acfMaxPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_max_pitch");
     acfVertCantDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_vertcant");
@@ -2225,6 +2451,10 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterFlightLoopCallback(UpdateFakeWindowCallback, -1, NULL);
     XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
 
+    // register draw callback
+    if (showIndicators)
+        XPLMRegisterDrawCallback(DrawCallback, xplm_Phase_Window, 1, NULL);
+
     // create menu-entries
     int subMenuItem = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 1);
     XPLMMenuID menu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
@@ -2245,6 +2475,8 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
 PLUGIN_API void	XPluginStop(void)
 {
+    CleanupShader(1);
+
     // revert any remaining button assignments
     while (!buttonAssignmentsStack.empty())
         PopButtonAssignments();
@@ -2266,6 +2498,11 @@ PLUGIN_API void	XPluginStop(void)
     // register flight loop callbacks
     XPLMUnregisterFlightLoopCallback(UpdateFakeWindowCallback, NULL);
     XPLMUnregisterFlightLoopCallback(FlightLoopCallback, NULL);
+
+    // unregister draw callback
+    if (showIndicators)
+        XPLMUnregisterDrawCallback(DrawCallback, xplm_Phase_Window, 1, NULL);
+
 
 #if IBM
     if (hGetProcIDDLL != NULL)
