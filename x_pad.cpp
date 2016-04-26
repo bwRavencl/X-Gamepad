@@ -226,8 +226,8 @@ struct ControllerStruct
 #define TOGGLE_BRAKES_COMMAND NAME_LOWERCASE "/toggle_brakes"
 
 // define auto-center view limit
-#define AUTO_CENTER_VIEW_DISTANCE_LIMIT 0.05f
-#define AUTO_CENTER_VIEW_ANGLE_LIMIT 6.0f
+#define AUTO_CENTER_VIEW_DISTANCE_LIMIT 0.03f
+#define AUTO_CENTER_VIEW_ANGLE_LIMIT 1.5f
 
 // define long press time
 #define BUTTON_LONG_PRESS_TIME 1.0f
