@@ -283,7 +283,7 @@ struct ControllerStruct
                         "}"
 
 // hardcoded '.acf' files that have no 2-d panel
-static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf"};
+static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf", "YAK-55M.acf"};
 
 // global internal variables
 static int controllerType = CONTROLLER_TYPE_XBOX360, axisOffset = 0, buttonOffset = 0, viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1;
