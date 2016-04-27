@@ -303,7 +303,7 @@ static Display *display = NULL;
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, acfVertCantDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
 
 // global widget variables
 static XPWidgetID settingsWidget = NULL, dualShock3ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, axisOffsetCaption = NULL, buttonOffsetCaption = NULL, axisOffsetSlider = NULL, buttonOffsetSlider = NULL, setDefaultAssignmentsButton = NULL, showIndicatorsCheckbox = NULL;
@@ -1158,12 +1158,11 @@ static int IsHelicopter()
     if (XPLMGetDatai(acfCockpitTypeDataRef) == 5)
         return 1;
 
-    float acfVertCant[8];
-    XPLMGetDatavf(acfVertCantDataRef, acfVertCant, 0, 8);
-
-    for (int i = 0; i < 8; i++)
+    int acfPropType[8];
+    XPLMGetDatavi(acfPropTypeDataRef, acfPropType, 0, 8);
+    for (int i = 0; i < XPLMGetDatai(acfNumEnginesDataRef); i++)
     {
-        if (acfVertCant[i] > 45.0f)
+        if (acfPropType[i] == 3)
             return 1;
     }
 
@@ -2363,7 +2362,6 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     acfPropTypeDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_prop_type");
     acfMinPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_min_pitch");
     acfMaxPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_max_pitch");
-    acfVertCantDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_vertcant");
     ongroundAnyDataRef = XPLMFindDataRef("sim/flightmodel/failures/onground_any");
     groundspeedDataRef = XPLMFindDataRef("sim/flightmodel/position/groundspeed");
     cinemaVeriteDataRef = XPLMFindDataRef("sim/graphics/view/cinema_verite");
