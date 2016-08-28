@@ -58,14 +58,14 @@
 // define config file path
 #if IBM
 #define CONFIG_PATH ".\\Resources\\plugins\\" NAME_LOWERCASE "\\" NAME_LOWERCASE ".ini"
-struct ControllerStruct
+struct XInputState
 {
-    unsigned long eventCount;
+    unsigned long dwPacketNumber;
     unsigned short up : 1, down : 1, left : 1, right : 1, start : 1, back : 1, l3 : 1, r3 : 1, lButton : 1, rButton : 1, guideButton : 1, unknown : 1, aButton : 1, bButton : 1, xButton : 1, yButton : 1;
     unsigned char lTrigger;
     unsigned char rTrigger;
     short lJoyY;
-    short lJoyx;
+    short lJoyX;
     short rJoyY;
     short rJoyX;
 };
@@ -232,9 +232,6 @@ struct ControllerStruct
 // define long press time
 #define BUTTON_LONG_PRESS_TIME 1.0f
 
-// define disable view heading time
-#define DISABLE_VIEW_HEADING_TIME 3.0f
-
 // define relative control multiplier
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.0f
 
@@ -283,18 +280,18 @@ struct ControllerStruct
                         "}"
 
 // hardcoded '.acf' files that have no 2-d panel
-static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf", "YAK-55M.acf"};
+static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf", "Hurricane.acf", "YAK-55M.acf", "YAK52.acf", "YAK52TD.acf", "YAK52TT.acf"};
 
 // global internal variables
-static int controllerType = CONTROLLER_TYPE_XBOX360, axisOffset = 0, buttonOffset = 0, viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, lastMouseX = 0, lastMouseY = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1;
-static float lastMouseUsageTime = 0.0f, lastViewModifierUsageTime = 0.0f, defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
-static GLuint textureId = 0, program = 0, fragmentShader = 0;
+static int controllerType = CONTROLLER_TYPE_XBOX360, axisOffset = 0, buttonOffset = 0, viewModifierDown = 0, propPitchThrottleModifierDown = 0, mixtureControlModifierDown = 0, cowlFlapModifierDown = 0, trimModifierDown = 0, mousePointerControlEnabled = 0, switchTo3DCommandLook = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1, viewHeadingEnabled = 1;
+static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
+static GLuint program = 0, fragmentShader = 0;
 static XPLMWindowID fakeWindow = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 #if IBM
 static HINSTANCE hGetProcIDDLL = NULL;
-typedef int(__stdcall * pICFUNC) (int, ControllerStruct&);
-pICFUNC getControllerData = NULL;
+typedef int(__stdcall * pICFUNC) (int, XInputState&);
+pICFUNC XInputGetStateEx = NULL;
 #elif LIN
 static Display *display = NULL;
 #endif
@@ -359,7 +356,7 @@ static int Has2DPanel(void)
     XPLMGetNthAircraftModel(0, fileName, path);
 
     // check if the path to the '.acf' file matches one of the hardcoded aircraft that have no 2D panel and for which the check below fails
-    for (int i = 0; i < sizeof(ACF_WITHOUT2D_PANEL) / sizeof(char*); i++)
+    for (int i = 0; i < (int) (sizeof(ACF_WITHOUT2D_PANEL) / sizeof(char*)); i++)
     {
         if (strstr(path, ACF_WITHOUT2D_PANEL[i]) != NULL)
             return 0;
@@ -466,8 +463,6 @@ static int ButtonIndex(int abstractButtonIndex)
 // command-handler that hadles the reset view command / view switching modifier command
 static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    static float beginTime = 0.0f;
-
     if (inPhase == xplm_CommandBegin)
     {
         // reset view
@@ -502,6 +497,8 @@ static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(Has2DPanel() != 0 ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_panel");
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        viewHeadingEnabled = 1;
     }
     else if (inPhase == xplm_CommandEnd)
     {
@@ -812,7 +809,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
     }
 
-    lastViewModifierUsageTime = XPLMGetElapsedTime();
+    viewHeadingEnabled = 0; 
 
     return 0;
 }
@@ -1203,10 +1200,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 #if IBM
         static int guideButtonDown = 0;
 
-        if (controllerType == CONTROLLER_TYPE_XBOX360 && getControllerData != NULL)
+        if (controllerType == CONTROLLER_TYPE_XBOX360 && XInputGetStateEx != NULL)
         {
-            ControllerStruct buttons;
-            getControllerData(0, buttons);
+            XInputState state;
+            XInputGetStateEx(0, state);
 
             if (guideButtonDown == 0 && buttons.guideButton != 0)
             {
@@ -1301,10 +1298,11 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             XPLMSetDataf(leftBrakeRatioDataRef, leftBrakeRatio);
             XPLMSetDataf(rightBrakeRatioDataRef, rightBrakeRatio);
 
-            static int leftTriggerDown = 0, rightTriggerDown = 0;
             if (controllerType == CONTROLLER_TYPE_XBOX360 && joystickAxisLeftXCalibrated)
             {
 #if IBM
+                static int leftTriggerDown = 0, rightTriggerDown = 0;
+
                 if (leftTriggerDown == 0 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.85f)
                     leftTriggerDown = 1;
                 else if (leftTriggerDown == 0 && rightTriggerDown == 0 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= 0.15f)
@@ -1661,10 +1659,8 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 {
                     static float normalizedViewHeading = 0.0f;
 
-                    float elapsedTime = XPLMGetElapsedTime() - (lastMouseUsageTime > lastViewModifierUsageTime ? lastMouseUsageTime : lastViewModifierUsageTime);
-
                     // handle view heading when the joystick has been calibrated, the aircraft is on ground and the current view is 3D cockpit command look
-                    if (joystickAxisLeftXCalibrated != 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && elapsedTime >= DISABLE_VIEW_HEADING_TIME)
+                    if (viewHeadingEnabled != 0 &&joystickAxisLeftXCalibrated != 0 && XPLMGetDatai(ongroundAnyDataRef) != 0 && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
                     {
                         float joystickHeadingNullzone = XPLMGetDataf(joystickHeadingNullzoneDataRef);
 
@@ -2200,9 +2196,9 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
             XPCreateWidget(x + 10, y - 125, x2 - 20, y - 140, 1, "Offsets:", 0, settingsWidget, xpWidgetClass_Caption);
 
             // add axis offset caption
-            char stringBrightness[32];
-            sprintf(stringBrightness, "Axis Offset: %d", axisOffset);
-            axisOffsetCaption = XPCreateWidget(x + 30, y - 155, x2 - 50, y - 170, 1, stringBrightness, 0, settingsWidget, xpWidgetClass_Caption);
+            char stringAxisOffset[32];
+            sprintf(stringAxisOffset, "Axis Offset: %d", axisOffset);
+            axisOffsetCaption = XPCreateWidget(x + 30, y - 155, x2 - 50, y - 170, 1, stringAxisOffset, 0, settingsWidget, xpWidgetClass_Caption);
 
             // add axis offset slider
             axisOffsetSlider = XPCreateWidget(x + 195, y - 155, x2 - 15, y - 170, 1, "Axis Offset", 0, settingsWidget, xpWidgetClass_ScrollBar);
@@ -2210,9 +2206,9 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
             XPSetWidgetProperty(axisOffsetSlider, xpProperty_ScrollBarMax, 95);
 
             // add button offset caption
-            char stringContrast[32];
-            sprintf(stringContrast, "Button Offset: %d", buttonOffset);
-            buttonOffsetCaption = XPCreateWidget(x + 30, y - 180, x2 - 50, y - 195, 1, stringContrast, 0, settingsWidget, xpWidgetClass_Caption);
+            char stringButtonOffset[32];
+            sprintf(stringButtonOffset, "Button Offset: %d", buttonOffset);
+            buttonOffsetCaption = XPCreateWidget(x + 30, y - 180, x2 - 50, y - 195, 1, stringButtonOffset, 0, settingsWidget, xpWidgetClass_Caption);
 
             // add button offset slider
             buttonOffsetSlider = XPCreateWidget(x + 195, y - 180, x2 - 15, y - 195, 1, "Button Offset", 0, settingsWidget, xpWidgetClass_ScrollBar);
@@ -2273,7 +2269,7 @@ static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags,
 
 static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
 {
-    lastMouseUsageTime = XPLMGetElapsedTime();
+    viewHeadingEnabled = 0;
 
     return 0;
 }
@@ -2284,7 +2280,7 @@ static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void
 
     if (x != lastX || y != lastY)
     {
-        lastMouseUsageTime = XPLMGetElapsedTime();
+        viewHeadingEnabled = 0;
         lastX = x;
         lastY = y;
     }
@@ -2294,7 +2290,7 @@ static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void
 
 static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, int clicks, void *inRefcon)
 {
-    lastMouseUsageTime = XPLMGetElapsedTime();
+    viewHeadingEnabled = 0;
 
     return 0;
 }
@@ -2314,15 +2310,14 @@ static void LoadSettings(void)
             std::string val = line.substr(line.find("=") + 1);
             std::istringstream iss(val);
 
-            if (line.find("controllerType") != -1)
+            if (line.find("controllerType") != std::string::npos)
                 iss >> controllerType;
-            else if (line.find("axisOffset") != -1)
+            else if (line.find("axisOffset") != std::string::npos)
                 iss >> axisOffset;
-            else if (line.find("buttonOffset") != -1)
+            else if (line.find("buttonOffset") != std::string::npos)
                 iss >> buttonOffset;
-            else if (line.find("showIndicators") != -1)
+            else if (line.find("showIndicators") != std::string::npos)
                 iss >> showIndicators;
-;
         }
 
         file.close();
@@ -2334,7 +2329,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 #if IBM
     hGetProcIDDLL = LoadLibrary(L"XInput1_3.dll");
     FARPROC lpfnGetProcessID = GetProcAddress(HMODULE(hGetProcIDDLL), (LPCSTR) 100);
-    getControllerData = pICFUNC(lpfnGetProcessID);
+    XInputGetStateEx = pICFUNC(lpfnGetProcessID);
 #endif
 
     // set plugin info
@@ -2462,7 +2457,6 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     display = XOpenDisplay(NULL);
     if(display != NULL)
     {
-        int screenNumber = DefaultScreen(display);
         XEvent event;
         XQueryPointer(display, RootWindow(display, DefaultScreen(display)), &event.xbutton.root, &event.xbutton.window, &event.xbutton.x_root, &event.xbutton.y_root, &event.xbutton.x, &event.xbutton.y, &event.xbutton.state);
     }
@@ -2471,7 +2465,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     return 1;
 }
 
-PLUGIN_API void	XPluginStop(void)
+PLUGIN_API void XPluginStop(void)
 {
     CleanupShader(1);
 
@@ -2535,6 +2529,8 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
         switchTo3DCommandLook = 0;
         if (Has2DPanel() == 0)
             switchTo3DCommandLook = 1;
+        // reenable head turning
+        viewHeadingEnabled = 1;
         break;
     }
 }
