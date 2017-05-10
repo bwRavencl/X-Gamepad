@@ -1,4 +1,4 @@
-/* Copyright (C) 2015  Matteo Hausner
+/* Copyright (C) 2017  Matteo Hausner
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "1.0"
+#define VERSION "1.1"
 
 // define config file path
 #if IBM
@@ -62,7 +62,7 @@ struct XInputState
 {
     unsigned long dwPacketNumber;
     unsigned short up : 1, down : 1, left : 1, right : 1, start : 1, back : 1, l3 : 1, r3 : 1, lButton : 1, rButton : 1, guideButton : 1, unknown : 1, aButton : 1, bButton : 1, xButton : 1, yButton : 1;
-    unsigned char lTrigger
+	unsigned char lTrigger;
     unsigned char rTrigger;
     short lJoyY;
     short lJoyX;
@@ -110,12 +110,21 @@ typedef enum
 #endif
 
 // define dualshock 4 joystick axis
+#if IBM
+#define JOYSTICK_AXIS_DS4_LEFT_X 3
+#define JOYSTICK_AXIS_DS4_LEFT_Y 2
+#define JOYSTICK_AXIS_DS4_RIGHT_X 1
+#define JOYSTICK_AXIS_DS4_RIGHT_Y 0
+#define JOYSTICK_AXIS_DS4_L2 5
+#define JOYSTICK_AXIS_DS4_R2 4
+#else
 #define JOYSTICK_AXIS_DS4_LEFT_X 0
 #define JOYSTICK_AXIS_DS4_LEFT_Y 1
 #define JOYSTICK_AXIS_DS4_RIGHT_X 2
 #define JOYSTICK_AXIS_DS4_RIGHT_Y 5
 #define JOYSTICK_AXIS_DS4_L2 3
 #define JOYSTICK_AXIS_DS4_R2 4
+#endif
 
 // define abstract joystick buttons
 #define JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT 0
@@ -220,12 +229,11 @@ typedef enum
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
 // define default nullzone
-#define DEFAULT_NULLZONE 0.15f
+#define DEFAULT_NULLZONE 0.10f
 
 // define default sensitivities
-
-#define DEFAULT_PITCH_SENSITIVITY 0.5f
-#define DEFAULT_ROLL_SENSITIVITY 0.5f
+#define DEFAULT_PITCH_SENSITIVITY 1.0f
+#define DEFAULT_ROLL_SENSITIVITY 1.0f
 #define DEFAULT_HEADING_SENSITIVITY 1.0f
 
 // define '.acf' file 'show cockpit object in: 2-d forward panel views' string
@@ -264,7 +272,7 @@ typedef enum
 #define BUTTON_LONG_PRESS_TIME 1.0f
 
 // define relative control multiplier
-#define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.0f
+#define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.5f
 
 // define collective control multiplier
 #define COLLECTIVE_CONTROL_MULTIPLIER 0.2f
@@ -332,7 +340,7 @@ static Display *display = NULL;
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL;
 
 // global dataref variables
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJostickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
 
 // global widget variables
 static XPWidgetID settingsWidget = NULL, dualShock3ControllerRadioButton = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, axisOffsetCaption = NULL, buttonOffsetCaption = NULL, axisOffsetSlider = NULL, buttonOffsetSlider = NULL, setDefaultAssignmentsButton = NULL, showIndicatorsCheckbox = NULL;
@@ -1279,7 +1287,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         switchTo3DCommandLook = 0;
     }
 
-    if (XPLMGetDatai(hasJostickDataRef) != 0)
+    if (XPLMGetDatai(hasJoystickDataRef) != 0)
     {
 #if IBM
         static int guideButtonDown = 0;
@@ -1289,12 +1297,12 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             XInputState state;
             XInputGetStateEx(0, state);
 
-            if (guideButtonDown == 0 && buttons.guideButton != 0)
+            if (guideButtonDown == 0 && state.guideButton != 0)
             {
                 guideButtonDown = 1;
                 XPLMCommandBegin(toggleMousePointerControlCommand);
             }
-            else if (guideButtonDown == 1 && buttons.guideButton == 0)
+            else if (guideButtonDown == 1 && state.guideButton == 0)
             {
                 guideButtonDown = 0;
                 XPLMCommandEnd(toggleMousePointerControlCommand);
@@ -2096,7 +2104,7 @@ static void InitShader(const char *fragmentShaderString)
 static void SetDefaultAssignments(void)
 {
     // only set default assignments if a joystick is found and if no modifier is down which can alter any assignments
-    if (XPLMGetDatai(hasJostickDataRef) && viewModifierDown == 0 && trimModifierDown == 0  && mousePointerControlEnabled == 0)
+    if (XPLMGetDatai(hasJoystickDataRef) && viewModifierDown == 0 && trimModifierDown == 0  && mousePointerControlEnabled == 0)
     {
         // set default axis assignments
         int joystickAxisAssignments[100];
@@ -2267,7 +2275,7 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
 static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
 {
     // settings menu entry
-    if ((long)inItemRef == 0)
+    if ((long) inItemRef == 0)
     {
         if (settingsWidget == NULL)
         {
@@ -2359,7 +2367,7 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
             // add about caption
             XPCreateWidget(x + 10, y - 380, x2 - 20, y - 395, 1, NAME " " VERSION, 0, settingsWidget, xpWidgetClass_Caption);
             XPCreateWidget(x + 10, y - 395, x2 - 20, y - 410, 1, "Thank you for using " NAME " by Matteo Hausner", 0, settingsWidget, xpWidgetClass_Caption);
-            XPCreateWidget(x + 10, y - 410, x2 - 20, y - 425, 1, "Contact: matteo.hausner@gmail.com or www.bwravencl.de", 0, settingsWidget, xpWidgetClass_Caption);
+            XPCreateWidget(x + 10, y - 410, x2 - 20, y - 425, 1, "Contact: matteo.hausner@gmail.com or bwravencl.de", 0, settingsWidget, xpWidgetClass_Caption);
 
             // init checkbox and slider positions
             UpdateSettingsWidgets();
@@ -2484,7 +2492,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     pilotsHeadPsiDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_psi");
     pilotsHeadTheDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_the");
     viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
-    hasJostickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
+    hasJoystickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
     joystickRollNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_roll_nullzone");
     joystickHeadingNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_heading_nullzone");
@@ -2509,6 +2517,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     carbHeatRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/carb_heat_ratio");
     cowlFlapRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/cowl_flap_ratio");
     thrustReverserDeployRatioDataRef = XPLMFindDataRef("sim/flightmodel2/engines/thrust_reverser_deploy_ratio");
+	overrideToeBrakesDataRef = XPLMFindDataRef("sim/operation/override/override_toe_brakes");
 
     // create custom commands
     cycleResetViewCommand = XPLMCreateCommand(CYCLE_RESET_VIEW_COMMAND, "Cycle / Reset View");
@@ -2561,6 +2570,10 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     fakeWindowParameters.handleMouseWheelFunc = HandleMouseWheel;
     fakeWindow = XPLMCreateWindowEx(&fakeWindowParameters);
 
+	// acquire toe brake control
+	if (overrideToeBrakesDataRef != NULL)
+		XPLMSetDatai(overrideToeBrakesDataRef, 1);
+
     // register flight loop callbacks
     XPLMRegisterFlightLoopCallback(UpdateFakeWindowCallback, -1, NULL);
     XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
@@ -2611,6 +2624,10 @@ PLUGIN_API void XPluginStop(void)
     // register flight loop callbacks
     XPLMUnregisterFlightLoopCallback(UpdateFakeWindowCallback, NULL);
     XPLMUnregisterFlightLoopCallback(FlightLoopCallback, NULL);
+
+	// release toe brake control
+	if (overrideToeBrakesDataRef != NULL)
+		XPLMSetDatai(overrideToeBrakesDataRef, 0);
 
     // unregister draw callback
     if (showIndicators)

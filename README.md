@@ -22,7 +22,7 @@ If you have more than one controller connected you have to adjust the 'Axis Offs
 
 Finally press the 'Set Default Assignments' menu entry to let X-pad set up X-Plane correctly for your controller.
 Please refer to the section 'Default Mappings' below in order to see which changes will be made to your joystick configuration.
-Also note that X-Plane's nullzone setting will be set to a value of 15% and the sensitivity of the yaw axis to fully linear.
+Also note that X-Plane's nullzone setting will be set to a value of 15% and the sensitivity of the three main control axes to 100%.
 
 When closing the 'Settings' window all settings will be stored to a configuration file automatically.
 
