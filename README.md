@@ -26,6 +26,8 @@ Also note that X-Plane's nullzone setting will be set to a value of 15% and the 
 
 When closing the 'Settings' window all settings will be stored to a configuration file automatically.
 
+In order to be able to use the DualShock 4's touchpad on Linux you need to copy the accompanying file '50-x_pad.rules' into your '/etc/udev/rules.d' directory.
+
 #### Disclaimer:
 This plugin currently supports DualShock 3 / 4 and Xbox 360 controllers.
 
