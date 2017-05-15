@@ -289,7 +289,7 @@
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 1.5f
 
 // define collective control multiplier
-#define COLLECTIVE_CONTROL_MULTIPLIER 0.2f
+#define COLLECTIVE_CONTROL_MULTIPLIER 0.5f
 
 // define joystick sensitivity values
 #define JOYSTICK_VIEW_SENSITIVITY 3.5f
@@ -327,7 +327,7 @@
                                 "float segmentWidth = size.x / segments;"\
                                 "if (gl_FragCoord.x < resolution.x - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + 1.0)"\
                                     "gl_FragColor = vec4(0.0, 0.0, 0.0, 0.5);"\
-                                "else if (gl_FragCoord.x >= resolution.x - (segments - 1.0) * segmentWidth && gl_FragCoord.x < resolution.x - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * prop) + 1.0)"\
+                                "else if (gl_FragCoord.x >= resolution.x - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < resolution.x - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + 1.0)"\
                                     "gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);"\
                                 "else if (gl_FragCoord.x >= resolution.x - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + 1.0)"\
                                     "gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);"\
@@ -1559,7 +1559,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         defaultHeadPositionZ = XPLMGetDataf(acfPeZDataRef);
     }
 
-    int isHelicopter = IsHelicopter();
+    int helicopter = IsHelicopter();
 
     int currentMouseX, currentMouseY;
     XPLMGetMouseLocation(&currentMouseX, &currentMouseY);
@@ -1895,7 +1895,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         }
         else
         {
-            if (!isHelicopter && mode == PROP)
+            if (!helicopter && mode == PROP)
             {
                 float acfRSCMingovPrp = XPLMGetDataf(acfRSCMingovPrpDataRef);
                 float acfRSCRedlinePrp = XPLMGetDataf(acfRSCRedlinePrpDataRef);
@@ -2053,7 +2053,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             }
             else
             {
-                if (!isHelicopter)
+                if (!helicopter)
                 {
                     static float normalizedViewHeading = 0.0f;
 
@@ -2096,7 +2096,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     }
                 }
 
-                if (isHelicopter && mode == DEFAULT)
+                if (helicopter && mode == DEFAULT)
                 {
                     float acfMinPitch[8];
                     XPLMGetDatavf(acfMinPitchDataRef, acfMinPitch, 0, 8);
@@ -2244,57 +2244,59 @@ static int DrawCallback(XPLMDrawingPhase inPhase, int inIsBefore, void *inRefcon
 {
     int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
 
-    if (acfNumEngines > 0)
+    if (acfNumEngines > 0 || XPLMGetDatai(acfSbrkEQDataRef))
     {
+        int helicopter = IsHelicopter();
+
         XPLMSetGraphicsState(0, 0, 0, 0, 0,  0, 0);
 
         glUseProgram(program);
 
         int numPropLevers = 0, numMixtureLevers = 0;
-        int acfPropType[8];
-        XPLMGetDatavi(acfPropTypeDataRef, acfPropType, 0, 8);
-        int acfEnType[8];
-        XPLMGetDatavi(acfEnTypeDataRef, acfEnType, 0, 8);
-        for (int i = 0; i < acfNumEngines; i++)
+        if (acfNumEngines > 0)
         {
-            if (acfPropType[i] >= 1 && acfPropType[i] <= 3)
-                numPropLevers++;
+            int acfPropType[8];
+            XPLMGetDatavi(acfPropTypeDataRef, acfPropType, 0, 8);
+            int acfEnType[8];
+            XPLMGetDatavi(acfEnTypeDataRef, acfEnType, 0, 8);
+            for (int i = 0; i < acfNumEngines; i++)
+            {
+                if (acfPropType[i] >= 1 && acfPropType[i] <= 3)
+                    numPropLevers++;
 
-            if (acfEnType[i] <  3 || acfEnType[i] == 8)
-                numMixtureLevers++;
+                if (acfEnType[i] <  2 || (acfEnType[i] == 2 && !helicopter) || acfEnType[i] == 8)
+                    numMixtureLevers++;
+            }
         }
 
         int throttleLocation = glGetUniformLocation(program, "throttle");
-        glUniform1f(throttleLocation, XPLMGetDataf(throttleRatioAllDataRef));
+        glUniform1f(throttleLocation, acfNumEngines > 0 ? XPLMGetDataf(throttleRatioAllDataRef) : 1.0f - XPLMGetDataf(speedbrakeRatioDataRef));
 
         int propLocation = glGetUniformLocation(program, "prop");
         float propRatio = 0.0f;
-        if (!IsHelicopter())
-            propRatio = Normalize(XPLMGetDataf(propRotationSpeedRadSecAllDataRef), XPLMGetDataf(acfRSCMingovPrpDataRef), XPLMGetDataf(acfRSCRedlinePrpDataRef), 0.0f, 1.0f);
-        else
+        if (helicopter)
         {
-            float acfMinPitch[8];
-            XPLMGetDatavf(acfMinPitchDataRef, acfMinPitch, 0, 8);
-            float acfMaxPitch[8];
-            XPLMGetDatavf(acfMaxPitchDataRef, acfMaxPitch, 0, 8);
-            float* propPitchDeg = (float*) malloc(acfNumEngines * sizeof(float));
-            XPLMGetDatavf(propPitchDegDataRef, propPitchDeg, 0, acfNumEngines);
+            float acfMinPitch = 0.0f;
+            XPLMGetDatavf(acfMinPitchDataRef, &acfMinPitch, 0, 1);
+            float acfMaxPitch = 0.0f;
+            XPLMGetDatavf(acfMaxPitchDataRef, &acfMaxPitch, 0, 1);
+            float propPitchDeg = 0.0f;
+            XPLMGetDatavf(propPitchDegDataRef, &propPitchDeg, 0, 1);
 
-            for (int i = 0; i < acfNumEngines; i++)
-                propRatio += Normalize(propPitchDeg[i], acfMinPitch[i], acfMaxPitch[i], 0.0f, 1.0f);
-
-            propRatio /= (float) acfNumEngines;
-            free(propPitchDeg);
+            propRatio = Normalize(propPitchDeg, acfMinPitch, acfMaxPitch, 0.0f, 1.0f);
         }
-        glUniform1f(propLocation, numPropLevers == 0 ? -1.0f : propRatio);
+        else
+            propRatio = Normalize(XPLMGetDataf(propRotationSpeedRadSecAllDataRef), XPLMGetDataf(acfRSCMingovPrpDataRef), XPLMGetDataf(acfRSCRedlinePrpDataRef), 0.0f, 1.0f);
+
+        glUniform1f(propLocation, numPropLevers < 1 ? -1.0f : propRatio);
 
         int mixtureLocation = glGetUniformLocation(program, "mixture");
-        glUniform1f(mixtureLocation, numMixtureLevers == 0 ? -1.0f : XPLMGetDataf(mixtureRatioAllDataRef));
+        glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -1.0f : XPLMGetDataf(mixtureRatioAllDataRef));
 
         float width = INDICATOR_LEVER_WIDTH;
-        if (numPropLevers != 0)
+        if (numPropLevers > 0)
             width += INDICATOR_LEVER_WIDTH;
-        if (numMixtureLevers != 0)
+        if (numMixtureLevers > 0)
             width += INDICATOR_LEVER_WIDTH;
 
         int sizeLocation = glGetUniformLocation(program, "size");
