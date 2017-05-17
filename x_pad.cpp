@@ -454,12 +454,11 @@ struct XInputState
 static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf", "Hurricane.acf", "YAK-55M.acf", "YAK52.acf", "YAK52TD.acf", "YAK52TT.acf"};
 
 // global internal variables
-static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, bringFakeWindowToFront = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1, viewHeadingEnabled = 1;
+static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
 static GLuint program = 0, fragmentShader = 0;
-static XPLMWindowID fakeWindow = NULL;
 static std::stack <int*> buttonAssignmentsStack;
 static volatile wchar_t *handledHidDevices[MAX_HID_DEVICES] = { NULL };
 static pthread_t hidDeviceThreads[MAX_HID_DEVICES] = { 0 };
@@ -481,25 +480,6 @@ static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDat
 
 // global widget variables
 static XPWidgetID settingsWidget = NULL, dualShock3ControllerRadioButton = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, axisOffsetCaption = NULL, buttonOffsetCaption = NULL, axisOffsetSlider = NULL, buttonOffsetSlider = NULL, setDefaultAssignmentsButton = NULL, showIndicatorsCheckbox = NULL;
-
-// flightloop-callback that resizes and brings the fake window back to the front if needed
-static float UpdateFakeWindowCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
-{
-    if (fakeWindow != NULL)
-    {
-        int x = 0, y = 0;
-        XPLMGetScreenSize(&x, &y);
-        XPLMSetWindowGeometry(fakeWindow, 0, y, x, 0);
-
-        if (!bringFakeWindowToFront)
-        {
-            XPLMBringWindowToFront(fakeWindow);
-            bringFakeWindowToFront = 1;
-        }
-    }
-
-    return -1.0f;
-}
 
 // push the current button assignments to the stack
 static void PushButtonAssignments(void)
@@ -718,8 +698,6 @@ static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(Has2DPanel() ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_panel");
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-        viewHeadingEnabled = 1;
     }
     else if (inPhase == xplm_CommandEnd)
     {
@@ -1011,10 +989,8 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             // temporarily disable cinema verite
             DisableCinemaVerite();
         }
-        else if (inPhase == xplm_CommandEnd)
+        else if (inPhase == xplm_CommandEnd && mode == VIEW)
         {
-            mode = DEFAULT;
-
             // auto-center 3D cockpit view if it is only the defined distance or angle off from the center anyways
             if (XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && fabs(defaultHeadPositionX - XPLMGetDataf(acfPeXDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT && fabs(defaultHeadPositionY - XPLMGetDataf(acfPeYDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT && fabs(defaultHeadPositionZ - XPLMGetDataf(acfPeZDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT)
             {
@@ -1040,12 +1016,12 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
             // restore cinema verite
             RestoreCinemaVerite();
+
+            mode = DEFAULT;
         }
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
     }
-
-    viewHeadingEnabled = 0;
 
     return 0;
 }
@@ -1055,7 +1031,7 @@ static int PropPitchOrThrottleModifierCommandHandler(XPLMCommandRef inCommand, X
 {
     if (inPhase == xplm_CommandBegin && mode == DEFAULT)
         mode = PROP;
-    else if (inPhase == xplm_CommandEnd)
+    else if (inPhase == xplm_CommandEnd && mode == PROP)
         mode = DEFAULT;
 
     return 0;
@@ -1066,7 +1042,7 @@ static int MixtureControlModifierCommandHandler(XPLMCommandRef inCommand, XPLMCo
 {
     if (inPhase == xplm_CommandBegin && mode == DEFAULT)
         mode = MIXTURE;
-    else if (inPhase == xplm_CommandEnd)
+    else if (inPhase == xplm_CommandEnd && mode == MIXTURE)
         mode = DEFAULT;
 
     return 0;
@@ -1077,7 +1053,7 @@ static int CowlFlapModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandP
 {
     if (inPhase == xplm_CommandBegin && mode == DEFAULT)
         mode = COWL;
-    else if (inPhase == xplm_CommandEnd)
+    else if (inPhase == xplm_CommandEnd && mode == COWL)
         mode = DEFAULT;
 
     return 0;
@@ -1138,10 +1114,8 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
-    else if (inPhase == xplm_CommandEnd)
+    else if (inPhase == xplm_CommandEnd && mode == TRIM)
     {
-        mode = DEFAULT;
-
         // restore the default button assignments
         PopButtonAssignments();
 
@@ -1151,6 +1125,8 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         // custom handling for DreamFoil B407
         else if (IsPluginEnabled(DREAMFOIL_B407_PLUGIN_SIGNATURE))
             XPLMCommandEnd(XPLMFindCommand("B407/flight_controls/force_trim"));
+
+        mode = DEFAULT;
     }
 
     return 0;
@@ -1276,12 +1252,12 @@ static void ToggleMouseButton(MouseButton button, int down, void *display)
 // command-handler that handles the toggle mouse pointer control command
 static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase == xplm_CommandBegin && mode == DEFAULT)
+    if (inPhase == xplm_CommandBegin)
     {
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
 
-        if (mode != MOUSE)
+        if (mode == DEFAULT)
         {
             mode = MOUSE;
 
@@ -1306,10 +1282,8 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
             // temporarily disable cinema verite
             DisableCinemaVerite();
         }
-        else
+        else if (mode == MOUSE)
         {
-            mode = DEFAULT;
-
             // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
             ToggleMouseButton(LEFT, 0, display);
             ToggleMouseButton(RIGHT, 0, display);
@@ -1323,6 +1297,8 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
 
             // restore cinema verite
             RestoreCinemaVerite();
+
+            mode = DEFAULT;
         }
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
@@ -2152,49 +2128,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             }
             else
             {
-                if (!helicopter)
-                {
-                    static float normalizedViewHeading = 0.0f;
-
-                    // handle view heading when the joystick has been calibrated, the aircraft is on ground and the current view is 3D cockpit command look
-                    if (viewHeadingEnabled && joystickAxisLeftXCalibrated && XPLMGetDatai(ongroundAnyDataRef) && XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
-                    {
-                        float joystickHeadingNullzone = XPLMGetDataf(joystickHeadingNullzoneDataRef);
-
-                        // handle nullzone
-                        if(fabs(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] - 0.5f) > joystickHeadingNullzone)
-                        {
-                            // center head position except view heading
-                            XPLMSetDataf(acfPeXDataRef, defaultHeadPositionX);
-                            XPLMSetDataf(acfPeYDataRef, defaultHeadPositionY);
-                            XPLMSetDataf(acfPeZDataRef, defaultHeadPositionZ);
-                            XPLMSetDataf(pilotsHeadTheDataRef, 0.0f);
-
-                            // normalize axis deflection
-                            if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] > 0.5f)
-                                normalizedViewHeading = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f + joystickHeadingNullzone, 1.0f, 0.0f, -1.0f);
-                            else
-                                normalizedViewHeading = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f - joystickHeadingNullzone, 0.0f, 0.0f, 1.0f);
-
-                            float groundspeed = XPLMGetDataf(groundspeedDataRef);
-
-                            // clamp absolute groundspeed to 15 m/s
-                            groundspeed = fabs(groundspeed < 15.0f ?  groundspeed : 15.0f);
-
-                            // apply acceleration function (y = x^2) and fade-out with increasing groundspeed
-                            float newPilotsHeadPsi = normalizedViewHeading * powf(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] - 0.5f, 2.0f) * 2.0f * Normalize(groundspeed, 15.0f, 0.0f, -1.0f, 0.0f) * 90.0f;
-
-                            XPLMSetDataf(pilotsHeadPsiDataRef, newPilotsHeadPsi);
-                        }
-                        // reset the view if the axis deflection has jumped from a large value right into the nullzone
-                        else if (normalizedViewHeading != 0.0f)
-                        {
-                            XPLMSetDataf(pilotsHeadPsiDataRef, 0.0f);
-                            normalizedViewHeading = 0.0f;
-                        }
-                    }
-                }
-
                 if (helicopter && mode == DEFAULT)
                 {
                     float acfMinPitch[8];
@@ -2795,42 +2728,6 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
     }
 }
 
-static void DrawWindow(XPLMWindowID inWindowID, void *inRefcon)
-{
-}
-
-static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus)
-{
-}
-
-static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
-{
-    viewHeadingEnabled = 0;
-
-    return 0;
-}
-
-static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon)
-{
-    static int lastX = x, lastY = y;
-
-    if (x != lastX || y != lastY)
-    {
-        viewHeadingEnabled = 0;
-        lastX = x;
-        lastY = y;
-    }
-
-    return xplm_CursorDefault;
-}
-
-static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, int clicks, void *inRefcon)
-{
-    viewHeadingEnabled = 0;
-
-    return 0;
-}
-
 // loads settings from the config file
 static void LoadSettings(void)
 {
@@ -2963,29 +2860,10 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // read and apply config file
     LoadSettings();
 
-    // create fake window
-    XPLMCreateWindow_t fakeWindowParameters;
-    memset(&fakeWindowParameters, 0, sizeof(fakeWindowParameters));
-    fakeWindowParameters.structSize = sizeof(fakeWindowParameters);
-    fakeWindowParameters.left = 0;
-    int x = 0, y = 0;
-    XPLMGetScreenSize(&x, &y);
-    fakeWindowParameters.top = y;
-    fakeWindowParameters.right = x;
-    fakeWindowParameters.bottom = 0;
-    fakeWindowParameters.visible = 1;
-    fakeWindowParameters.drawWindowFunc = DrawWindow;
-    fakeWindowParameters.handleKeyFunc = HandleKey;
-    fakeWindowParameters.handleMouseClickFunc = HandleMouseClick;
-    fakeWindowParameters.handleCursorFunc = HandleCursor;
-    fakeWindowParameters.handleMouseWheelFunc = HandleMouseWheel;
-    fakeWindow = XPLMCreateWindowEx(&fakeWindowParameters);
-
     // acquire toe brake control
     XPLMSetDatai(overrideToeBrakesDataRef, 1);
 
     // register flight loop callbacks
-    XPLMRegisterFlightLoopCallback(UpdateFakeWindowCallback, -1, NULL);
     XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
 
     // register draw callback
@@ -3032,7 +2910,6 @@ PLUGIN_API void XPluginStop(void)
     XPLMUnregisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommandHandler, 1, NULL);
 
     // register flight loop callbacks
-    XPLMUnregisterFlightLoopCallback(UpdateFakeWindowCallback, NULL);
     XPLMUnregisterFlightLoopCallback(FlightLoopCallback, NULL);
 
     // release toe brake control
@@ -3078,7 +2955,6 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
     switch (inMessage)
     {
     case XPLM_MSG_PLANE_LOADED:
-        bringFakeWindowToFront = 0;
         // reset the default head position if a new plane is loaded so that it is updated during the next flight loop
         defaultHeadPositionX = FLT_MAX;
         defaultHeadPositionY = FLT_MAX;
@@ -3088,8 +2964,6 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
         switchTo3DCommandLook = 0;
         if (!Has2DPanel())
             switchTo3DCommandLook = 1;
-        // reenable head turning
-        viewHeadingEnabled = 1;
         break;
     }
 }
