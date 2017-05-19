@@ -1519,21 +1519,25 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
 // hid device thread cleanup function
 static void DeviceThreadCleanup(hid_device *handle, hid_device_info *dev, void *display)
 {
-    hid_close(handle);
+    if (handle != NULL)
+        hid_close(handle);
 
     if (display != NULL)
         XCloseDisplay((Display*) display);
 
-    for (int i = 0; i < MAX_HID_DEVICES; i++)
+    if (dev != NULL)
     {
-        if (handledHidDevices[i] == dev->serial_number)
+        for (int i = 0; i < MAX_HID_DEVICES; i++)
         {
-            handledHidDevices[i] = NULL;
-            break;
+            if (handledHidDevices[i] == dev->serial_number)
+            {
+                handledHidDevices[i] = NULL;
+                break;
+            }
         }
-    }
 
-    hid_free_enumeration(dev);
+        hid_free_enumeration(dev);
+    }
 
     hidDeviceThreadCount--;
 }
@@ -1545,7 +1549,7 @@ static void *DeviceThread (void *argument)
     hid_device *handle = hid_open(dev->vendor_id, dev->product_id, dev->serial_number);
     if (handle == NULL)
     {
-        DeviceThreadCleanup(handle, dev, display);
+        DeviceThreadCleanup(handle, dev, NULL);
         return (void*) 1;
     }
 
