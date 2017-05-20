@@ -1585,7 +1585,7 @@ static void *DeviceThread (void *argument)
             MouseButton button = down2 ? RIGHT : LEFT;
             ToggleMouseButton(button, 1, display);
         }
-        else if (prevTouchpadButtonDown)
+        else if (!touchpadButtonDown && prevTouchpadButtonDown)
         {
             ToggleMouseButton(LEFT, 0, display);
             ToggleMouseButton(RIGHT, 0, display);
