@@ -1390,7 +1390,7 @@ static int ToggleBrakesCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             XPLMCommandOnce(XPLMFindCommand("airbus_qpac/park_brake_toggle"));
         // default handling
         else
-            XPLMCommandOnce(XPLMFindCommand("sim/flight_controls/brakes_toggle_regular"));
+            XPLMCommandOnce(XPLMFindCommand("sim/flight_controls/brakes_toggle_max"));
     }
 
     return 0;
@@ -1774,7 +1774,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 #endif
                     (controllerType == DS4 && joystickAxisValues[JOYSTICK_AXIS_DS4_L2 + axisOffset] >= 0.5f))
             {
-                if (!brakeMode && mode != VIEW)
+                if (!brakeMode && mode == DEFAULT)
                 {
                     PushButtonAssignments();
 
