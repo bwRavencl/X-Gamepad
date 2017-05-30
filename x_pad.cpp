@@ -528,8 +528,10 @@ static int Has2DPanel(void)
         char temp[512];
         while(fgets(temp, 512, file) != NULL)
         {
-            if((strstr(temp, ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS)) != NULL)
+            if((strstr(temp, ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS)) != NULL) {
                 has2DPanel = 0;
+		break;
+	    }
         }
 
         fclose(file);
@@ -671,11 +673,11 @@ static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
         {
         case VIEW_TYPE_FORWARDS_WITH_PANEL:
             XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
-            XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+            XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_2d_panel"));
             break;
 
         case VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK:
-            XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_panel"));
+            XPLMCommandOnce(XPLMFindCommand("sim/view/forward_with_2d_panel"));
             XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
             break;
 
@@ -694,8 +696,9 @@ static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
 
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/view/chase");
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/view/forward_with_hud");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(Has2DPanel() ? "sim/view/forward_with_panel" : "sim/view/3d_cockpit_cmnd_look");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(Has2DPanel() ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_panel");
+	int has2DPanel = Has2DPanel();
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(has2DPanel ? "sim/view/forward_with_2d_panel" : "sim/view/3d_cockpit_cmnd_look");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(has2DPanel ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_2d_panel");
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     }
