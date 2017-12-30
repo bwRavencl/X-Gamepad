@@ -376,8 +376,8 @@
 // define dualshock 4 touchpad stuff
 #define MAX_HID_DEVICES 8
 #define TOUCHPAD_MAX_DELTA 150
-#define TOUCHPAD_CURSOR_SENSITIVITY 1.5f
-#define TOUCHPAD_SCROLL_SENSITIVITY 0.25f
+#define TOUCHPAD_CURSOR_SENSITIVITY 1.0f
+#define TOUCHPAD_SCROLL_SENSITIVITY 0.1f
 
 // fragment-shader code
 #define FRAGMENT_SHADER "#version 130\n"\
