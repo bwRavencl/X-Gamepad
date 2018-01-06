@@ -1,49 +1,53 @@
-BUILDDIR    := ./build
-SRC_BASE    := .
-TARGET      := x_pad
+BUILDDIR	:=	./build
+SRC_BASE	:=	.
+TARGET		:= x_pad
 
-SOURCES = x_pad.cpp
+SOURCES = \
+	x_pad.cpp
 
 LIBS = -pthread -lXtst -lhidapi-hidraw
 
-INCLUDES = -I$(SRC_BASE)/SDK/CHeaders/XPLM -I$(SRC_BASE)/SDK/CHeaders/Widgets
+INCLUDES = \
+	-I$(SRC_BASE)/SDK/CHeaders/XPLM \
+	-I$(SRC_BASE)/SDK/CHeaders/Widgets
 
-DEFINES = -DAPL=0 -DIBM=0 -DLIN=1 -DXPLM200=1 -D_GLIBCXX_USE_CXX11_ABI=0
+DEFINES = -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DAPL=0 -DIBM=0 -DLIN=1 -DGL_GLEXT_PROTOTYPES
 
 ############################################################################
 
 
 VPATH = $(SRC_BASE)
 
-CSOURCES        := $(filter %.c, $(SOURCES))
-CXXSOURCES      := $(filter %.cpp, $(SOURCES))
+CSOURCES	:= $(filter %.c, $(SOURCES))
+CXXSOURCES	:= $(filter %.cpp, $(SOURCES))
 
-CDEPS           := $(patsubst %.c, $(BUILDDIR)/obj/%.cdep, $(CSOURCES))
-CXXDEPS         := $(patsubst %.cpp, $(BUILDDIR)/obj/%.cppdep, $(CXXSOURCES))
-COBJECTS        := $(patsubst %.c, $(BUILDDIR)/obj/%.o, $(CSOURCES))
-CXXOBJECTS      := $(patsubst %.cpp, $(BUILDDIR)/obj/%.o, $(CXXSOURCES))
-ALL_DEPS        := $(sort $(CDEPS) $(CXXDEPS))
-ALL_OBJECTS     := $(sort $(COBJECTS) $(CXXOBJECTS))
+CDEPS64			:= $(patsubst %.c, $(BUILDDIR)/obj64/%.cdep, $(CSOURCES))
+CXXDEPS64		:= $(patsubst %.cpp, $(BUILDDIR)/obj64/%.cppdep, $(CXXSOURCES))
+COBJECTS64		:= $(patsubst %.c, $(BUILDDIR)/obj64/%.o, $(CSOURCES))
+CXXOBJECTS64	:= $(patsubst %.cpp, $(BUILDDIR)/obj64/%.o, $(CXXSOURCES))
+ALL_DEPS64		:= $(sort $(CDEPS64) $(CXXDEPS64))
+ALL_OBJECTS64	:= $(sort $(COBJECTS64) $(CXXOBJECTS64))
 
-CFLAGS := $(DEFINES) $(INCLUDES) -Wall -fPIC -O3 -s -fvisibility=hidden -DGL_GLEXT_PROTOTYPES
+CFLAGS := $(DEFINES) $(INCLUDES) -Wall -fPIC -O3 -s -fvisibility=hidden
 
 
 # Phony directive tells make that these are "virtual" targets, even if a file named "clean" exists.
 .PHONY: all clean $(TARGET)
 # Secondary tells make that the .o files are to be kept - they are secondary derivatives, not just
 # temporary build products.
-.SECONDARY: $(ALL_OBJECTS) $(ALL_DEPS)
+.SECONDARY: $(ALL_OBJECTS) $(ALL_OBJECTS64) $(ALL_DEPS)
 
 
 
 # Target rules - these just induce the right .xpl files.
 
 $(TARGET): $(BUILDDIR)/$(TARGET)/64/lin.xpl
+	
 
-$(BUILDDIR)/$(TARGET)/64/lin.xpl: $(ALL_OBJECTS)
+$(BUILDDIR)/$(TARGET)/64/lin.xpl: $(ALL_OBJECTS64)
 	@echo Linking $@
 	mkdir -p $(dir $@)
-	gcc -m64 -static-libgcc -shared -Wl,--version-script=exports.txt -o $@ $(ALL_OBJECTS) $(LIBS)
+	gcc -m64 -static-libgcc -shared -Wl,--version-script=exports.txt -o $@ $(ALL_OBJECTS64) $(LIBS)
 
 # Compiler rules
 
@@ -52,13 +56,12 @@ $(BUILDDIR)/$(TARGET)/64/lin.xpl: $(ALL_OBJECTS)
 # goes in the cdep.  Thus:
 # - if the .c itself is touched, we remake the .o and the cdep, as expected.
 # - If any header file listed in the cdep turd is changed, rebuild the .o.
-
-$(BUILDDIR)/obj/%.o : %.c
+$(BUILDDIR)/obj64/%.o : %.c
 	mkdir -p $(dir $@)
 	g++ $(CFLAGS) -m64 -c $< -o $@
 	g++ $(CFLAGS) -MM -MT $@ -o $(@:.o=.cdep) $<
 
-$(BUILDDIR)/obj/%.o : %.cpp
+$(BUILDDIR)/obj64/%.o : %.cpp
 	mkdir -p $(dir $@)
 	g++ $(CFLAGS) -m64 -c $< -o $@
 	g++ $(CFLAGS) -MM -MT $@ -o $(@:.o=.cppdep) $<
@@ -70,11 +73,12 @@ clean:
 # Include any dependency turds, but don't error out if they don't exist.
 # On the first build, every .c is dirty anyway.  On future builds, if the
 # .c changes, it is rebuilt (as is its dep) so who cares if dependencies
-# are stale.  If the .c is the same but a header has changed, this
-# declares the header to be changed.  If a primary header includes a
+# are stale.  If the .c is the same but a header has changed, this 
+# declares the header to be changed.  If a primary header includes a 
 # utility header and the primary header is changed, the dependency
 # needs a rebuild because EVERY header is included.  And if the secondary
 # header is changed, the primary header had it before (and is unchanged)
 # so that is in the dependency file too.
--include $(ALL_DEPS)
+-include $(ALL_DEPS64)
+
 
