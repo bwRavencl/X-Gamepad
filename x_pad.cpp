@@ -1,4 +1,4 @@
-/* Copyright (C) 2017  Matteo Hausner
+/* Copyright (C) 2018  Matteo Hausner
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -39,7 +39,6 @@
 #include <OpenGL/gl.h>
 #elif LIN
 #include <float.h>
-#include <hidapi/hidapi.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -373,12 +372,6 @@
 #define INDICATOR_LEVER_WIDTH 16.0f
 #define INDICATOR_LEVER_HEIGHT 120.0f
 
-// define dualshock 4 touchpad stuff
-#define MAX_HID_DEVICES 8
-#define TOUCHPAD_MAX_DELTA 150
-#define TOUCHPAD_CURSOR_SENSITIVITY 1.0f
-#define TOUCHPAD_SCROLL_SENSITIVITY 0.1f
-
 // fragment-shader code
 #define FRAGMENT_SHADER "#version 130\n"\
                         "uniform float throttle;"\
@@ -460,15 +453,11 @@ static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
 static GLuint program = 0, fragmentShader = 0;
 static std::stack <int*> buttonAssignmentsStack;
-static volatile wchar_t *handledHidDevices[MAX_HID_DEVICES] = { NULL };
-static pthread_t hidDeviceThreads[MAX_HID_DEVICES] = { 0 };
 #if IBM
 static HINSTANCE hGetProcIDDLL = NULL;
 typedef int(__stdcall * pICFUNC) (int, XInputState&);
 pICFUNC XInputGetStateEx = NULL;
 #elif LIN
-static int hidInitialized = 0;
-static volatile int hidDeviceThreadCount = 0, hidDeviceThreadsRun = 1;
 static Display *display = NULL;
 #endif
 
@@ -1518,117 +1507,6 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
 #endif
 }
 
-#if LIN
-// hid device thread cleanup function
-static void DeviceThreadCleanup(hid_device *handle, hid_device_info *dev, void *display)
-{
-    if (handle != NULL)
-        hid_close(handle);
-
-    if (display != NULL)
-        XCloseDisplay((Display*) display);
-
-    if (dev != NULL)
-    {
-        for (int i = 0; i < MAX_HID_DEVICES; i++)
-        {
-            if (handledHidDevices[i] == dev->serial_number)
-            {
-                handledHidDevices[i] = NULL;
-                break;
-            }
-        }
-
-        hid_free_enumeration(dev);
-    }
-
-    hidDeviceThreadCount--;
-}
-
-// hid device thread function
-static void *DeviceThread (void *argument)
-{
-    struct hid_device_info *dev = (hid_device_info*) argument;
-    hid_device *handle = hid_open(dev->vendor_id, dev->product_id, dev->serial_number);
-    if (handle == NULL)
-    {
-        DeviceThreadCleanup(handle, dev, NULL);
-        return (void*) 1;
-    }
-
-    Display *display = XOpenDisplay(NULL);
-    if (display == NULL)
-    {
-        DeviceThreadCleanup(handle, dev, display);
-        return (void*) 1;
-    }
-
-    unsigned char data[40];
-    static int prevTouchpadButtonDown = 0, prevX1 = 0, prevY1 = 0, prevDown1 = 0, prevDown2 = 0;
-    while (hidDeviceThreadsRun)
-    {
-        memset(data, 0, 40);
-        if (hid_read(handle, data, 40) == -1)
-        {
-            DeviceThreadCleanup(handle, dev, display);
-            return (void*) 1;
-        }
-
-        int touchpadButtonDown = (data[7] & 2) != 0;
-        int down1 = data[35] >> 7 == 0;
-        int down2 = data[39] >> 7 == 0;
-
-        int x1 = data[36] + (data[37] & 0xF) * 255;
-        int y1 = ((data[37] & 0xF0) >> 4) + data[38] * 16;
-        int dX1 = x1 - prevX1;
-        int dY1 = y1 - prevY1;
-
-        if (touchpadButtonDown && !prevTouchpadButtonDown)
-        {
-            MouseButton button = down2 ? RIGHT : LEFT;
-            ToggleMouseButton(button, 1, display);
-        }
-        else if (!touchpadButtonDown && prevTouchpadButtonDown)
-        {
-            ToggleMouseButton(LEFT, 0, display);
-            ToggleMouseButton(RIGHT, 0, display);
-        }
-
-        if (down1 && !prevDown1)
-        {
-            prevX1 = -1;
-            prevY1 = -1;
-        }
-
-        int scrollClicks = 0;
-        if (!prevDown2 || touchpadButtonDown)
-        {
-            int distX = 0, distY = 0;
-
-            if (prevX1 > 0 && abs(dX1) < TOUCHPAD_MAX_DELTA)
-                distX = (int) (dX1 * TOUCHPAD_CURSOR_SENSITIVITY);
-            if (prevY1 > 0 && abs(dY1) < TOUCHPAD_MAX_DELTA)
-                distY = (int) (dY1 * TOUCHPAD_CURSOR_SENSITIVITY);
-
-            MoveMousePointer(distX, distY, display);
-        }
-        else if (prevY1 > 0 && abs(dY1) < TOUCHPAD_MAX_DELTA)
-            scrollClicks = (int) (-dY1 * TOUCHPAD_SCROLL_SENSITIVITY);
-
-        Scroll(scrollClicks, display);
-
-        prevTouchpadButtonDown = touchpadButtonDown;
-        prevDown1 = down1;
-        prevDown2 = down2;
-        prevX1 = x1;
-        prevY1 = y1;
-    }
-
-    DeviceThreadCleanup(handle, dev, display);
-    return (void*) 0;
-}
-#endif
-
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
@@ -1656,64 +1534,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
     {
         float currentTime = XPLMGetElapsedTime();
 
-#if LIN
-        if (controllerType == DS4)
-        {
-            static float lastEnumerationTime = 0.0f;
-            if (currentTime - lastEnumerationTime >= 5.0f)
-            {
-                if (!hidInitialized && hid_init() != -1)
-                    hidInitialized = 1;
-
-                if (hidInitialized)
-                {
-                    struct hid_device_info *devs = hid_enumerate(0x54C, 0x0);
-                    struct hid_device_info *currentDev = devs;
-
-                    while (currentDev && hidDeviceThreadCount < MAX_HID_DEVICES)
-                    {
-                        if (currentDev->product_id == 0x5C4 || currentDev->product_id == 0x9CC || currentDev->product_id == 0xBA0)
-                        {
-                            int found = 0;
-                            for (int i = 0; i < MAX_HID_DEVICES; i++)
-                            {
-                                if (handledHidDevices[i] != NULL && wcscmp((const wchar_t*) handledHidDevices[i], currentDev->serial_number) == 0)
-                                {
-                                    found = 1;
-                                    break;
-                                }
-                            }
-
-                            if (!found)
-                            {
-                                struct hid_device_info *currentDevCopy = (hid_device_info*) malloc(sizeof(hid_device_info));
-                                memset(currentDevCopy, 0, sizeof(hid_device_info));
-                                currentDevCopy->vendor_id = currentDev->vendor_id;
-                                currentDevCopy->product_id = currentDev->product_id;
-                                size_t len = wcslen(currentDev->serial_number);
-                                currentDevCopy->serial_number = (wchar_t*) malloc(sizeof(wchar_t) * len);
-                                wcsncpy(currentDevCopy->serial_number, currentDev->serial_number, len);
-
-                                if (pthread_create(&hidDeviceThreads[hidDeviceThreadCount], NULL, DeviceThread, currentDevCopy) == 0)
-                                {
-                                    handledHidDevices[hidDeviceThreadCount] = currentDevCopy->serial_number;
-                                    hidDeviceThreadCount++;
-                                }
-                                else
-                                    hid_free_enumeration(currentDevCopy);
-                            }
-                        }
-
-                        currentDev = currentDev->next;
-                    }
-
-                    hid_free_enumeration(devs);
-                }
-
-                lastEnumerationTime = currentTime;
-            }
-        }
-#elif IBM
+#if IBM
         static int guideButtonDown = 0;
 
         if (controllerType == XBOX360 && XInputGetStateEx != NULL)
@@ -2930,19 +2751,6 @@ PLUGIN_API void XPluginStop(void)
     if (hGetProcIDDLL != NULL)
         FreeLibrary(hGetProcIDDLL);
 #elif LIN
-    hidDeviceThreadsRun = 0;
-    for (int i = 0; i < MAX_HID_DEVICES; i++)
-    {
-        pthread_t *thread = &hidDeviceThreads[i];
-        if (thread != NULL)
-        {
-            void* trc;
-            pthread_join(*thread, &trc);
-        }
-    }
-
-    hid_exit();
-
     if(display != NULL)
         XCloseDisplay(display);
 #endif

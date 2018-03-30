@@ -5,13 +5,13 @@ TARGET		:= x_pad
 SOURCES = \
 	x_pad.cpp
 
-LIBS = -pthread -lXtst -lhidapi-hidraw
+LIBS = -pthread -lXtst
 
 INCLUDES = \
 	-I$(SRC_BASE)/SDK/CHeaders/XPLM \
 	-I$(SRC_BASE)/SDK/CHeaders/Widgets
 
-DEFINES = -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DAPL=0 -DIBM=0 -DLIN=1 -DGL_GLEXT_PROTOTYPES
+DEFINES = -DXPLM200=1 -DXPLM210=1 -DXPLM300=1 -DXPLM301=1 -DAPL=0 -DIBM=0 -DLIN=1 -DGL_GLEXT_PROTOTYPES
 
 ############################################################################
 
