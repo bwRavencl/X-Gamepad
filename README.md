@@ -57,8 +57,8 @@ Default mappings for a DualShock 3 / 4 controller:
 | Select     | Beta / Reverser                     |
 | L1         | Trim modifier                       |
 | R1         | View modifier                       |
-| L2         | Brakes                              |
-| R2         | Push-to-Talk (mapped to 'O' key)    |
+| L2         | Control wheel steering              |
+| R2         | Brake                               |
 | L3         | Zoom out                            |
 | R3         | Zoom in                             |
 | PS         | Mouse mode                          |
@@ -66,14 +66,14 @@ Default mappings for a DualShock 3 / 4 controller:
 
 Default mappings for an Xbox 360 controller:
 
-| Axis                  | Control                                 |
-| --------------------- | --------------------------------------- |
-| Left Joystick X-Axis  | Yaw                                     |
-| Left Joystick Y-Axis  | Throttle / Collective                   |
-| Right Joystick X-Axis | Roll                                    |
-| Right Joystick Y-Axis | Pitch                                   |
-| Left Trigger          | Brake                                   |
-| Right Trigger         | None / Push-to-Talk (mapped to 'O' key) |
+| Axis                  | Control                |
+| --------------------- | ---------------------- |
+| Left Joystick X-Axis  | Yaw                    |
+| Left Joystick Y-Axis  | Throttle / Collective  |
+| Right Joystick X-Axis | Roll                   |
+| Right Joystick Y-Axis | Pitch                  |
+| Left Trigger          | Control wheel steering |
+| Right Trigger         | Brake                  |
 
 | Button       | Command                             |
 | -------------| ------------------------------------|
