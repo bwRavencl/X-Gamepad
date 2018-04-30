@@ -1640,8 +1640,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 case DS4:
                     leftBrakeRatio = rightBrakeRatio = Normalize(joystickAxisValues[JOYSTICK_AXIS_DS4_R2 + axisOffset], 0.5f, 1.0f, 0.0f, 1.0f);
                     break;
-                default:
-                    break;
                 }
 
                 if (mode == DEFAULT)
@@ -2374,8 +2372,6 @@ static void SetDefaultAssignments(void)
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
 #endif
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t) XPLMFindCommand("sim/autopilot/control_wheel_steer");
-            break;
-        default:
             break;
         }
 
