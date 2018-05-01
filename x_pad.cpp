@@ -414,6 +414,7 @@ typedef enum
 {
     DEFAULT,
     VIEW,
+    SWITCH_VIEW,
     PROP,
     MIXTURE,
     COWL,
@@ -677,25 +678,32 @@ static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
             break;
         }
 
-        // store the default button assignments
-        PushButtonAssignments();
+        if (mode == DEFAULT)
+        {
+            mode = SWITCH_VIEW;
 
-        // assign view controls to face buttons
-        int joystickButtonAssignments[1600];
-        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+            // store the default button assignments
+            PushButtonAssignments();
 
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/view/chase");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/view/forward_with_hud");
-        int has2DPanel = Has2DPanel();
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(has2DPanel ? "sim/view/forward_with_2d_panel" : "sim/view/3d_cockpit_cmnd_look");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(has2DPanel ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_2d_panel");
+            // assign view controls to face buttons
+            int joystickButtonAssignments[1600];
+            XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/view/chase");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/view/forward_with_hud");
+            int has2DPanel = Has2DPanel();
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(has2DPanel ? "sim/view/forward_with_2d_panel" : "sim/view/3d_cockpit_cmnd_look");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(has2DPanel ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_2d_panel");
+
+            XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        }
     }
-    else if (inPhase == xplm_CommandEnd)
+    else if (inPhase == xplm_CommandEnd && mode == SWITCH_VIEW)
     {
         // restore the default button assignments
         PopButtonAssignments();
+
+        mode = DEFAULT;
     }
 
     return 0;
