@@ -31,8 +31,10 @@
 #include <stack>
 
 #if IBM
+#include "hidapi.h"
 #include "GLee.h"
-#include <Windows.h>
+#include <process.h>
+#include <windows.h>
 #elif APL
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
@@ -53,7 +55,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "1.1"
+#define VERSION "1.2"
 
 // define config file path
 #if IBM
@@ -241,7 +243,7 @@
 #define JOYSTICK_BUTTON_DS4_DPAD_LEFT_UP 21
 #define JOYSTICK_BUTTON_DS4_DPAD_LEFT_DOWN 19
 #define JOYSTICK_BUTTON_DS4_DPAD_RIGHT_UP 15
-#define JOYSTICK_BUTTON_DS4_DPAD_RIGHT_DOWN 16
+#define JOYSTICK_BUTTON_DS4_DPAD_RIGHT_DOWN 17
 #define JOYSTICK_BUTTON_DS4_SQUARE 0
 #define JOYSTICK_BUTTON_DS4_CIRCLE 2
 #define JOYSTICK_BUTTON_DS4_TRIANGLE 3
@@ -372,6 +374,11 @@
 #define INDICATOR_LEVER_WIDTH 16.0f
 #define INDICATOR_LEVER_HEIGHT 120.0f
 
+// define dualshock 4 touchpad stuff
+#define TOUCHPAD_MAX_DELTA 150
+#define TOUCHPAD_CURSOR_SENSITIVITY 1.0f
+#define TOUCHPAD_SCROLL_SENSITIVITY 0.1f
+
 // fragment-shader code
 #define FRAGMENT_SHADER "#version 130\n"\
                         "uniform float throttle;"\
@@ -458,6 +465,9 @@ static std::stack <int*> buttonAssignmentsStack;
 static HINSTANCE hGetProcIDDLL = NULL;
 typedef int(__stdcall * pICFUNC) (int, XInputState&);
 pICFUNC XInputGetStateEx = NULL;
+static HANDLE hidDeviceThread = 0;
+static int hidInitialized = 0;
+static volatile int hidDeviceThreadRun = 1;
 #elif LIN
 static Display *display = NULL;
 #endif
@@ -1533,6 +1543,96 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
 #endif
 }
 
+#if IBM
+// hid device thread cleanup function
+static void DeviceThreadCleanup(hid_device *handle, hid_device_info *dev)
+{
+    if (handle != NULL)
+        hid_close(handle);
+
+    if (dev != NULL)
+        free(dev);
+
+    hidDeviceThread = 0;
+}
+
+// hid device thread function
+static void DeviceThread(void *argument)
+{
+    struct hid_device_info *dev = (hid_device_info*) argument;
+    hid_device *handle = hid_open(dev->vendor_id, dev->product_id, dev->serial_number);
+    if (handle == NULL)
+    {
+        DeviceThreadCleanup(handle, dev);
+        return;
+    }
+
+    unsigned char data[40];
+    static int prevTouchpadButtonDown = 0, prevX1 = 0, prevY1 = 0, prevDown1 = 0, prevDown2 = 0;
+    while (hidDeviceThreadRun)
+    {
+        memset(data, 0, 40);
+        if (hid_read(handle, data, 40) == -1)
+        {
+            DeviceThreadCleanup(handle, dev);
+            return;
+        }
+
+        int touchpadButtonDown = (data[7] & 2) != 0;
+        int down1 = data[35] >> 7 == 0;
+        int down2 = data[39] >> 7 == 0;
+
+        int x1 = data[36] + (data[37] & 0xF) * 255;
+        int y1 = ((data[37] & 0xF0) >> 4) + data[38] * 16;
+        int dX1 = x1 - prevX1;
+        int dY1 = y1 - prevY1;
+
+        if (touchpadButtonDown && !prevTouchpadButtonDown)
+        {
+            MouseButton button = down2 ? RIGHT : LEFT;
+            ToggleMouseButton(button, 1);
+        }
+        else if (!touchpadButtonDown && prevTouchpadButtonDown)
+        {
+            ToggleMouseButton(LEFT, 0);
+            ToggleMouseButton(RIGHT, 0);
+        }
+
+        if (down1 && !prevDown1)
+        {
+            prevX1 = -1;
+            prevY1 = -1;
+        }
+
+        int scrollClicks = 0;
+        if (!prevDown2 || touchpadButtonDown)
+        {
+            int distX = 0, distY = 0;
+
+            if (prevX1 > 0 && abs(dX1) < TOUCHPAD_MAX_DELTA)
+                distX = (int) (dX1 * TOUCHPAD_CURSOR_SENSITIVITY);
+            if (prevY1 > 0 && abs(dY1) < TOUCHPAD_MAX_DELTA)
+                distY = (int) (dY1 * TOUCHPAD_CURSOR_SENSITIVITY);
+
+            MoveMousePointer(distX, distY);
+        }
+        else if (prevY1 > 0 && abs(dY1) < TOUCHPAD_MAX_DELTA)
+            scrollClicks = (int) (-dY1 * TOUCHPAD_SCROLL_SENSITIVITY);
+
+        Scroll(scrollClicks);
+
+        prevTouchpadButtonDown = touchpadButtonDown;
+        prevDown1 = down1;
+        prevDown2 = down2;
+        prevX1 = x1;
+        prevY1 = y1;
+    }
+
+    DeviceThreadCleanup(handle, dev);
+    _endthread();
+}
+#endif
+
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
@@ -1577,6 +1677,46 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             {
                 guideButtonDown = 0;
                 XPLMCommandEnd(toggleMousePointerControlCommand);
+            }
+        }
+        else if (controllerType == DS4)
+        {
+            static float lastEnumerationTime = 0.0f;
+            if (hidDeviceThread == 0 && currentTime - lastEnumerationTime >= 5.0f)
+            {
+                lastEnumerationTime = currentTime;
+
+                if (!hidInitialized && hid_init() != -1)
+                    hidInitialized = 1;
+
+                if (hidInitialized)
+                {
+                    struct hid_device_info *devs = hid_enumerate(/*0x54C*/0x0, 0x0);
+                    struct hid_device_info *currentDev = devs;
+
+                    while (currentDev != NULL)
+                    {
+                        if (currentDev->vendor_id == 0x54C && (currentDev->product_id == 0x5C4 || currentDev->product_id == 0x9CC || currentDev->product_id == 0xBA0))
+                        {
+                            struct hid_device_info *currentDevCopy = (hid_device_info*) calloc(1, sizeof(hid_device_info));
+                            currentDevCopy->vendor_id = currentDev->vendor_id;
+                            currentDevCopy->product_id = currentDev->product_id;
+
+                            HANDLE threadHandle = (HANDLE) _beginthread(DeviceThread, 0, currentDevCopy);
+                            if (threadHandle > 0)
+                            {
+                                hidDeviceThread = threadHandle;
+                                break;
+                            }
+                            else
+                                hid_free_enumeration(currentDevCopy);
+                        }
+
+                        currentDev = currentDev->next;
+                    }
+
+                    hid_free_enumeration(devs);
+                }
             }
         }
 #endif
@@ -2391,11 +2531,7 @@ static void SetDefaultAssignments(void)
             break;
 #endif
         case DS4:
-#if LIN
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t) XPLMFindCommand("sim/none/none");
-#else
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
-#endif
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t) XPLMFindCommand("sim/autopilot/control_wheel_steer");
             break;
         }
@@ -2824,6 +2960,13 @@ PLUGIN_API void XPluginStop(void)
 #if IBM
     if (hGetProcIDDLL != NULL)
         FreeLibrary(hGetProcIDDLL);
+
+
+    hidDeviceThreadRun = 0;
+    if (hidDeviceThread != 0)
+        WaitForSingleObject(hidDeviceThread, INFINITE);
+
+    hid_exit();
 #elif LIN
     if(display != NULL)
         XCloseDisplay(display);

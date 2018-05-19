@@ -64,7 +64,7 @@
       <Optimization>MaxSpeed</Optimization>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>SDK\CHeaders\XPLM;SDK\CHeaders\Widgets;GLee5_4;AdditionalIncludeDirectories%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>SDK\CHeaders\XPLM;SDK\CHeaders\Widgets;GLee5_4;hidapi;AdditionalIncludeDirectories%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;SIMDATA_EXPORTS;IBM=1;XPLM200=1;XPLM210=1;XPLM300=1;XPLM301=1;_CRT_SECURE_NO_WARNINGS;GLEW_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AssemblerListingLocation>.\Release\64\</AssemblerListingLocation>
       <PrecompiledHeaderOutputFile>.\Release\64\x_pad.pch</PrecompiledHeaderOutputFile>
@@ -93,8 +93,8 @@
       <LinkDLL>true</LinkDLL>
       <SubSystem>Console</SubSystem>
       <ImportLibrary>.\Release\64\x_pad.lib</ImportLibrary>
-      <AdditionalLibraryDirectories>SDK\Libraries\Win;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Opengl32.lib;odbc32.lib;odbccp32.lib;XPLM_64.lib;XPWidgets_64.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>SDK\Libraries\Win;hidapi%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Opengl32.lib;odbc32.lib;odbccp32.lib;XPLM_64.lib;XPWidgets_64.lib;winmm.lib;hidapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -105,7 +105,7 @@
       <Optimization>Disabled</Optimization>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
-      <AdditionalIncludeDirectories>SDK\CHeaders\XPLM;SDK\CHeaders\Widgets;GLee5_4%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>SDK\CHeaders\XPLM;SDK\CHeaders\Widgets;GLee5_4;hidapi;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;SIMDATA_EXPORTS;IBM=1;XPLM200=1;XPLM210=1;XPLM300=1;XPLM301=1;GLEW_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AssemblerListingLocation>.\Debug\64\</AssemblerListingLocation>
       <PrecompiledHeaderOutputFile>.\Debug\64\x_pad.pch</PrecompiledHeaderOutputFile>
@@ -136,8 +136,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <ImportLibrary>.\Debug\64\x_pad.lib</ImportLibrary>
-      <AdditionalLibraryDirectories>SDK\Libraries\Win;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Opengl32.lib;odbc32.lib;odbccp32.lib;XPLM_64.lib;XPWidgets_64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>SDK\Libraries\Win;hidapi;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Opengl32.lib;odbc32.lib;odbccp32.lib;XPLM_64.lib;XPWidgets_64.lib;hidapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -146,6 +146,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GLee5_4\GLee.h" />
+    <ClInclude Include="hidapi\hidapi.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
