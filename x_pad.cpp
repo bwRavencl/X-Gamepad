@@ -1199,7 +1199,7 @@ static int ToggleBetaOrToggleReverseCommandHandler(XPLMCommandRef inCommand, XPL
 }
 
 // toggle mouse button state
-static void ToggleMouseButton(MouseButton button, int down, void *display)
+static void ToggleMouseButton(MouseButton button, int down, void *display = NULL)
 {
 #if IBM
     static int lastLeftDown = 0, lastRightDown = 0;
@@ -1292,8 +1292,13 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
         else if (mode == MOUSE)
         {
             // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
+#if LIN
             ToggleMouseButton(LEFT, 0, display);
             ToggleMouseButton(RIGHT, 0, display);
+#else
+            ToggleMouseButton(LEFT, 0);
+            ToggleMouseButton(RIGHT, 0);
+#endif
 
             // assign the default controls to the left joystick's axis
             joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_YAW;
@@ -1315,7 +1320,7 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
 }
 
 // scroll up or down
-static void Scroll(int clicks, void *display)
+static void Scroll(int clicks, void *display = NULL)
 {
     if (clicks == 0)
         return;
@@ -1978,21 +1983,33 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 #endif
 
                     // handle left and right mouse button presses
+#if LIN
                     ToggleMouseButton(LEFT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)], display);
                     ToggleMouseButton(RIGHT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)], display);
-
+#else
+                    ToggleMouseButton(LEFT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)]);
+                    ToggleMouseButton(RIGHT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)]);
+#endif
                     // handle scrolling
                     static float lastScrollTime = 0.0f;
                     if (currentTime - lastScrollTime >= 0.1f)
                     {
                         if (joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)])
                         {
+#if LIN
                             Scroll(1, display);
+#else
+                            Scroll(1);
+#endif
                             lastScrollTime = currentTime;
                         }
                         if (joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)])
                         {
+#if LIN
                             Scroll(-1, display);
+#else
+                            Scroll(-1);
+#endif
                             lastScrollTime = currentTime;
                         }
                     }
@@ -2649,7 +2666,7 @@ static void LoadSettings(void)
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 {
 #if IBM
-    hGetProcIDDLL = LoadLibrary(L"XInput1_3.dll");
+    hGetProcIDDLL = LoadLibrary("XInput1_3.dll");
     FARPROC lpfnGetProcessID = GetProcAddress(HMODULE(hGetProcIDDLL), (LPCSTR) 100);
     XInputGetStateEx = pICFUNC(lpfnGetProcessID);
 #endif
