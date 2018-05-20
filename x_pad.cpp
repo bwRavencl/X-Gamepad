@@ -1908,11 +1908,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     float newPilotsHeadPsi = pilotsHeadPsi + deltaPsi;
                     float newPilotsHeadThe = pilotsHeadThe + deltaThe;
 
-                    if (pilotsHeadPsi < 180.0f && newPilotsHeadPsi > 179.9f)
-                        newPilotsHeadPsi = 179.9f;
-                    if (pilotsHeadPsi > 180.0f && newPilotsHeadPsi < 180.1f)
-                        newPilotsHeadPsi = 180.1f;
-
                     if (newPilotsHeadThe < -89.9f)
                         newPilotsHeadThe = -89.9f;
                     if (newPilotsHeadThe > 89.9f)
