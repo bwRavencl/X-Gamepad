@@ -328,13 +328,15 @@
 // define '.acf' file 'show cockpit object in: 2-d forward panel views' string
 #define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
 
+// define default B738 filename
+#define DEFAULT_B738_ACF_FILENAME "b738.acf"
+
 // define plugin signatures
 #define BLU_FX_PLUGIN_SIGNATURE "de.bwravencl.blu_fx"
 #define DREAMFOIL_AS350_PLUGIN_SIGNATURE "DreamFoil.AS350"
 #define DREAMFOIL_B407_PLUGIN_SIGNATURE "DreamFoil.B407"
 #define QPAC_A320_PLUGIN_SIGNATURE "QPAC.airbus.fbw"
 #define ROTORSIM_EC135_PLUGIN_SIGNATURE "rotorsim.ec135.management"
-#define X737_PLUGIN_SIGNATURE "bs.x737.plugin"
 #define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
 #define X_XSQUAWKBOX_PLUGIN_SIGNATURE "vatsim.protodev.clients.xsquawkbox"
 
@@ -451,9 +453,6 @@ struct XInputState
 };
 #endif
 
-// hardcoded '.acf' files that have no 2-d panel
-static const char* ACF_WITHOUT2D_PANEL[] = {"727-100.acf", "727-200Adv.acf", "727-200F.acf", "ATR72.acf", "Hurricane.acf", "YAK-55M.acf", "YAK52.acf", "YAK52TD.acf", "YAK52TT.acf"};
-
 // global internal variables
 static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
@@ -511,13 +510,6 @@ static int Has2DPanel(void)
 {
     char fileName[256], path[512];
     XPLMGetNthAircraftModel(0, fileName, path);
-
-    // check if the path to the '.acf' file matches one of the hardcoded aircraft that have no 2D panel and for which the check below fails
-    for (int i = 0; i < (int) (sizeof(ACF_WITHOUT2D_PANEL) / sizeof(char*)); i++)
-    {
-        if (strstr(path, ACF_WITHOUT2D_PANEL[i]) != NULL)
-            return 0;
-    }
 
     int has2DPanel = 1;
 
@@ -782,6 +774,14 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCo
     return 0;
 }
 
+static int IsDefaultB738(void)
+{
+    char fileName[256], path[512];
+    XPLMGetNthAircraftModel(0, fileName, path);
+
+    return strcmp(fileName, DEFAULT_B738_ACF_FILENAME) == 0 ? 1 : 0;
+}
+
 // check if a plugin with a given signature is enabled
 static int IsPluginEnabled(const char* pluginSignature)
 {
@@ -802,15 +802,17 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
         // disable flight director
         if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
         {
-            // custom handling for QPAC A320
-            if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE))
-                XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
-            // custom handling for x737
-            else if (IsPluginEnabled(X737_PLUGIN_SIGNATURE))
+            // custom handling for default B738
+            XPLMCommandRef B738CMDAutopilotFlightDirToggle = XPLMFindCommand("laminar/B738/autopilot/flight_director_toggle");
+            XPLMCommandRef B738CMDAutopilotFlightDirFoToggle = XPLMFindCommand("laminar/B738/autopilot/flight_director_fo_toggle");
+            if (IsDefaultB738() && B738CMDAutopilotFlightDirToggle != NULL && B738CMDAutopilotFlightDirFoToggle != NULL)
             {
-                XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_A_OFF"));
-                XPLMCommandOnce(XPLMFindCommand("x737/mcp/FD_B_OFF"));
+                XPLMCommandOnce(B738CMDAutopilotFlightDirToggle);
+                XPLMCommandOnce(B738CMDAutopilotFlightDirFoToggle);
             }
+            // custom handling for QPAC A320
+            else if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE))
+                XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
             // custom handling for RotorSim EC135
             else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE))
                 XPLMCommandOnce(XPLMFindCommand("ec135/autopilot/apmd_dcpl"));
@@ -826,8 +828,12 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
         // toggle autopilot
         if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
         {
+            // custom handling for default B738
+            XPLMCommandRef B738CMDAutopilotDisconectButton = XPLMFindCommand("laminar/B738/autopilot/disconnect_button");
+            if (IsDefaultB738() && B738CMDAutopilotDisconectButton != NULL)
+                XPLMCommandOnce(B738CMDAutopilotDisconectButton);
             // custom handling for QPAC A320
-            if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE))
+            else if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE))
             {
                 XPLMDataRef ap1EngageDataRef = XPLMFindDataRef("AirbusFBW/AP1Engage");
                 XPLMDataRef ap2EngageDataRef = XPLMFindDataRef("AirbusFBW/AP2Engage");
@@ -838,23 +844,6 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
                         XPLMCommandOnce(XPLMFindCommand("airbus_qpac/ap1_push"));
                     else
                         XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
-                }
-            }
-            // custom handling for x737
-            else if (IsPluginEnabled(X737_PLUGIN_SIGNATURE))
-            {
-                XPLMDataRef cmdADataRef = XPLMFindDataRef("x737/systems/afds/CMD_A");
-                XPLMDataRef cmdBDataRef = XPLMFindDataRef("x737/systems/afds/CMD_B");
-
-                if (cmdADataRef != NULL && cmdBDataRef != NULL)
-                {
-                    if (!XPLMGetDatai(cmdADataRef) && !XPLMGetDatai(cmdBDataRef))
-                        XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDA_ON"));
-                    else
-                    {
-                        XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDA_OFF"));
-                        XPLMCommandOnce(XPLMFindCommand("x737/mcp/CMDB_OFF"));
-                    }
                 }
             }
             // custom handling for RotorSim EC135
