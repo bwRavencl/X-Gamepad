@@ -11,7 +11,7 @@ For example it allows the user to control functions like throttle, prop pitch or
 In order to facilitate the control of a complex simulation like X-Plane by gamepad, extensive use of modifier keys is made by X-pad.
 
 #### Instructions:
-In order to install the plugin, place the 'x_pad' folder in your 'X-Plane 10/Resources/plugins' folder.
+In order to install the plugin, place the 'x_pad' folder in your 'X-Plane 11/Resources/plugins' folder.
 After installing the plugin you should start X-Plane and open X-pad's 'Settings' window via the corresponding menu entry in X-Plane's 'Plugins' menu.
 
 In the settings menu select wether you are using a DualShock 3 / 4 or Xbox 360 controller.
@@ -25,6 +25,11 @@ Please refer to the section 'Default Mappings' below in order to see which chang
 Also note that X-Plane's nullzone setting will be set to a value of 15% and the sensitivity of the three main control axes to 100%.
 
 When closing the 'Settings' window all settings will be stored to a configuration file automatically.
+
+#### Building:
+- Windows: run 'msbuild /p:Platform=x64;Configuration=Release' in X-pad's project directory
+- macOS: open x_pad.xcodeproj with XCode and start the build
+- Linux: run 'make' in X-pad's project directory
 
 #### Disclaimer:
 This plugin currently supports DualShock 3 / 4 and Xbox 360 controllers.
