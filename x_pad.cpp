@@ -55,7 +55,7 @@
 #define NAME_LOWERCASE "x_pad"
 
 // define version
-#define VERSION "1.2"
+#define VERSION "1.3"
 
 // define config file path
 #if IBM
@@ -373,8 +373,8 @@
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 30.0f
 
 // define indicator size
-#define INDICATOR_LEVER_WIDTH 16.0f
-#define INDICATOR_LEVER_HEIGHT 120.0f
+#define INDICATOR_LEVER_WIDTH 16
+#define INDICATOR_LEVER_HEIGHT 120
 
 // define dualshock 4 touchpad stuff
 #define TOUCHPAD_MAX_DELTA 150
@@ -386,12 +386,12 @@
                         "uniform float throttle;"\
                         "uniform float prop;"\
                         "uniform float mixture;"\
-                        "uniform vec2 size;"\
-                        "uniform vec2 resolution;"\
+                        "uniform vec4 bounds;"\
                         "void main()"\
                         "{"\
+                            "vec2 size = vec2(bounds.z - bounds.x, bounds.y - bounds.w);"\
                             "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.1);"\
-                            "if (round(gl_FragCoord.x) == round(resolution.x - size.x) || round(gl_FragCoord.x) == round(resolution.x) || round(gl_FragCoord.y) == round(size.y) || round(gl_FragCoord.y) == 0.0 || round(mod(gl_FragCoord.y, (size.y / 5.0))) == 0)"\
+                            "if (round(gl_FragCoord.x) == round(bounds.x) || round(gl_FragCoord.x) == round(bounds.z) || round(gl_FragCoord.y) == round(bounds.y) || round(gl_FragCoord.y) == round(bounds.w) || round(mod(gl_FragCoord.y - bounds.w, (size.y / 5.0))) == 0)"\
                                 "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.5);"\
                             "else"\
                             "{"\
@@ -401,11 +401,11 @@
                                 "if (mixture < -0.5)"\
                                     "segments -= 1.0;"\
                                 "float segmentWidth = size.x / segments;"\
-                                "if (gl_FragCoord.x < resolution.x - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + 1.0)"\
+                                "if (gl_FragCoord.x < bounds.z - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"\
                                     "gl_FragColor = vec4(0.0, 0.0, 0.0, 0.5);"\
-                                "else if (gl_FragCoord.x >= resolution.x - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < resolution.x - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + 1.0)"\
+                                "else if (gl_FragCoord.x >= bounds.z - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"\
                                     "gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);"\
-                                "else if (gl_FragCoord.x >= resolution.x - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + 1.0)"\
+                                "else if (gl_FragCoord.x >= bounds.z - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + bounds.w + 1.0)"\
                                     "gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);"\
                             "}"\
                         "}"
@@ -454,12 +454,13 @@ struct XInputState
 #endif
 
 // global internal variables
-static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1;
+static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1, numPropLevers = 0, numMixtureLevers = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
 static GLuint program = 0, fragmentShader = 0;
 static std::stack <int*> buttonAssignmentsStack;
+static XPLMWindowID indicatorsWindow = NULL;
 #if IBM
 static HINSTANCE hGetProcIDDLL = NULL;
 typedef int(__stdcall * pICFUNC) (int, XInputState&);
@@ -2284,116 +2285,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
     return -1.0f;
 }
 
-// draw-callback that performs the drawing of the indicator overlay
-static int DrawCallback(XPLMDrawingPhase inPhase, int inIsBefore, void *inRefcon)
-{
-    int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
-    int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
-
-    if (acfNumEngines > 0 || gliderWithSpeedbrakes)
-    {
-        int helicopter = IsHelicopter();
-
-        XPLMSetGraphicsState(0, 0, 0, 0, 0,  0, 0);
-
-        glUseProgram(program);
-
-        int numPropLevers = 0, numMixtureLevers = 0;
-        float throttle = 0.0f;
-        if (gliderWithSpeedbrakes)
-            throttle = 1.0f - XPLMGetDataf(speedbrakeRatioDataRef);
-        else
-        {
-            int acfPropType[8];
-            XPLMGetDatavi(acfPropTypeDataRef, acfPropType, 0, 8);
-            int acfEnType[8];
-            XPLMGetDatavi(acfEnTypeDataRef, acfEnType, 0, 8);
-            for (int i = 0; i < acfNumEngines; i++)
-            {
-                if (acfPropType[i] >= 1 && acfPropType[i] <= 3)
-                    numPropLevers++;
-
-                if (acfEnType[i] <  2 || (acfEnType[i] == 2 && !helicopter) || acfEnType[i] == 8)
-                    numMixtureLevers++;
-            }
-
-            throttle = XPLMGetDataf(throttleRatioAllDataRef);
-        }
-
-        int throttleLocation = glGetUniformLocation(program, "throttle");
-        glUniform1f(throttleLocation, throttle);
-
-        int propLocation = glGetUniformLocation(program, "prop");
-        float propRatio = 0.0f;
-        if (helicopter)
-        {
-            float acfMinPitch = 0.0f;
-            XPLMGetDatavf(acfMinPitchDataRef, &acfMinPitch, 0, 1);
-            float acfMaxPitch = 0.0f;
-            XPLMGetDatavf(acfMaxPitchDataRef, &acfMaxPitch, 0, 1);
-            float propPitchDeg = 0.0f;
-            XPLMGetDatavf(propPitchDegDataRef, &propPitchDeg, 0, 1);
-
-            propRatio = Normalize(propPitchDeg, acfMinPitch, acfMaxPitch, 0.0f, 1.0f);
-        }
-        else
-            propRatio = Normalize(XPLMGetDataf(propRotationSpeedRadSecAllDataRef), XPLMGetDataf(acfRSCMingovPrpDataRef), XPLMGetDataf(acfRSCRedlinePrpDataRef), 0.0f, 1.0f);
-
-        glUniform1f(propLocation, numPropLevers < 1 ? -1.0f : propRatio);
-
-        int mixtureLocation = glGetUniformLocation(program, "mixture");
-        glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -1.0f : XPLMGetDataf(mixtureRatioAllDataRef));
-
-        float width = INDICATOR_LEVER_WIDTH;
-        if (numPropLevers > 0)
-            width += INDICATOR_LEVER_WIDTH;
-        if (numMixtureLevers > 0)
-            width += INDICATOR_LEVER_WIDTH;
-
-        int sizeLocation = glGetUniformLocation(program, "size");
-        glUniform2f(sizeLocation, width, INDICATOR_LEVER_HEIGHT);
-
-        int x = 0, y = 0;
-        XPLMGetScreenSize(&x, &y);
-        int resolutionLocation = glGetUniformLocation(program, "resolution");
-        glUniform2f(resolutionLocation, (float) x, (float) y);
-
-        glPushAttrib(GL_VIEWPORT_BIT);
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0.0f, x, 0.0f, y, -1.0f, 1.0f);
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-        glViewport(0, 0, x, y);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        glColor3f(1.0f, 1.0f, 1.0f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(0.0f, 0.0f);
-        glVertex2f((float) x - width, 0.0f);
-        glTexCoord2f(0.0f, 1.0f);
-        glVertex2f((float) x - width, INDICATOR_LEVER_HEIGHT);
-        glTexCoord2f(1.0f, 1.0f);
-        glVertex2f((GLfloat) x, INDICATOR_LEVER_HEIGHT);
-        glTexCoord2f(1.0f, 0.0f);
-        glVertex2f((GLfloat) x, 0.0f);
-        glEnd();
-
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-        glPopAttrib();
-
-        glUseProgram(0);
-    }
-
-    return 1;
-}
-
 // removes the fragment-shader from video memory, if deleteProgram is set the shader-program is also removed
 static void CleanupShader(int deleteProgram = 0)
 {
@@ -2572,6 +2463,143 @@ static void SaveSettings(void)
     }
 }
 
+// draws the content of the indicators window
+static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
+{
+    int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
+    int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
+    int helicopter = IsHelicopter();
+
+    XPLMSetGraphicsState(0, 0, 0, 0, 1, 0, 0);
+
+    glUseProgram(program);
+
+    float throttle = 0.0f;
+    if (gliderWithSpeedbrakes)
+        throttle = 1.0f - XPLMGetDataf(speedbrakeRatioDataRef);
+    else
+        throttle = XPLMGetDataf(throttleRatioAllDataRef);
+
+    int throttleLocation = glGetUniformLocation(program, "throttle");
+    glUniform1f(throttleLocation, throttle);
+
+    int propLocation = glGetUniformLocation(program, "prop");
+    float propRatio = 0.0f;
+    if (helicopter)
+    {
+        float acfMinPitch = 0.0f;
+        XPLMGetDatavf(acfMinPitchDataRef, &acfMinPitch, 0, 1);
+        float acfMaxPitch = 0.0f;
+        XPLMGetDatavf(acfMaxPitchDataRef, &acfMaxPitch, 0, 1);
+        float propPitchDeg = 0.0f;
+        XPLMGetDatavf(propPitchDegDataRef, &propPitchDeg, 0, 1);
+
+        propRatio = Normalize(propPitchDeg, acfMinPitch, acfMaxPitch, 0.0f, 1.0f);
+    }
+    else
+        propRatio = Normalize(XPLMGetDataf(propRotationSpeedRadSecAllDataRef), XPLMGetDataf(acfRSCMingovPrpDataRef), XPLMGetDataf(acfRSCRedlinePrpDataRef), 0.0f, 1.0f);
+
+    glUniform1f(propLocation, numPropLevers < 1 ? -1.0f : propRatio);
+
+    int mixtureLocation = glGetUniformLocation(program, "mixture");
+    glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -1.0f : XPLMGetDataf(mixtureRatioAllDataRef));
+
+    int l = 0, t = 0, r = 0, b = 0;
+    XPLMGetWindowGeometry(indicatorsWindow, &l, &t, &r, &b);
+    int boundsLocation = glGetUniformLocation(program, "bounds");
+    glUniform4f(boundsLocation, (GLfloat) l, (GLfloat) t, (GLfloat) r, (GLfloat) b);
+
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f);
+    glVertex2f((GLfloat) l, (GLfloat) b);
+    glTexCoord2f(0.0f, 1.0f);
+    glVertex2f((GLfloat) l, (GLfloat) t);
+    glTexCoord2f(1.0f, 1.0f);
+    glVertex2f((GLfloat) r, (GLfloat) t);
+    glTexCoord2f(1.0f, 0.0f);
+    glVertex2f((GLfloat) r, (GLfloat) b);
+    glEnd();
+
+    glUseProgram(0);
+}
+
+static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus)
+{
+}
+
+static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
+{
+    return 0;
+}
+
+static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon)
+{
+    return xplm_CursorDefault;
+}
+
+static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, int clicks, void *inRefcon)
+{
+    return 0;
+}
+
+static void UpdateIndicatorsWindow()
+{
+    if (indicatorsWindow)
+    {
+        XPLMDestroyWindow(indicatorsWindow);
+        indicatorsWindow = NULL;
+    }
+
+    int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
+    int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
+
+    if (!showIndicators || (acfNumEngines < 1 && !gliderWithSpeedbrakes))
+        return;
+
+    numPropLevers = 0;
+    numMixtureLevers = 0;
+    if (!gliderWithSpeedbrakes)
+    {
+        int helicopter = IsHelicopter();
+
+        int acfPropType[8];
+        XPLMGetDatavi(acfPropTypeDataRef, acfPropType, 0, 8);
+        int acfEnType[8];
+        XPLMGetDatavi(acfEnTypeDataRef, acfEnType, 0, 8);
+        for (int i = 0; i < acfNumEngines; i++)
+        {
+            if (acfPropType[i] >= 1 && acfPropType[i] <= 3)
+                numPropLevers++;
+
+            if (acfEnType[i] <  2 || (acfEnType[i] == 2 && !helicopter) || acfEnType[i] == 8)
+                numMixtureLevers++;
+        }
+    }
+
+    int width = INDICATOR_LEVER_WIDTH;
+    if (numPropLevers > 0)
+        width += INDICATOR_LEVER_WIDTH;
+    if (numMixtureLevers > 0)
+        width += INDICATOR_LEVER_WIDTH;
+
+    XPLMCreateWindow_t indicatorsWindowParameters;
+    indicatorsWindowParameters.structSize = sizeof(indicatorsWindowParameters);
+    XPLMGetScreenBoundsGlobal(NULL, NULL, &indicatorsWindowParameters.right, &indicatorsWindowParameters.bottom);
+    indicatorsWindowParameters.top = indicatorsWindowParameters.bottom + INDICATOR_LEVER_HEIGHT;
+    indicatorsWindowParameters.left = indicatorsWindowParameters.right - width;
+    indicatorsWindowParameters.visible = 1;
+    indicatorsWindowParameters.drawWindowFunc = DrawIndicatorsWindow;
+    indicatorsWindowParameters.handleKeyFunc = HandleKey;
+    indicatorsWindowParameters.handleMouseClickFunc = HandleMouseClick;
+    indicatorsWindowParameters.handleCursorFunc = HandleCursor;
+    indicatorsWindowParameters.handleMouseWheelFunc = HandleMouseWheel;
+    indicatorsWindowParameters.decorateAsFloatingWindow = xplm_WindowDecorationSelfDecoratedResizable;
+    indicatorsWindowParameters.layer = xplm_WindowLayerFlightOverlay;
+    indicatorsWindowParameters.handleRightClickFunc = HandleMouseClick;
+    indicatorsWindow = XPLMCreateWindowEx(&indicatorsWindowParameters);
+}
+
 // handles the settings widget
 static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget, long inParam1, long inParam2)
 {
@@ -2612,11 +2640,7 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
         else if (inParam1 == (long) showIndicatorsCheckbox)
         {
             showIndicators = (int) XPGetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, 0);
-
-            if (!showIndicators)
-                XPLMUnregisterDrawCallback(DrawCallback, xplm_Phase_Window, 1, NULL);
-            else
-                XPLMRegisterDrawCallback(DrawCallback, xplm_Phase_Window, 1, NULL);
+            UpdateIndicatorsWindow();
         }
     }
     else if (inMessage == xpMsg_ScrollBarSliderPositionChanged)
@@ -2888,9 +2912,8 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // register flight loop callbacks
     XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
 
-    // register draw callback
-    if (showIndicators)
-        XPLMRegisterDrawCallback(DrawCallback, xplm_Phase_Window, 1, NULL);
+    // initialize indicators window if necessary
+    UpdateIndicatorsWindow();
 
     // create menu-entries
     int subMenuItem = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 1);
@@ -2937,10 +2960,6 @@ PLUGIN_API void XPluginStop(void)
     // release toe brake control
     XPLMSetDatai(overrideToeBrakesDataRef, 0);
 
-    // unregister draw callback
-    if (showIndicators)
-        XPLMUnregisterDrawCallback(DrawCallback, xplm_Phase_Window, 1, NULL);
-
 #if IBM
     if (hGetProcIDDLL != NULL)
         FreeLibrary(hGetProcIDDLL);
@@ -2975,6 +2994,10 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
         defaultHeadPositionX = FLT_MAX;
         defaultHeadPositionY = FLT_MAX;
         defaultHeadPositionZ = FLT_MAX;
+
+        // reinitialize indicators window if necessary
+        UpdateIndicatorsWindow();
+
     case XPLM_MSG_AIRPORT_LOADED:
         // schedule a switch to the 3D cockpit view during the next flight loop
         switchTo3DCommandLook = 0;
