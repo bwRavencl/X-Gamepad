@@ -335,6 +335,7 @@
 #define BLU_FX_PLUGIN_SIGNATURE "de.bwravencl.blu_fx"
 #define DREAMFOIL_AS350_PLUGIN_SIGNATURE "DreamFoil.AS350"
 #define DREAMFOIL_B407_PLUGIN_SIGNATURE "DreamFoil.B407"
+#define HEAD_SHAKE_PLUGIN_SIGNATURE "com.simcoders.headshake"
 #define QPAC_A320_PLUGIN_SIGNATURE "QPAC.airbus.fbw"
 #define ROTORSIM_EC135_PLUGIN_SIGNATURE "rotorsim.ec135.management"
 #define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
@@ -454,7 +455,7 @@ struct XInputState
 #endif
 
 // global internal variables
-static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, lastCinemaVerite = 0, showIndicators = 1, numPropLevers = 0, numMixtureLevers = 0;
+static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, numPropLevers = 0, numMixtureLevers = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
@@ -874,8 +875,20 @@ static int SetOverrideControlCinemaVeriteDataRefCallback(int overrideEnabled)
     return 1;
 }
 
-// disables cinema verite and also overrides the control cinema verite function of BLU-fx
-static void DisableCinemaVerite(void)
+static int SetOverrideHeadShakePlugin(int overrideEnabled)
+{
+    if (IsPluginEnabled(HEAD_SHAKE_PLUGIN_SIGNATURE))
+    {
+        XPLMSetDatai(XPLMFindDataRef("simcoders/headshake/override"), overrideEnabled);
+
+        return 0;
+    }
+
+    return 1;
+}
+
+// disables cinema verite and also overrides BLU-fx and HeadShake
+static void OverrideCameraControls(void)
 {
     // enable the control cinema verite override of BLU-fx
     overrideControlCinemaVeriteFailed = SetOverrideControlCinemaVeriteDataRefCallback(1);
@@ -884,10 +897,13 @@ static void DisableCinemaVerite(void)
     lastCinemaVerite = XPLMGetDatai(cinemaVeriteDataRef);
     if (lastCinemaVerite)
         XPLMSetDatai(cinemaVeriteDataRef, 0);
+
+    // enalbe the camera override of HeadShake
+    overrideHeadShakePluginFailed = SetOverrideHeadShakePlugin(1);
 }
 
-// restores cinema verite and removes the override of the control cinema verite function of BLU-fx
-static void RestoreCinemaVerite(void)
+// restores cinema verite and removes the override of BLU-fx and HeadShake
+static void RestoreCameraControls(void)
 {
     // disable the control cinema verite override of BLU-fx if we enabled it before
     if (!overrideControlCinemaVeriteFailed)
@@ -896,6 +912,10 @@ static void RestoreCinemaVerite(void)
     // restore cinema verite to its old status
     if (lastCinemaVerite)
         XPLMSetDatai(cinemaVeriteDataRef, 1);
+
+    // disable the camera override of HeadhShake if we enabled it before
+    if (!overrideHeadShakePluginFailed)
+        SetOverrideHeadShakePlugin(0);
 }
 
 // converts an abstract axis index to an actual index of the selected controller while respecting the selected axis offset
@@ -993,8 +1013,8 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-            // temporarily disable cinema verite
-            DisableCinemaVerite();
+            // temporarily gain exclusive camera controls
+            OverrideCameraControls();
         }
         else if (inPhase == xplm_CommandEnd && mode == VIEW)
         {
@@ -1021,8 +1041,8 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             // restore the default button assignments
             PopButtonAssignments();
 
-            // restore cinema verite
-            RestoreCinemaVerite();
+            // restore camera controls
+            RestoreCameraControls();
 
             mode = DEFAULT;
         }
@@ -1286,8 +1306,8 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-            // temporarily disable cinema verite
-            DisableCinemaVerite();
+            // temporarily gain exclusive camera controls
+            OverrideCameraControls();
         }
         else if (mode == MOUSE)
         {
@@ -1307,8 +1327,8 @@ static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPL
             // restore the default button assignments
             PopButtonAssignments();
 
-            // restore cinema verite
-            RestoreCinemaVerite();
+            // restore camera controls
+            RestoreCameraControls();
 
             mode = DEFAULT;
         }
