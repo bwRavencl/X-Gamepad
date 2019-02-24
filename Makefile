@@ -1,9 +1,9 @@
 BUILDDIR	:=	./build
 SRC_BASE	:=	.
-TARGET		:= x_pad
+TARGET		:= x_gamepad
 
 SOURCES = \
-	x_pad.cpp
+	x_gamepad.cpp
 
 LIBS = -pthread -lXtst
 

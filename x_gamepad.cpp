@@ -1,4 +1,4 @@
-/* Copyright (C) 2018  Matteo Hausner
+/* Copyright (C) 2019  Matteo Hausner
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,8 +51,8 @@
 #endif
 
 // define name
-#define NAME "X-pad"
-#define NAME_LOWERCASE "x_pad"
+#define NAME "X-Gamepad"
+#define NAME_LOWERCASE "x_gamepad"
 
 // define version
 #define VERSION "1.3"
@@ -69,12 +69,6 @@
 #define JOYSTICK_AXIS_ABSTRACT_LEFT_Y 1
 #define JOYSTICK_AXIS_ABSTRACT_RIGHT_X 2
 #define JOYSTICK_AXIS_ABSTRACT_RIGHT_Y 3
-
-// define dualshock 3 joystick axis
-#define JOYSTICK_AXIS_DS3_LEFT_X 0
-#define JOYSTICK_AXIS_DS3_LEFT_Y 1
-#define JOYSTICK_AXIS_DS3_RIGHT_X 2
-#define JOYSTICK_AXIS_DS3_RIGHT_Y 3
 
 // define xbox 360 joystick axis
 #if IBM
@@ -128,53 +122,6 @@
 #define JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT 15
 #define JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT 16
 #define JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT 17
-
-// define dualshock 3 joystick buttons
-#if IBM
-#define JOYSTICK_BUTTON_DS3_DPAD_LEFT -1
-#define JOYSTICK_BUTTON_DS3_DPAD_RIGHT -1
-#define JOYSTICK_BUTTON_DS3_DPAD_UP -1
-#define JOYSTICK_BUTTON_DS3_DPAD_DOWN -1
-#define JOYSTICK_BUTTON_DS3_DPAD_LEFT_UP -1
-#define JOYSTICK_BUTTON_DS3_DPAD_LEFT_DOWN -1
-#define JOYSTICK_BUTTON_DS3_DPAD_RIGHT_UP -1
-#define JOYSTICK_BUTTON_DS3_DPAD_RIGHT_DOWN -1
-#define JOYSTICK_BUTTON_DS3_SQUARE -1
-#define JOYSTICK_BUTTON_DS3_CIRCLE -1
-#define JOYSTICK_BUTTON_DS3_TRIANGLE -1
-#define JOYSTICK_BUTTON_DS3_CROSS -1
-#define JOYSTICK_BUTTON_DS3_START -1
-#define JOYSTICK_BUTTON_DS3_PS -1
-#define JOYSTICK_BUTTON_DS3_SELECT -1
-#define JOYSTICK_BUTTON_DS3_L1 -1
-#define JOYSTICK_BUTTON_DS3_R1 -1
-#define JOYSTICK_BUTTON_DS3_L2 -1
-#define JOYSTICK_BUTTON_DS3_R2 -1
-#define JOYSTICK_BUTTON_DS3_L3 -1
-#define JOYSTICK_BUTTON_DS3_R3 -1
-#else
-#define JOYSTICK_BUTTON_DS3_DPAD_LEFT 7
-#define JOYSTICK_BUTTON_DS3_DPAD_RIGHT 5
-#define JOYSTICK_BUTTON_DS3_DPAD_UP 4
-#define JOYSTICK_BUTTON_DS3_DPAD_DOWN 6
-#define JOYSTICK_BUTTON_DS3_DPAD_LEFT_UP -1
-#define JOYSTICK_BUTTON_DS3_DPAD_LEFT_DOWN -1
-#define JOYSTICK_BUTTON_DS3_DPAD_RIGHT_UP -1
-#define JOYSTICK_BUTTON_DS3_DPAD_RIGHT_DOWN -1
-#define JOYSTICK_BUTTON_DS3_SQUARE 15
-#define JOYSTICK_BUTTON_DS3_CIRCLE 13
-#define JOYSTICK_BUTTON_DS3_TRIANGLE 12
-#define JOYSTICK_BUTTON_DS3_CROSS 14
-#define JOYSTICK_BUTTON_DS3_START 3
-#define JOYSTICK_BUTTON_DS3_PS 16
-#define JOYSTICK_BUTTON_DS3_SELECT 0
-#define JOYSTICK_BUTTON_DS3_L1 10
-#define JOYSTICK_BUTTON_DS3_R1 11
-#define JOYSTICK_BUTTON_DS3_L2 8
-#define JOYSTICK_BUTTON_DS3_R2 9
-#define JOYSTICK_BUTTON_DS3_L3 1
-#define JOYSTICK_BUTTON_DS3_R3 2
-#endif
 
 // define xbox 360 joystick buttons
 #if IBM
@@ -332,7 +279,6 @@
 #define DEFAULT_B738_ACF_FILENAME "b738.acf"
 
 // define plugin signatures
-#define BLU_FX_PLUGIN_SIGNATURE "de.bwravencl.blu_fx"
 #define DREAMFOIL_AS350_PLUGIN_SIGNATURE "DreamFoil.AS350"
 #define DREAMFOIL_B407_PLUGIN_SIGNATURE "DreamFoil.B407"
 #define HEAD_SHAKE_PLUGIN_SIGNATURE "com.simcoders.headshake"
@@ -414,7 +360,6 @@
 // define controller types
 typedef enum
 {
-    DS3,
     XBOX360,
     DS4
 } ControllerType;
@@ -439,6 +384,16 @@ typedef enum
     RIGHT
 } MouseButton;
 
+// define configuration steps
+typedef enum
+{
+    START,
+    AXES,
+    BUTTONS,
+    ABORT,
+    DONE
+} ConfigurationStep;
+
 // define xinput state structure
 #if IBM
 struct XInputState
@@ -455,10 +410,11 @@ struct XInputState
 #endif
 
 // global internal variables
-static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, numPropLevers = 0, numMixtureLevers = 0;
+static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
+static ConfigurationStep configurationStep = START;
 static GLuint program = 0, fragmentShader = 0;
 static std::stack <int*> buttonAssignmentsStack;
 static XPLMWindowID indicatorsWindow = NULL;
@@ -480,7 +436,7 @@ static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleC
 static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
 
 // global widget variables
-static XPWidgetID settingsWidget = NULL, dualShock3ControllerRadioButton = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, axisOffsetCaption = NULL, buttonOffsetCaption = NULL, axisOffsetSlider = NULL, buttonOffsetSlider = NULL, setDefaultAssignmentsButton = NULL, showIndicatorsCheckbox = NULL;
+static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, configurationStatusCaption = NULL, startConfigurationtButton = NULL, showIndicatorsCheckbox = NULL;
 
 // push the current button assignments to the stack
 static void PushButtonAssignments(void)
@@ -540,41 +496,6 @@ static int ButtonIndex(int abstractButtonIndex)
 {
     switch (controllerType)
     {
-    case DS3:
-        switch (abstractButtonIndex)
-        {
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT:
-            return JOYSTICK_BUTTON_DS3_DPAD_LEFT + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT:
-            return JOYSTICK_BUTTON_DS3_DPAD_RIGHT + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_UP:
-            return JOYSTICK_BUTTON_DS3_DPAD_UP + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN:
-            return JOYSTICK_BUTTON_DS3_DPAD_DOWN + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT:
-            return JOYSTICK_BUTTON_DS3_SQUARE + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT:
-            return JOYSTICK_BUTTON_DS3_CIRCLE + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_UP:
-            return JOYSTICK_BUTTON_DS3_TRIANGLE + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN:
-            return JOYSTICK_BUTTON_DS3_CROSS + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT:
-            return JOYSTICK_BUTTON_DS3_SELECT + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT:
-            return JOYSTICK_BUTTON_DS3_START + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT:
-            return JOYSTICK_BUTTON_DS3_L1 + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT:
-            return JOYSTICK_BUTTON_DS3_R1 + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT:
-            return JOYSTICK_BUTTON_DS3_L3 + buttonOffset;
-        case JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT:
-            return JOYSTICK_BUTTON_DS3_R3 + buttonOffset;
-        default:
-            return -1;
-        }
-        break;
     case XBOX360:
         switch (abstractButtonIndex)
         {
@@ -862,19 +783,6 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
     return 0;
 }
 
-// override control cinema verite function of BLU-fx - returns 1 if it fails
-static int SetOverrideControlCinemaVeriteDataRefCallback(int overrideEnabled)
-{
-    if (IsPluginEnabled(BLU_FX_PLUGIN_SIGNATURE))
-    {
-        XPLMSetDatai(XPLMFindDataRef("blu_fx/override_control_cinema_verite"), overrideEnabled);
-
-        return 0;
-    }
-
-    return 1;
-}
-
 static int SetOverrideHeadShakePlugin(int overrideEnabled)
 {
     if (IsPluginEnabled(HEAD_SHAKE_PLUGIN_SIGNATURE))
@@ -887,12 +795,9 @@ static int SetOverrideHeadShakePlugin(int overrideEnabled)
     return 1;
 }
 
-// disables cinema verite and also overrides BLU-fx and HeadShake
+// disables cinema verite and also overrides HeadShake
 static void OverrideCameraControls(void)
 {
-    // enable the control cinema verite override of BLU-fx
-    overrideControlCinemaVeriteFailed = SetOverrideControlCinemaVeriteDataRefCallback(1);
-
     // disable cinema verite if it is enabled and store its status
     lastCinemaVerite = XPLMGetDatai(cinemaVeriteDataRef);
     if (lastCinemaVerite)
@@ -902,13 +807,9 @@ static void OverrideCameraControls(void)
     overrideHeadShakePluginFailed = SetOverrideHeadShakePlugin(1);
 }
 
-// restores cinema verite and removes the override of BLU-fx and HeadShake
+// restores cinema verite and removes the override of HeadShake
 static void RestoreCameraControls(void)
 {
-    // disable the control cinema verite override of BLU-fx if we enabled it before
-    if (!overrideControlCinemaVeriteFailed)
-        SetOverrideControlCinemaVeriteDataRefCallback(0);
-
     // restore cinema verite to its old status
     if (lastCinemaVerite)
         XPLMSetDatai(cinemaVeriteDataRef, 1);
@@ -923,21 +824,6 @@ static int AxisIndex(int abstractAxisIndex)
 {
     switch (controllerType)
     {
-    case DS3:
-        switch (abstractAxisIndex)
-        {
-        case JOYSTICK_AXIS_ABSTRACT_LEFT_X:
-            return JOYSTICK_AXIS_DS3_LEFT_X + axisOffset;
-        case JOYSTICK_AXIS_ABSTRACT_LEFT_Y:
-            return JOYSTICK_AXIS_DS3_LEFT_Y + axisOffset;
-        case JOYSTICK_AXIS_ABSTRACT_RIGHT_X:
-            return JOYSTICK_AXIS_DS3_RIGHT_X + axisOffset;
-        case JOYSTICK_AXIS_ABSTRACT_RIGHT_Y:
-            return JOYSTICK_AXIS_DS3_RIGHT_Y + axisOffset;
-        default:
-            return -1;
-        }
-        break;
     case XBOX360:
         switch (abstractAxisIndex)
         {
@@ -1006,9 +892,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t) XPLMFindCommand("sim/general/backward");
 
             // assign push-to-talk controls
-            if (controllerType == DS3)
-                joystickButtonAssignments[JOYSTICK_BUTTON_DS3_L2 + buttonOffset] = (std::size_t) XPLMFindCommand(PUSH_TO_TALK_COMMAND);
-            else if (controllerType == DS4)
+            if (controllerType == DS4)
                 joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t) XPLMFindCommand(PUSH_TO_TALK_COMMAND);
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
@@ -1643,6 +1527,140 @@ static void DeviceThread(void *argument)
 }
 #endif
 
+// updates all caption widgets and slider positions associated with settings variables
+static void UpdateSettingsWidgets(void)
+{
+    XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, (int) (controllerType == XBOX360));
+    XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, (int) (controllerType == DS4));
+
+    const char *configurationStatusString;
+    switch (configurationStep)
+    {
+        case START:
+            configurationStatusString = "Click 'Start Configuration' to configure X-Plane for the selected controller type.";
+            break;
+        case AXES:
+            configurationStatusString = "Move the right stick of your controller up and down.";
+            break;
+        case BUTTONS:
+            configurationStatusString = "Now press and release the 'X'-Button on your controller.";
+            break;
+        case DONE:
+            configurationStatusString = "Success! Your controller is now fully configured.";
+            break;
+        case ABORT:
+            configurationStatusString = "Configuration aborted!";
+            break;
+        default:
+            break;
+    }
+    XPSetWidgetDescriptor(configurationStatusCaption, configurationStatusString);
+    XPSetWidgetProperty(configurationStatusCaption, xpProperty_CaptionLit, configurationStep != START);
+    
+    XPSetWidgetDescriptor(startConfigurationtButton, configurationStep == AXES || configurationStep == BUTTONS ? "Abort Configuration" : "Start Configuration");
+
+    XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, showIndicators);
+}
+
+// saves current settings to the config file
+static void SaveSettings(void)
+{
+    std::fstream file;
+    file.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
+
+    if (file.is_open())
+    {
+        file << "controllerType=" << controllerType << std::endl;
+        file << "axisOffset=" << axisOffset << std::endl;
+        file << "buttonOffset=" << buttonOffset << std::endl;
+        file << "showIndicators=" << showIndicators << std::endl;
+        file << "indicatorsRight=" << indicatorsRight << std::endl;
+        file << "indicatorsBottom=" << indicatorsBottom << std::endl;
+
+        file.close();
+    }
+}
+
+// set the default axis and button assignments
+static void SetDefaultAssignments(void)
+{
+    // only set default assignments if a joystick is found and if no modifier is down which can alter any assignments
+    if (XPLMGetDatai(hasJoystickDataRef) && mode == DEFAULT)
+    {
+        // set default axis assignments
+        int joystickAxisAssignments[100];
+        XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_YAW;
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_RIGHT_X)] = AXIS_ASSIGNMENT_ROLL;
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_RIGHT_Y)] = AXIS_ASSIGNMENT_PITCH;
+        if (controllerType == XBOX360)
+        {
+#if IBM
+            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] = AXIS_ASSIGNMENT_NONE;
+#else
+            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER + axisOffset] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + axisOffset] = AXIS_ASSIGNMENT_NONE;
+#endif
+        }
+        else if (controllerType == DS4)
+        {
+            joystickAxisAssignments[JOYSTICK_AXIS_DS4_L2 + axisOffset] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_DS4_R2 + axisOffset] = AXIS_ASSIGNMENT_NONE;
+        }
+
+        XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+
+        // set default button assignments
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_up");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_down");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_UP)] = (std::size_t) XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_DOWN)] = (std::size_t) XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_UP)] = (std::size_t) XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_DOWN)] = (std::size_t) XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t) XPLMFindCommand(CYCLE_RESET_VIEW_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t) XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t) XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t) XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t) XPLMFindCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t) XPLMFindCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (std::size_t) XPLMFindCommand(TRIM_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t) XPLMFindCommand(VIEW_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT)] = (std::size_t) XPLMFindCommand("sim/general/zoom_out");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT)] = (std::size_t) XPLMFindCommand("sim/general/zoom_in");
+        switch (controllerType)
+        {
+#if !IBM
+        case XBOX360:
+            joystickButtonAssignments[JOYSTICK_BUTTON_XBOX360_GUIDE + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
+            break;
+#endif
+        case DS4:
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t) XPLMFindCommand("sim/none/none");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t) XPLMFindCommand("sim/autopilot/control_wheel_steer");
+            break;
+        }
+
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        // set default nullzone
+        XPLMSetDataf(joystickPitchNullzoneDataRef, DEFAULT_NULLZONE);
+        XPLMSetDataf(joystickRollNullzoneDataRef, DEFAULT_NULLZONE);
+        XPLMSetDataf(joystickHeadingNullzoneDataRef, DEFAULT_NULLZONE);
+
+        // set default sensitivity
+        XPLMSetDataf(joystickPitchSensitivityDataRef, DEFAULT_PITCH_SENSITIVITY);
+        XPLMSetDataf(joystickRollSensitivityDataRef, DEFAULT_ROLL_SENSITIVITY);
+        XPLMSetDataf(joystickHeadingSensitivityDataRef, DEFAULT_HEADING_SENSITIVITY);
+    }
+}
+
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
@@ -1708,7 +1726,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     {
                         if (currentDev->vendor_id == 0x54C && (currentDev->product_id == 0x5C4 || currentDev->product_id == 0x9CC || currentDev->product_id == 0xBA0))
                         {
-                            struct hid_device_info *currentDevCopy = (hid_device_info*) calloc(1, sizeof(hid_device_info));
+                            struct hid_device_info *currentDevCopy = (hid_device_info*) calloc(1, sizeof hid_device_info);
                             currentDevCopy->vendor_id = currentDev->vendor_id;
                             currentDevCopy->product_id = currentDev->product_id;
 
@@ -1731,15 +1749,66 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         }
 #endif
 
-        float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
-
-        float joystickPitchNullzone = XPLMGetDataf(joystickPitchNullzoneDataRef);
-
         float joystickAxisValues[100];
         XPLMGetDatavf(joystickAxisValuesDataRef, joystickAxisValues, 0, 100);
 
         int joystickButtonValues[1600];
         XPLMGetDatavi(joystickButtonValuesDataRef, joystickButtonValues, 0, 1600);
+
+        static int potentialAxes[100] = { 0 };
+        static int potentialButtons[1600] = { 0 };
+
+        switch (configurationStep)
+        {
+            case AXES:
+                // we go through all axes and mark the indices of the axes with values above 0.75, if we see a previously marked axis taking a value below -0.75 we can assume it is the axis the user is moving
+                for (int i = 0; i < 100; i++)
+                {
+                    if (joystickAxisValues[i] > 0.75f)
+                        potentialAxes[i] = 1;
+                    else if (potentialAxes[i])
+                    {
+                        axisOffset = i - (controllerType == XBOX360 ? JOYSTICK_AXIS_XBOX360_RIGHT_Y : JOYSTICK_AXIS_DS4_RIGHT_Y);
+memset(potentialAxes, 0, sizeof potentialAxes);
+                        configurationStep = BUTTONS;
+                        UpdateSettingsWidgets();
+                        return -1.0f;
+                    }
+                }
+                return -1.0f;
+            case BUTTONS:
+                // because some joysticks have buttons that are in a depressed state by default, we go through all buttons and mark the indices of the buttons that are not pressed, if we see a previously marked button getting pressed we can assume it is the button the user pressed
+                for (int i = 0; i < 1600; i++)
+                {
+                    if (joystickButtonValues[i])
+                        potentialButtons[i] = 1;
+                    else if (potentialButtons[i])
+                    {
+                        buttonOffset = i - (XBOX360 ? JOYSTICK_BUTTON_XBOX360_X : JOYSTICK_BUTTON_DS4_CROSS);
+                        SetDefaultAssignments();
+                        SaveSettings();
+                        memset(potentialButtons, 0, sizeof potentialButtons);
+                        configurationStep = DONE;
+                        UpdateSettingsWidgets();
+                        return -1.0f;
+                    }
+                }
+                return -1.0f;
+            case ABORT:
+                // we need to cleanup the arrays in case of an abort
+                memset(potentialAxes, 0, sizeof potentialAxes);
+                memset(potentialButtons, 0, sizeof potentialButtons);
+                // we first update the window to display the aborted message
+                UpdateSettingsWidgets();
+                configurationStep = START;
+                return -1.0f;
+            default:
+                break;
+        }
+
+        float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
+
+        float joystickPitchNullzone = XPLMGetDataf(joystickPitchNullzoneDataRef);
 
         static int joystickAxisLeftXCalibrated = 0;
         if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] > 0.0f)
@@ -1766,7 +1835,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             // handle brakes
             float leftBrakeRatio = 0.0f, rightBrakeRatio = 0.0f;
 
-            if ((controllerType == DS3 && joystickButtonValues[JOYSTICK_BUTTON_DS3_R2 + buttonOffset] != 0.0f) ||
+            if (
 #if IBM
                     (controllerType == XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= -0.75f) ||
 #else
@@ -1790,9 +1859,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
                 switch (controllerType)
                 {
-                case DS3:
-                    leftBrakeRatio = rightBrakeRatio = 1.0f;
-                    break;
                 case XBOX360:
 #if IBM
                     leftBrakeRatio = rightBrakeRatio = Normalize(joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset], -0.75f, -1.0f, 0.0f, 1.0f);
@@ -2360,129 +2426,6 @@ static void InitShader(const char *fragmentShaderString)
     CleanupShader(0);
 }
 
-// set the default axis and button assignments
-static void SetDefaultAssignments(void)
-{
-    // only set default assignments if a joystick is found and if no modifier is down which can alter any assignments
-    if (XPLMGetDatai(hasJoystickDataRef) && mode == DEFAULT)
-    {
-        // set default axis assignments
-        int joystickAxisAssignments[100];
-        XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-
-        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_YAW;
-        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
-        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_RIGHT_X)] = AXIS_ASSIGNMENT_ROLL;
-        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_RIGHT_Y)] = AXIS_ASSIGNMENT_PITCH;
-        if (controllerType == XBOX360)
-        {
-#if IBM
-            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] = AXIS_ASSIGNMENT_NONE;
-#else
-            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER + axisOffset] = AXIS_ASSIGNMENT_NONE;
-            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + axisOffset] = AXIS_ASSIGNMENT_NONE;
-#endif
-        }
-        else if (controllerType == DS4)
-        {
-            joystickAxisAssignments[JOYSTICK_AXIS_DS4_L2 + axisOffset] = AXIS_ASSIGNMENT_NONE;
-            joystickAxisAssignments[JOYSTICK_AXIS_DS4_R2 + axisOffset] = AXIS_ASSIGNMENT_NONE;
-        }
-
-        XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-
-        // set default button assignments
-        int joystickButtonAssignments[1600];
-        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_up");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_down");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_UP)] = (std::size_t) XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_DOWN)] = (std::size_t) XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_UP)] = (std::size_t) XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_DOWN)] = (std::size_t) XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t) XPLMFindCommand(CYCLE_RESET_VIEW_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t) XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t) XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t) XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t) XPLMFindCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t) XPLMFindCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (std::size_t) XPLMFindCommand(TRIM_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t) XPLMFindCommand(VIEW_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT)] = (std::size_t) XPLMFindCommand("sim/general/zoom_out");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT)] = (std::size_t) XPLMFindCommand("sim/general/zoom_in");
-        switch (controllerType)
-        {
-        case DS3:
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS3_PS + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS3_L2 + buttonOffset] = (std::size_t) XPLMFindCommand("sim/autopilot/control_wheel_steer");
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS3_R2 + buttonOffset] = (std::size_t) XPLMFindCommand("sim/none/none");
-            break;
-#if !IBM
-        case XBOX360:
-            joystickButtonAssignments[JOYSTICK_BUTTON_XBOX360_GUIDE + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
-            break;
-#endif
-        case DS4:
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t) XPLMFindCommand("sim/none/none");
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t) XPLMFindCommand("sim/autopilot/control_wheel_steer");
-            break;
-        }
-
-        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-        // set default nullzone
-        XPLMSetDataf(joystickPitchNullzoneDataRef, DEFAULT_NULLZONE);
-        XPLMSetDataf(joystickRollNullzoneDataRef, DEFAULT_NULLZONE);
-        XPLMSetDataf(joystickHeadingNullzoneDataRef, DEFAULT_NULLZONE);
-
-        // set default sensitivity
-        XPLMSetDataf(joystickPitchSensitivityDataRef, DEFAULT_PITCH_SENSITIVITY);
-        XPLMSetDataf(joystickRollSensitivityDataRef, DEFAULT_ROLL_SENSITIVITY);
-        XPLMSetDataf(joystickHeadingSensitivityDataRef, DEFAULT_HEADING_SENSITIVITY);
-    }
-}
-
-// updates all caption widgets and slider positions associated with settings variables
-static void UpdateSettingsWidgets(void)
-{
-    XPSetWidgetProperty(dualShock3ControllerRadioButton, xpProperty_ButtonState, (int) (controllerType == DS3));
-    XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, (int) (controllerType == XBOX360));
-    XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, (int) (controllerType == DS4));
-
-    char stringAxisOffset[32];
-    sprintf(stringAxisOffset, "Axis Offset: %d", axisOffset);
-    XPSetWidgetDescriptor(axisOffsetCaption, stringAxisOffset);
-
-    char stringButtonOffset[32];
-    sprintf(stringButtonOffset, "Button Offset: %d", buttonOffset);
-    XPSetWidgetDescriptor(buttonOffsetCaption, stringButtonOffset);
-
-    XPSetWidgetProperty(axisOffsetSlider, xpProperty_ScrollBarSliderPosition, (intptr_t) axisOffset);
-    XPSetWidgetProperty(buttonOffsetSlider, xpProperty_ScrollBarSliderPosition, (intptr_t) buttonOffset);
-
-    XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, showIndicators);
-}
-
-// saves current settings to the config file
-static void SaveSettings(void)
-{
-    std::fstream file;
-    file.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
-
-    if (file.is_open())
-    {
-        file << "controllerType=" << controllerType << std::endl;
-        file << "axisOffset=" << axisOffset << std::endl;
-        file << "buttonOffset=" << buttonOffset << std::endl;
-        file << "showIndicators=" << showIndicators << std::endl;
-
-        file.close();
-    }
-}
-
 // draws the content of the indicators window
 static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
 {
@@ -2548,14 +2491,82 @@ static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags,
 {
 }
 
+// modifies the supplied window bounds accordingly to ensure they are within the global screen bounds
+static void FitGeometryWithinScreenBounds(int *left, int *top, int *right, int *bottom)
+{
+    int minLeft = 0, maxTop = 0, maxRight = 0, minBottom = 0;
+    XPLMGetScreenBoundsGlobal(&minLeft, &maxTop, &maxRight, &minBottom);
+
+    int leftOverflow = minLeft - *left;
+    if (leftOverflow > 0)
+    {
+        *left = minLeft;
+        *right += leftOverflow;
+    }
+
+    int topOverflow = maxTop - *top;
+    if (topOverflow < 0)
+    {
+        *top = maxTop;
+        *bottom += topOverflow;
+    }
+
+    int rightOverflow = maxRight - *right;
+    if (rightOverflow < 0)
+    {
+        *right = maxRight;
+        *left += rightOverflow;
+    }
+
+    int bottomOverflow = minBottom - *bottom;
+    if (bottomOverflow > 0)
+    {
+        *bottom = minBottom;
+        *top += bottomOverflow;
+    }
+}
+
+// handles the dragging of the indicators window and storing its position
 static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
 {
-    return 0;
+    static int lastX = -1, lastY = -1;
+
+    switch (inMouse) {
+       case xplm_MouseDrag:
+           if (lastX > 0 && lastY > 0)
+           {
+               int left = 0, top = 0;
+               XPLMGetWindowGeometry(inWindowID, &left, &top, &indicatorsRight, &indicatorsBottom);
+
+               int deltaX = x - lastX;
+               int deltaY = y - lastY;
+
+               left += deltaX;
+               top += deltaY;
+               indicatorsRight += deltaX;
+               indicatorsBottom += deltaY;
+
+               FitGeometryWithinScreenBounds(&left, &top, &indicatorsRight, &indicatorsBottom);
+               XPLMSetWindowGeometry(inWindowID, left, top, indicatorsRight, indicatorsBottom);
+           }
+       case xplm_MouseDown:
+           lastX = x;
+           lastY = y;
+           break;
+       case xplm_MouseUp:
+           lastX = lastY = -1;
+           SaveSettings();
+           break;
+       default:
+           break;
+    }
+
+    return 1;
 }
 
 static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon)
 {
-    return xplm_CursorDefault;
+    return xplm_CursorArrow;
 }
 
 static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, int clicks, void *inRefcon)
@@ -2604,20 +2615,32 @@ static void UpdateIndicatorsWindow()
         width += INDICATOR_LEVER_WIDTH;
 
     XPLMCreateWindow_t indicatorsWindowParameters;
-    indicatorsWindowParameters.structSize = sizeof(indicatorsWindowParameters);
-    XPLMGetScreenBoundsGlobal(NULL, NULL, &indicatorsWindowParameters.right, &indicatorsWindowParameters.bottom);
-    indicatorsWindowParameters.top = indicatorsWindowParameters.bottom + INDICATOR_LEVER_HEIGHT;
-    indicatorsWindowParameters.left = indicatorsWindowParameters.right - width;
+    indicatorsWindowParameters.structSize = sizeof indicatorsWindowParameters;
+    indicatorsWindowParameters.top = indicatorsBottom + INDICATOR_LEVER_HEIGHT;
+    indicatorsWindowParameters.left = indicatorsRight - width;
+    indicatorsWindowParameters.right = indicatorsRight;
+    indicatorsWindowParameters.bottom = indicatorsBottom;
+    FitGeometryWithinScreenBounds(&indicatorsWindowParameters.left, &indicatorsWindowParameters.top, &indicatorsWindowParameters.right, &indicatorsWindowParameters.bottom);
     indicatorsWindowParameters.visible = 1;
     indicatorsWindowParameters.drawWindowFunc = DrawIndicatorsWindow;
     indicatorsWindowParameters.handleKeyFunc = HandleKey;
     indicatorsWindowParameters.handleMouseClickFunc = HandleMouseClick;
     indicatorsWindowParameters.handleCursorFunc = HandleCursor;
     indicatorsWindowParameters.handleMouseWheelFunc = HandleMouseWheel;
-    indicatorsWindowParameters.decorateAsFloatingWindow = xplm_WindowDecorationSelfDecoratedResizable;
+    indicatorsWindowParameters.decorateAsFloatingWindow = xplm_WindowDecorationSelfDecorated;
     indicatorsWindowParameters.layer = xplm_WindowLayerFlightOverlay;
     indicatorsWindowParameters.handleRightClickFunc = HandleMouseClick;
     indicatorsWindow = XPLMCreateWindowEx(&indicatorsWindowParameters);
+}
+
+// stops the configuration process correctly
+static void StopConfiguration(void)
+{
+    // if the user closes the widget while he is configuring a controller we need to set the aborted state to perform the cleanup
+    if (configurationStep == AXES || configurationStep == BUTTONS)
+        configurationStep = ABORT;
+    else
+        configurationStep = START;
 }
 
 // handles the settings widget
@@ -2627,24 +2650,18 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
     {
         if (XPIsWidgetVisible(settingsWidget))
         {
+            StopConfiguration();
             SaveSettings();
             XPHideWidget(settingsWidget);
         }
     }
     else if (inMessage == xpMsg_ButtonStateChanged)
     {
-        if (inParam1 == (long) dualShock3ControllerRadioButton)
-        {
-            if ((int) XPGetWidgetProperty(dualShock3ControllerRadioButton, xpProperty_ButtonState, 0))
-            {
-                controllerType = DS3;
-                UpdateSettingsWidgets();
-            }
-        }
-        else if (inParam1 == (long) xbox360ControllerRadioButton)
+        if (inParam1 == (long) xbox360ControllerRadioButton)
         {
             if ((int) XPGetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, 0))
             {
+                StopConfiguration();
                 controllerType = XBOX360;
                 UpdateSettingsWidgets();
             }
@@ -2653,6 +2670,7 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
         {
             if ((int) XPGetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, 0))
             {
+                StopConfiguration();
                 controllerType = DS4;
                 UpdateSettingsWidgets();
             }
@@ -2663,19 +2681,17 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
             UpdateIndicatorsWindow();
         }
     }
-    else if (inMessage == xpMsg_ScrollBarSliderPositionChanged)
-    {
-        if (inParam1 == (long) axisOffsetSlider)
-            axisOffset = XPGetWidgetProperty(axisOffsetSlider, xpProperty_ScrollBarSliderPosition, 0);
-        else if (inParam1 == (long) buttonOffsetSlider)
-            buttonOffset = XPGetWidgetProperty(buttonOffsetSlider, xpProperty_ScrollBarSliderPosition, 0);
-
-        UpdateSettingsWidgets();
-    }
     else if (inMessage == xpMsg_PushButtonPressed)
     {
-        if (inParam1 == (long) setDefaultAssignmentsButton)
-            SetDefaultAssignments();
+        if (inParam1 == (long) startConfigurationtButton)
+        {
+            if (configurationStep == AXES || configurationStep == BUTTONS)
+                configurationStep = ABORT;
+            else
+                configurationStep = AXES;
+
+            UpdateSettingsWidgets();
+        }
     }
 
     return 0;
@@ -2684,113 +2700,84 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
 // handles the menu-entries
 static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
 {
-    // settings menu entry
-    if ((long) inItemRef == 0)
+    if (settingsWidget == NULL)
     {
-        if (settingsWidget == NULL)
-        {
-            // create settings widget
-            int x = 10, y = 0, w = 350, h = 445;
-            XPLMGetScreenSize(NULL, &y);
-            y -= 100;
+        // create settings widget
+        int x = 10, y = 0, w = 500, h = 375;
+        XPLMGetScreenSize(NULL, &y);
+        y -= 100;
 
-            int x2 = x + w;
-            int y2 = y - h;
+        int x2 = x + w;
+        int y2 = y - h;
 
-            // widget window
-            settingsWidget = XPCreateWidget(x, y, x2, y2, 1, NAME" Settings", 1, 0, xpWidgetClass_MainWindow);
+        // widget window
+        settingsWidget = XPCreateWidget(x, y, x2, y2, 1, NAME" Settings", 1, 0, xpWidgetClass_MainWindow);
 
-            // add close box
-            XPSetWidgetProperty(settingsWidget, xpProperty_MainWindowHasCloseBoxes, 1);
+        // add close box
+        XPSetWidgetProperty(settingsWidget, xpProperty_MainWindowHasCloseBoxes, 1);
 
-            // add controller type sub window
-            XPCreateWidget(x + 10, y - 30, x2 - 10, y - 125 - 10, 1, "Controller Type:", 0, settingsWidget, xpWidgetClass_SubWindow);
+        // add controller type sub window
+        XPCreateWidget(x + 10, y - 30, x2 - 10, y - 100 - 10, 1, "", 0, settingsWidget, xpWidgetClass_SubWindow);
 
-            // add controller type caption
-            XPCreateWidget(x + 10, y - 30, x2 - 20, y - 45, 1, "Controller Type:", 0, settingsWidget, xpWidgetClass_Caption);
+        // add controller type caption
+        XPCreateWidget(x + 10, y - 30, x2 - 20, y - 45, 1, "Controller Type:", 0, settingsWidget, xpWidgetClass_Caption);
 
-            // add dualshock 3 controller radio button
-            dualShock3ControllerRadioButton = XPCreateWidget(x + 20, y - 60, x2 - 20, y - 75, 1, "DualShock 3 Controller", 0, settingsWidget, xpWidgetClass_Button);
-            XPSetWidgetProperty(dualShock3ControllerRadioButton, xpProperty_ButtonType, xpRadioButton);
-            XPSetWidgetProperty(dualShock3ControllerRadioButton, xpProperty_ButtonBehavior, xpButtonBehaviorRadioButton);
+        // add xbox 360 controller radio button
+        xbox360ControllerRadioButton = XPCreateWidget(x + 20, y - 60, x + 350 + 20, y - 75, 1, "Xbox 360 Controller", 0, settingsWidget, xpWidgetClass_Button);
+        XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonType, xpRadioButton);
+        XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonBehavior, xpButtonBehaviorRadioButton);
 
-            // add xbox 360 controller radio button
-            xbox360ControllerRadioButton = XPCreateWidget(x + 20, y - 85, x2 - 20, y - 100, 1, "Xbox 360 Controller", 0, settingsWidget, xpWidgetClass_Button);
-            XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonType, xpRadioButton);
-            XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonBehavior, xpButtonBehaviorRadioButton);
+        // add dualshock 4 controller radio button
+        dualShock4ControllerRadioButton = XPCreateWidget(x + 20, y - 85, x + 350 + 20, y - 100, 1, "DualShock 4 Controller", 0, settingsWidget, xpWidgetClass_Button);
+        XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonType, xpRadioButton);
+        XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonBehavior, xpButtonBehaviorRadioButton);
 
-            // add dualshock 4 controller radio button
-            dualShock4ControllerRadioButton = XPCreateWidget(x + 20, y - 110, x2 - 20, y - 125, 1, "DualShock 4 Controller", 0, settingsWidget, xpWidgetClass_Button);
-            XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonType, xpRadioButton);
-            XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonBehavior, xpButtonBehaviorRadioButton);
+        // add configuration sub window
+        XPCreateWidget(x + 10, y - 125, x2 - 10, y - 215 - 10, 1, "", 0, settingsWidget, xpWidgetClass_SubWindow);
 
-            // add offsets type sub window
-            XPCreateWidget(x + 10, y - 150, x2 - 10, y - 220 - 10, 1, "Offsets:", 0, settingsWidget, xpWidgetClass_SubWindow);
+        // add assignments caption
+        XPCreateWidget(x + 10, y - 125, x2 - 20, y - 140, 1, "Configuration:", 0, settingsWidget, xpWidgetClass_Caption);
 
-            // add offsets type caption
-            XPCreateWidget(x + 10, y - 150, x2 - 20, y - 165, 1, "Offsets:", 0, settingsWidget, xpWidgetClass_Caption);
+        // add important notice caption
+        XPCreateWidget(x + 30, y - 155, x2 - 20, y - 170, 1, "Important: First calibrate your controller in X-Plane's 'Joystick' settings screen.", 0, settingsWidget, xpWidgetClass_Caption);
 
-            // add axis offset caption
-            char stringAxisOffset[32];
-            sprintf(stringAxisOffset, "Axis Offset: %d", axisOffset);
-            axisOffsetCaption = XPCreateWidget(x + 30, y - 180, x2 - 50, y - 195, 1, stringAxisOffset, 0, settingsWidget, xpWidgetClass_Caption);
+        // add configuration status caption
+        configurationStatusCaption = XPCreateWidget(x + 30, y - 175, x2 - 50, y - 190, 1, "", 0, settingsWidget, xpWidgetClass_Caption);
 
-            // add axis offset slider
-            axisOffsetSlider = XPCreateWidget(x + 195, y - 180, x2 - 15, y - 195, 1, "Axis Offset", 0, settingsWidget, xpWidgetClass_ScrollBar);
-            XPSetWidgetProperty(axisOffsetSlider, xpProperty_ScrollBarMin, 0);
-            XPSetWidgetProperty(axisOffsetSlider, xpProperty_ScrollBarMax, 95);
+        // start configuration
+        startConfigurationtButton = XPCreateWidget(x + 30, y - 200, x + 200 + 30, y - 215, 1, "", 0, settingsWidget, xpWidgetClass_Button);
+        XPSetWidgetProperty(startConfigurationtButton, xpProperty_ButtonType, xpPushButton);
 
-            // add button offset caption
-            char stringButtonOffset[32];
-            sprintf(stringButtonOffset, "Button Offset: %d", buttonOffset);
-            buttonOffsetCaption = XPCreateWidget(x + 30, y - 205, x2 - 50, y - 220, 1, stringButtonOffset, 0, settingsWidget, xpWidgetClass_Caption);
+        // add indicators sub window
+        XPCreateWidget(x + 10, y - 240, x2 - 10, y - 285 - 10, 1, "", 0, settingsWidget, xpWidgetClass_SubWindow);
 
-            // add button offset slider
-            buttonOffsetSlider = XPCreateWidget(x + 195, y - 205, x2 - 15, y - 220, 1, "Button Offset", 0, settingsWidget, xpWidgetClass_ScrollBar);
-            XPSetWidgetProperty(buttonOffsetSlider, xpProperty_ScrollBarMin, 0);
-            XPSetWidgetProperty(buttonOffsetSlider, xpProperty_ScrollBarMax, 1583);
+        // add indicators caption
+        XPCreateWidget(x + 10, y - 240, x2 - 20, y - 265, 1, "Indicators:", 0, settingsWidget, xpWidgetClass_Caption);
 
-            // add assignments sub window
-            XPCreateWidget(x + 10, y - 245, x2 - 10, y - 290 - 10, 1, "Assignments:", 0, settingsWidget, xpWidgetClass_SubWindow);
+        // add show indicators radio button
+        showIndicatorsCheckbox = XPCreateWidget(x + 20, y - 270, x + 300 + 20, y - 285, 1, "Show Indicators", 0, settingsWidget, xpWidgetClass_Button);
+        XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonType, xpRadioButton);
+        XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
 
-            // add assignments caption
-            XPCreateWidget(x + 10, y - 245, x2 - 20, y - 260, 1, "Assignments:", 0, settingsWidget, xpWidgetClass_Caption);
+        // add about sub window
+        XPCreateWidget(x + 10, y - 310, x2 - 10, y - 355 - 10, 1, "", 0, settingsWidget, xpWidgetClass_SubWindow);
 
-            // add set default assignments preset button
-            setDefaultAssignmentsButton = XPCreateWidget(x + 30, y - 275, x2 - 120, y - 290, 1, "Set Default Assignments", 0, settingsWidget, xpWidgetClass_Button);
-            XPSetWidgetProperty(setDefaultAssignmentsButton, xpProperty_ButtonType, xpPushButton);
+        // add about caption
+        XPCreateWidget(x + 10, y - 310, x2 - 20, y - 325, 1, NAME " " VERSION, 0, settingsWidget, xpWidgetClass_Caption);
+        XPCreateWidget(x + 10, y - 325, x2 - 20, y - 340, 1, "Thank you for using " NAME " by Matteo Hausner", 0, settingsWidget, xpWidgetClass_Caption);
+        XPCreateWidget(x + 10, y - 340, x2 - 20, y - 355, 1, "Contact: matteo.hausner@gmail.com or bwravencl.de", 0, settingsWidget, xpWidgetClass_Caption);
 
-            // add indicators sub window
-            XPCreateWidget(x + 10, y - 315, x2 - 10, y - 360 - 10, 1, "Indicators:", 0, settingsWidget, xpWidgetClass_SubWindow);
+        // init checkbox and slider positions
+        UpdateSettingsWidgets();
 
-            // add indicators caption
-            XPCreateWidget(x + 10, y - 315, x2 - 20, y - 330, 1, "Indicators:", 0, settingsWidget, xpWidgetClass_Caption);
-
-            // add show indicators radio button
-            showIndicatorsCheckbox = XPCreateWidget(x + 20, y - 345, x2 - 20, y - 360, 1, "Show Indicators", 0, settingsWidget, xpWidgetClass_Button);
-            XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonType, xpRadioButton);
-            XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonBehavior, xpButtonBehaviorCheckBox);
-
-            // add about sub window
-            XPCreateWidget(x + 10, y - 380, x2 - 10, y - 425 - 10, 1, "About:", 0, settingsWidget, xpWidgetClass_SubWindow);
-
-            // add about caption
-            XPCreateWidget(x + 10, y - 380, x2 - 20, y - 395, 1, NAME " " VERSION, 0, settingsWidget, xpWidgetClass_Caption);
-            XPCreateWidget(x + 10, y - 395, x2 - 20, y - 410, 1, "Thank you for using " NAME " by Matteo Hausner", 0, settingsWidget, xpWidgetClass_Caption);
-            XPCreateWidget(x + 10, y - 410, x2 - 20, y - 425, 1, "Contact: matteo.hausner@gmail.com or bwravencl.de", 0, settingsWidget, xpWidgetClass_Caption);
-
-            // init checkbox and slider positions
-            UpdateSettingsWidgets();
-
-            // register widget handler
-            XPAddWidgetCallback(settingsWidget, (XPWidgetFunc_t) SettingsWidgetHandler);
-        }
-        else
-        {
-            // settings widget already created
-            if (!XPIsWidgetVisible(settingsWidget))
-                XPShowWidget(settingsWidget);
-        }
+        // register widget handler
+        XPAddWidgetCallback(settingsWidget, (XPWidgetFunc_t) SettingsWidgetHandler);
+    }
+    else
+    {
+        // settings widget already created
+        if (!XPIsWidgetVisible(settingsWidget))
+            XPShowWidget(settingsWidget);
     }
 }
 
@@ -2821,6 +2808,10 @@ static void LoadSettings(void)
                 iss >> buttonOffset;
             else if (line.find("showIndicators") != std::string::npos)
                 iss >> showIndicators;
+            else if (line.find("indicatorsRight") != std::string::npos)
+                iss >> indicatorsRight;
+            else if (line.find("indicatorsBottom") != std::string::npos)
+                iss >> indicatorsBottom;
         }
 
         file.close();
@@ -2923,6 +2914,12 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterCommandHandler(pushToTalkCommand, PushToTalkCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommandHandler, 1, NULL);
 
+    // initialize indicator default position
+    int right = 0, bottom = 0;
+    XPLMGetScreenBoundsGlobal(NULL, NULL, &right, &bottom);
+    indicatorsRight = right;
+    indicatorsBottom = bottom;
+
     // read and apply config file
     LoadSettings();
 
@@ -2936,9 +2933,9 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     UpdateIndicatorsWindow();
 
     // create menu-entries
-    int subMenuItem = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 1);
-    XPLMMenuID menu = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), subMenuItem, MenuHandlerCallback, 0);
-    XPLMAppendMenuItem(menu, "Settings", (void*) 0, 1);
+    int menuContainerIndex = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 0);
+    XPLMMenuID menuID = XPLMCreateMenu(NAME, XPLMFindPluginsMenu(), menuContainerIndex, MenuHandlerCallback, NULL);
+    XPLMAppendMenuItem(menuID, "Settings", NULL, 1);
 
 #if LIN
     display = XOpenDisplay(NULL);
