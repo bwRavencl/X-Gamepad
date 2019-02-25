@@ -36,14 +36,16 @@
 
 #if IBM
 #include "glew.h"
-#include "hidapi.h"
 #include <process.h>
 #include <windows.h>
 #elif APL
+#include <pthread.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
 #include <OpenGL/gl.h>
-#elif LIN
+#endif
+
+#if LIN
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
@@ -52,6 +54,8 @@
 #include <GL/gl.h>
 #include <X11/keysym.h>
 #include <X11/extensions/XTest.h>
+#else
+#include "hidapi.h"
 #endif
 
 // define name
@@ -339,7 +343,7 @@
                         "{"\
                             "vec2 size = vec2(bounds.z - bounds.x, bounds.y - bounds.w);"\
                             "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.1);"\
-                            "if (round(gl_FragCoord.x) == round(bounds.x) || round(gl_FragCoord.x) == round(bounds.z) || round(gl_FragCoord.y) == round(bounds.y) || round(gl_FragCoord.y) == round(bounds.w) || round(mod(gl_FragCoord.y - bounds.w, (size.y / 5.0))) == 0)"\
+                            "if (round(gl_FragCoord.x) == round(bounds.x) || round(gl_FragCoord.x) == round(bounds.z) || round(gl_FragCoord.y) == round(bounds.y) || round(gl_FragCoord.y) == round(bounds.w) || round(mod(gl_FragCoord.y - bounds.w, (size.y / 4.0))) == 0)"\
                                 "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.5);"\
                             "else"\
                             "{"\
@@ -411,7 +415,7 @@ struct XInputState
 #endif
 
 // global internal variables
-static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideControlCinemaVeriteFailed = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0;
+static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
@@ -419,15 +423,21 @@ static ConfigurationStep configurationStep = START;
 static GLuint program = 0, fragmentShader = 0;
 static std::stack <int*> buttonAssignmentsStack;
 static XPLMWindowID indicatorsWindow = NULL;
+
 #if IBM
 static HINSTANCE hGetProcIDDLL = NULL;
 typedef int(__stdcall * pICFUNC) (int, XInputState&);
 pICFUNC XInputGetStateEx = NULL;
 static HANDLE hidDeviceThread = 0;
+#elif APL
+static pthread_t hidDeviceThread = 0;
+#endif
+
+#if LIN
+static Display *display = NULL;
+#else
 static int hidInitialized = 0;
 static volatile int hidDeviceThreadRun = 1;
-#elif LIN
-static Display *display = NULL;
 #endif
 
 // global commandref variables
@@ -635,6 +645,12 @@ static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
     return 0;
 }
 
+// numerically stable float comparison
+inline static int FloatsEqual(float a, float b)
+{
+    return fabs(a - b) < FLT_EPSILON;
+}
+
 // command-handler that handles the speedbrake toggle / arm command or the carb heat, if the plane has no speedbrake
 static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
@@ -652,7 +668,7 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCo
             // arm / unarm speedbrake
             if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
             {
-                float newSpeedbrakeRatio = oldSpeedbrakeRatio == -0.5f ? 0.0f : -0.5f;
+                float newSpeedbrakeRatio = FloatsEqual(oldSpeedbrakeRatio, -0.5f) ? 0.0f : -0.5f;
 
                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
 
@@ -662,7 +678,7 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCo
         else if (inPhase == xplm_CommandEnd)
         {
             // toggle speedbrake
-            if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
+            if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
             {
                 float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
 
@@ -750,7 +766,7 @@ static int ToggleAutopilotOrDisableFlightDirectorCommandHandler(XPLMCommandRef i
     else if (inPhase == xplm_CommandEnd)
     {
         // toggle autopilot
-        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
+        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
         {
             // custom handling for default B738
             XPLMCommandRef B738CMDAutopilotDisconectButton = XPLMFindCommand("laminar/B738/autopilot/disconnect_button");
@@ -1094,7 +1110,7 @@ static int ToggleBetaOrToggleReverseCommandHandler(XPLMCommandRef inCommand, XPL
     else if (inPhase == xplm_CommandEnd)
     {
         // toggle reverse
-        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && beginTime != FLT_MAX)
+        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
             XPLMCommandOnce(XPLMFindCommand("sim/engines/thrust_reverse_toggle"));
 
         beginTime = 0.0f;
@@ -1125,8 +1141,8 @@ static void ToggleMouseButton(MouseButton button, int down, void *display = NULL
             lastRightDown = down;
     }
 #elif APL
-    CGEventType mouseType = 0;
-    CGMouseButton mouseButton = 0;
+    CGEventType mouseType;
+    CGMouseButton mouseButton;
     if (button == LEFT)
     {
         mouseType = (!down ? kCGEventLeftMouseUp : kCGEventLeftMouseDown);
@@ -1398,7 +1414,7 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
     // get display ids of the display on which the mouse pointer was contained before and will be once moved - values of -1 indicate that the pointer is outside of all displays
     int oldContainingDisplay = -1;
     int newContainingDisplay = -1;
-    for (int i = 0; i < displayCount; i++)
+    for (int i = 0; i < (int) displayCount; i++)
     {
         CGRect screenBounds = CGDisplayBounds(activeDisplays[i]);
 
@@ -1438,7 +1454,7 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
 #endif
 }
 
-#if IBM
+#if !LIN
 // hid device thread cleanup function
 static void DeviceThreadCleanup(hid_device *handle, hid_device_info *dev)
 {
@@ -1452,14 +1468,22 @@ static void DeviceThreadCleanup(hid_device *handle, hid_device_info *dev)
 }
 
 // hid device thread function
+#if IBM
 static void DeviceThread(void *argument)
+#elif APL
+static void* DeviceThread(void *argument)
+#endif
 {
     struct hid_device_info *dev = (hid_device_info*) argument;
     hid_device *handle = hid_open(dev->vendor_id, dev->product_id, dev->serial_number);
     if (handle == NULL)
     {
         DeviceThreadCleanup(handle, dev);
+#if IBM
         return;
+#elif APL
+        return (void*) 1;
+#endif
     }
 
     unsigned char data[40];
@@ -1470,7 +1494,11 @@ static void DeviceThread(void *argument)
         if (hid_read(handle, data, 40) == -1)
         {
             DeviceThreadCleanup(handle, dev);
+#if IBM
             return;
+#elif APL
+            return (void*) 1;
+#endif
         }
 
         int touchpadButtonDown = (data[7] & 2) != 0;
@@ -1524,7 +1552,12 @@ static void DeviceThread(void *argument)
     }
 
     DeviceThreadCleanup(handle, dev);
+
+#if IBM
     _endthread();
+#elif APL
+    return (void*) 0;
+#endif
 }
 #endif
 
@@ -1666,7 +1699,7 @@ static void SetDefaultAssignments(void)
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
     // update the default head position when required
-    if (defaultHeadPositionX == FLT_MAX || defaultHeadPositionY == FLT_MAX || defaultHeadPositionZ == FLT_MAX)
+    if (FloatsEqual(defaultHeadPositionX, FLT_MAX) || FloatsEqual(defaultHeadPositionY, FLT_MAX) || FloatsEqual(defaultHeadPositionZ, FLT_MAX))
     {
         defaultHeadPositionX = XPLMGetDataf(acfPeXDataRef);
         defaultHeadPositionY = XPLMGetDataf(acfPeYDataRef);
@@ -1708,7 +1741,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 XPLMCommandEnd(toggleMousePointerControlCommand);
             }
         }
-        else if (controllerType == DS4)
+#endif
+
+#if !LIN
+        if (controllerType == DS4)
         {
             static float lastEnumerationTime = 0.0f;
             if (hidDeviceThread == 0 && currentTime - lastEnumerationTime >= 5.0f)
@@ -1720,23 +1756,28 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
                 if (hidInitialized)
                 {
-                    struct hid_device_info *devs = hid_enumerate(/*0x54C*/0x0, 0x0);
+                    struct hid_device_info *devs = hid_enumerate(0x0, 0x0);
                     struct hid_device_info *currentDev = devs;
 
                     while (currentDev != NULL)
                     {
                         if (currentDev->vendor_id == 0x54C && (currentDev->product_id == 0x5C4 || currentDev->product_id == 0x9CC || currentDev->product_id == 0xBA0))
                         {
-                            struct hid_device_info *currentDevCopy = (hid_device_info*) calloc(1, sizeof hid_device_info);
+                            struct hid_device_info *currentDevCopy = (hid_device_info*) calloc(1, sizeof(hid_device_info));
                             currentDevCopy->vendor_id = currentDev->vendor_id;
                             currentDevCopy->product_id = currentDev->product_id;
 
+#if IBM
                             HANDLE threadHandle = (HANDLE) _beginthread(DeviceThread, 0, currentDevCopy);
                             if (threadHandle > 0)
                             {
                                 hidDeviceThread = threadHandle;
                                 break;
                             }
+#elif APL
+                            if (pthread_create(&hidDeviceThread, NULL, DeviceThread, currentDevCopy))
+                                break;
+#endif
                             else
                                 hid_free_enumeration(currentDevCopy);
                         }
@@ -2276,7 +2317,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                             if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                             {
                                 // de-arm speedbrake if armed
-                                if (speedbrakeRatio == -0.5f)
+                                if (FloatsEqual(speedbrakeRatio, -0.5f))
                                     speedbrakeRatio = 0.0f;
 
                                 // normalize range [0.5, 0.0] to [0.0, 1.0]
@@ -2291,7 +2332,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                             else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                             {
                                 // de-arm speedbrake if armed
-                                if (speedbrakeRatio == -0.5f)
+                                if (FloatsEqual(speedbrakeRatio, -0.5f))
                                     speedbrakeRatio = 0.0f;
 
                                 // normalize range [0.5, 1.0] to [0.0, 1.0]
@@ -2430,7 +2471,6 @@ static void InitShader(const char *fragmentShaderString)
 // draws the content of the indicators window
 static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
 {
-    int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
     int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
     int helicopter = IsHelicopter();
 

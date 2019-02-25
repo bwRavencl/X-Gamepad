@@ -1,4 +1,10 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.13)
+
+set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
 project(x_gamepad)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -16,18 +22,14 @@ endif()
 
 set(LIB_DIR "${PROJECT_SOURCE_DIR}/lib")
 
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_VERBOSE_MAKEFILE ON)
-
 if(UNIX AND NOT APPLE)
     set(LINUX TRUE)
 endif()
 
 if(UNIX)
-    set(PLATFORM_COMPILE_OPTIONS -Wall -Wunreachable-code -Wextra -Wshadow -Wfloat-equal -pedantic -O3 -s)
+    set(PLATFORM_COMPILE_OPTIONS -Wall -Wunreachable-code -Wextra -Wshadow -Wfloat-equal -Wno-unused-parameter -pedantic -O3 -pthread)
 else()
-    set(PLATFORM_COMPILE_OPTIONS /W3 /wd4996)
+    set(PLATFORM_COMPILE_OPTIONS /W3 /wd4267 /wd4996)
 endif()
 
 if(APPLE)
@@ -36,6 +38,8 @@ if(APPLE)
         APL=1
         LIN=0
         IBM=0)
+    set(PLATFORM_INCLUDE_DIRECTORIES
+            ${LIB_DIR}/hidapi)
 else()
     if(LINUX)
         set(PLATFORM_CORE_DEFINITIONS
@@ -53,6 +57,18 @@ else()
         set(PLATFORM_INCLUDE_DIRECTORIES
             ${LIB_DIR}/glew-2.1.0/include/GL
             ${LIB_DIR}/hidapi)
+        set(CompilerFlags
+            CMAKE_CXX_FLAGS
+            CMAKE_CXX_FLAGS_DEBUG
+            CMAKE_CXX_FLAGS_RELEASE
+            CMAKE_C_FLAGS
+            CMAKE_C_FLAGS_DEBUG
+            CMAKE_C_FLAGS_RELEASE
+            )
+        foreach(CompilerFlag ${CompilerFlags})
+            string(REPLACE "/MD" "/MT" ${CompilerFlag} "${${CompilerFlag}}")
+            string(REPLACE "/MDd" "/MTd" ${CompilerFlag} "${${CompilerFlag}}")
+        endforeach()
         set(PLATFORM_DEBUG_OPTIONS "-MTd")
         set(PLATFORM_RELEASE_OPTIONS "-MT")
     endif()
@@ -81,11 +97,16 @@ target_compile_options(x_gamepad PUBLIC "$<$<CONFIG:RELEASE>:${PLATFORM_RELEASE_
 target_compile_definitions(x_gamepad PRIVATE ${DEFINITIONS})
 
 if(APPLE)
-    target_link_libraries(x_gamepad "-framework OpenGL")
+    target_link_libraries(x_gamepad "-framework ApplicationServices" )
     target_link_libraries(x_gamepad "-framework CoreFoundation")
+    target_link_libraries(x_gamepad "-framework OpenGL")
     target_link_libraries(x_gamepad "-framework XPWidgets")
     target_link_libraries(x_gamepad "-framework XPLM")
-    set_target_properties(x_gamepad PROPERTIES LINK_FLAGS "-Wl,-F/Library/Frameworks, -Wl,-FSDK/Libraries/Mac\
+    set_target_properties(x_gamepad PROPERTIES LINK_FLAGS "\
+    -Wl,-F/Library/Frameworks,\
+    -Wl,-F${LIB_DIR}/SDK/Libraries/Mac\
+    -Wl,-L${LIB_DIR}/hidapi\
+    -Wl,-lhidapi\
     -Wl,-exported_symbol -Wl,_XPluginStart\
     -Wl,-exported_symbol -Wl,_XPluginEnable\
     -Wl,-exported_symbol -Wl,_XPluginReceiveMessage\
@@ -94,7 +115,7 @@ if(APPLE)
     set_target_properties(x_gamepad PROPERTIES OUTPUT_NAME "apl")
 else()
     if(LINUX)
-        target_compile_options(x_gamepad PRIVATE "-fvisibility=hidden")
+        target_compile_options(x_gamepad PRIVATE "-fvisibility=hidden" -s -static-libgcc -static-libstdc++)
         set_target_properties(x_gamepad PROPERTIES OUTPUT_NAME "lin")
     else()
         target_link_libraries(x_gamepad "${LIB_DIR}/SDK/Libraries/Win/XPWidgets_64.lib")
@@ -106,10 +127,11 @@ else()
     endif()
 endif()
 
+set_target_properties(x_gamepad PROPERTIES LIBRARY_OUTPUT_DIRECTORY "bin/${CMAKE_BUILD_TYPE}/x_gamepad/64")
 foreach(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
     string(TOUPPER ${OUTPUTCONFIG} OUTPUTCONFIG_UPPER)
     set_target_properties(x_gamepad PROPERTIES LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG_UPPER} "bin/${OUTPUTCONFIG}/x_gamepad/64")
-endforeach(OUTPUTCONFIG)
+endforeach()
 
 set_target_properties(x_gamepad PROPERTIES PREFIX "")
 set_target_properties(x_gamepad PROPERTIES SUFFIX ".xpl")
