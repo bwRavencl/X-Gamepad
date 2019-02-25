@@ -30,9 +30,13 @@
 #include <sstream>
 #include <stack>
 
+#ifndef VERSION
+#define VERSION "UNDEFINED"
+#endif
+
 #if IBM
+#include "glew.h"
 #include "hidapi.h"
-#include "GLee.h"
 #include <process.h>
 #include <windows.h>
 #elif APL
@@ -53,9 +57,6 @@
 // define name
 #define NAME "X-Gamepad"
 #define NAME_LOWERCASE "x_gamepad"
-
-// define version
-#define VERSION "1.3"
 
 // define config file path
 #if IBM
@@ -2833,6 +2834,16 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
     // get paths in POSIX format
     XPLMEnableFeature("XPLM_USE_NATIVE_PATHS", 1);
+
+#if IBM
+    // init glew
+    GLenum err = glewInit();
+    if (err != GLEW_OK)
+    {
+        XPLMDebugString(NAME": The following error occured while initializing GLEW:\n");
+        XPLMDebugString((const char*) glewGetErrorString(err));
+    }
+#endif
 
     // prepare fragment-shader
     InitShader(FRAGMENT_SHADER);
