@@ -303,9 +303,19 @@
 #define TRIM_MODIFIER_COMMAND NAME_LOWERCASE "/trim_modifier"
 #define TRIM_RESET_COMMAND_NAME_LOWERCASE "/trim_reset"
 #define TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND NAME_LOWERCASE "/toggle_beta_or_toggle_reverse"
-#define TOGGLE_MOUSE_POINTER_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_pointer_control"
+#define TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_or_keyboard_control"
 #define PUSH_TO_TALK_COMMAND NAME_LOWERCASE "/push_to_talk"
 #define TOGGLE_BRAKES_COMMAND NAME_LOWERCASE "/toggle_brakes"
+#define TOGGLE_LEFT_MOUSE_BUTTON_COMMAND NAME_LOWERCASE "/toggle_left_mouse_button"
+#define TOGGLE_RIGHT_MOUSE_BUTTON_COMMAND NAME_LOWERCASE "/toggle_right_mouse_button"
+#define SCROLL_UP_COMMAND NAME_LOWERCASE "/scroll_up"
+#define SCROLL_DOWN_COMMAND NAME_LOWERCASE "/scroll_down"
+#define KEYBOARD_SELECTOR_UP_COMMAND "/keyboard_selector_up"
+#define KEYBOARD_SELECTOR_DOWN_COMMAND "/keyboard_selector_down"
+#define KEYBOARD_SELECTOR_LEFT_COMMAND "/keyboard_selector_left"
+#define KEYBOARD_SELECTOR_RIGHT_COMMAND "/keyboard_selector_right"
+#define PRESS_KEYBOARD_KEY_COMMAND "/press_keyboard_key"
+#define LOCK_KEYBOARD_KEY_COMMAND "/lock_keyboard_key"
 
 // define auto-center view limit
 #define AUTO_CENTER_VIEW_DISTANCE_LIMIT 0.03f
@@ -379,7 +389,8 @@ typedef enum
     MIXTURE,
     COWL,
     TRIM,
-    MOUSE
+    MOUSE,
+    KEYBOARD
 } Mode;
 
 // define mouse buttons
@@ -441,7 +452,7 @@ static volatile int hidDeviceThreadRun = 1;
 #endif
 
 // global commandref variables
-static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
 
 // global dataref variables
 static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
@@ -669,9 +680,7 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCo
             if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
             {
                 float newSpeedbrakeRatio = FloatsEqual(oldSpeedbrakeRatio, -0.5f) ? 0.0f : -0.5f;
-
                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
-
                 beginTime = FLT_MAX;
             }
         }
@@ -680,11 +689,9 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCo
             // toggle speedbrake
             if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
             {
-                float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
-
+                float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f
                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
             }
-
             beginTime = 0.0f;
         }
     }
@@ -1177,65 +1184,283 @@ static void ToggleMouseButton(MouseButton button, int down, void *display = NULL
 #endif
 }
 
-// command-handler that handles the toggle mouse pointer control command
-static int ToggleMousePointerControlCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+static void HandleToggleMouseButtonCommand(XPLMCommandPhase phase, MouseButton button)
+{
+    if (inPhase != xplm_CommandContinue)
+#if LIN
+        ToggleMouseButton(button, inCommand == xplm_CommandBegin, display);
+#else
+        ToggleMouseButton(button, inCommand == xplm_CommandBegin);
+#endif
+}
+
+static int ToggleLeftMouseButtonCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    HandleToggleMouseButtonCommand(inPhase, LEFT);
+    return 0;
+}
+
+static int ToggleRightMouseButtonCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    HandleToggleMouseButtonCommand(inPhase, RIGHT);
+    return 0;
+}
+
+static void HandleScrollCommand(XPLMCommandPhase phase, int clicks)
+{
+    static float lastScrollTime = 0.0f;
+    float currentTime = XPLMGetElapsedTime();
+
+    if (inPhase == xplm_CommandBegin || currentTime - lastScrollTime >= 0.1f)
+    {
+#if LIN
+        Scroll(clicks, display);
+#else
+        Scroll(clicks);
+#endif
+        lastScrollTime = currentTime;
+    }
+}
+
+static int ScrollUpCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    HandleScrollCommand(inPhase, 1);
+    return 0;
+}
+
+static int ScrollDownCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    HandleScrollCommand(inPhase, -1);
+    return 0;
+}
+
+static void ToggleMouseControl(void)
+{
+    // if we are in keyboard mode we actually want to toggle it off instead of toggling mouse mode
+    if (mode == KEYBOARD)
+    {
+        ToggleKeyboardControl();
+        return;
+    }
+
+    int joystickAxisAssignments[100];
+    XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+
+    if (mode == DEFAULT)
+    {
+        mode = MOUSE;
+
+        // assign no controls to the left joystick's axis since it will control the mouse pointer
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_NONE;
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
+
+        // store the default button assignments
+        PushButtonAssignments();
+
+        // assign the mouse button and scrolling commands
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = toggleLeftMouseButtonCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = toggleRightMouseButtonCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = scrollUpCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = scrollDownCommand;
+
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        // temporarily gain exclusive camera controls
+        OverrideCameraControls();
+    }
+    else if (mode == MOUSE)
+    {
+        // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
+#if LIN
+        ToggleMouseButton(LEFT, 0, display);
+        ToggleMouseButton(RIGHT, 0, display);
+#else
+        ToggleMouseButton(LEFT, 0);
+        ToggleMouseButton(RIGHT, 0);
+#endif
+
+        // assign the default controls to the left joystick's axis
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_YAW;
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
+
+        // restore the default button assignments
+        PopButtonAssignments();
+
+        // restore camera controls
+        RestoreCameraControls();
+
+        mode = DEFAULT;
+    }
+
+    XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+}
+
+static int KeyboardSelectorUpCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (keyboardSelectorY > 0)
+        keyboardSelectorY--;
+    else
+        keyboardSelector = sizeof(keyboardRows) / sizeof KeyboardKey* - 1;
+}
+
+static int KeyboardSelectorDownCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+     if (keyboardSelectorY < sizeof(keyboardRows) / sizeof KeyboardKey* - 1)
+        keyboardSelectorY++;
+     else
+        keyboardSelectorY = 0;
+}
+
+static int KeyboardSelectorLeftCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+     if (keyboardSelectorX > 0)
+         keyboardSelectorX--;
+     else
+     {
+         KeyboardKey *row = keyboardRows[keyboardSelectorY];
+         keyboardSlectorX = sizeof(row) / sizeof KeyboardKey - 1;
+     }
+}
+
+static int KeyboardSelectorRightCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+     KeyboardKey *row = keyboardRows[keyboardSelectorY];
+
+     if (keyboardSelectorX < sizeof(row) / sizeof KeyboardKey - 1)
+        keyboardSelectorX++;
+     else
+        keyboardSelectorX = 0;
+}
+
+static void SetKeyState(void *code, KeyState state)
+{
+    // TODO: implement
+}
+
+static int PressKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase != xplm_CommandContinue)
+    {
+        KeyboardKey key = keyboardRows[keyboardSelectorY][keyboardSelectorX];
+
+        if (inPhase == xplm_CommandBegin)
+        {
+            if(key.state == LOCKED)
+            {
+                SetKeyState(key.code, UP);
+                key.state = UP;
+            }
+            else if (key.state == UP)
+            {
+                key.state = DOWN;
+                SetKeyState(key.code, DOWN);
+            }
+        }
+        else if (inPhase == xplm_CommandEnd && key.state == DOWN)
+        {
+            SetKeyState(key.code, UP);
+            key.state = UP;
+        }
+    }
+
+    return 0;
+}
+
+static int LockKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
     {
-        int joystickAxisAssignments[100];
-        XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+        KeyboardKey key = keyboardRows[keyboardSelectorY][keyboardSelectorX];
 
-        if (mode == DEFAULT)
+        if(key.state == LOCKED)
         {
-            mode = MOUSE;
-
-            // assign no controls to the left joystick's axis since it will control the mouse pointer
-            joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_NONE;
-            joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
-
-            // store the default button assignments
-            PushButtonAssignments();
-
-            // assign no commands to the down and right face and up and down dpad buttons since they will be used as mouse buttons and for scrolling
-            int joystickButtonAssignments[1600];
-            XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t) XPLMFindCommand("sim/none/none");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t) XPLMFindCommand("sim/none/none");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand("sim/none/none");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand("sim/none/none");
-
-            XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-            // temporarily gain exclusive camera controls
-            OverrideCameraControls();
+            SetKeyState(key.code, UP);
+            key.state = UP;
         }
-        else if (mode == MOUSE)
+        else if (key.state == UP)
         {
-            // release both mouse buttons if they were still pressed while the mouse pointer control mode was turned off
-#if LIN
-            ToggleMouseButton(LEFT, 0, display);
-            ToggleMouseButton(RIGHT, 0, display);
-#else
-            ToggleMouseButton(LEFT, 0);
-            ToggleMouseButton(RIGHT, 0);
-#endif
-
-            // assign the default controls to the left joystick's axis
-            joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_YAW;
-            joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
-
-            // restore the default button assignments
-            PopButtonAssignments();
-
-            // restore camera controls
-            RestoreCameraControls();
-
-            mode = DEFAULT;
+            key.state = LOCKED;
+            SetKeyState(key.code, DOWN);
         }
-
-        XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
     }
+
+    return 0;
+}
+
+static void ToggleKeyboardControl(void)
+{
+    // if we are in mouse mode we actually want to toggle it off instead of toggling keyboard mode
+    if (mode == MOUSE)
+    {
+        ToggleMouseControl();
+        return;
+    }
+
+    if (mode == DEFAULT)
+    {
+        mode = KEYBOARD;
+
+        // store the default button assignments
+        PushButtonAssignments();
+
+        // assign the keyboard selector and key commands
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = keyboardSelectorUpCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = keyboardSelectorDownCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = keyboardSelectorLeftCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = keyboardSelectorRightCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = pressKeyboardKeyCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = lockKeyboardKeyCommand;
+
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+    }
+    else if (mode == KEYBOARD)
+    {
+        // TODO: release all keys that are still down
+
+        // restore the default button assignments
+        PopButtonAssignments();
+
+        mode = DEFAULT;
+    }
+}
+
+// command-handler that handles the toggle mouse or keyboard control command
+static int ToggleMouseOrKeyboardControlCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+#if LIN
+    if (controllerType == Xbox360)
+#else
+    if (!hidInitialized)
+#endif
+    {
+        static float beginTime = 0.0f;
+
+        if (inPhase == xplm_CommandBegin)
+            beginTime = XPLMGetElapsedTime();
+        else if (inPhase == xplm_CommandContinue)
+        {
+            if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
+            {
+                ToggleKeyboardControl();
+                beginTime = FLT_MAX;
+            }
+        }
+        else if (inPhase == xplm_CommandEnd)
+        {
+            if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
+                ToggleMouseControl();
+
+            beginTime = 0.0f;
+        }
+    }
+    else if (inPhase == xplm_CommandBegin)
+        ToggleKeyboardControl();
 
     return 0;
 }
@@ -1672,11 +1897,11 @@ static void SetDefaultAssignments(void)
         {
 #if !IBM
         case XBOX360:
-            joystickButtonAssignments[JOYSTICK_BUTTON_XBOX360_GUIDE + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND);
+            joystickButtonAssignments[JOYSTICK_BUTTON_XBOX360_GUIDE + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
             break;
 #endif
         case DS4:
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t) XPLMFindCommand("sim/none/none");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t) XPLMFindCommand("sim/autopilot/control_wheel_steer");
             break;
         }
@@ -2234,38 +2459,6 @@ memset(potentialAxes, 0, sizeof potentialAxes);
 #else
                     MoveMousePointer(distX, distY);
 #endif
-
-                    // handle left and right mouse button presses
-#if LIN
-                    ToggleMouseButton(LEFT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)], display);
-                    ToggleMouseButton(RIGHT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)], display);
-#else
-                    ToggleMouseButton(LEFT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)]);
-                    ToggleMouseButton(RIGHT, joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)]);
-#endif
-                    // handle scrolling
-                    static float lastScrollTime = 0.0f;
-                    if (currentTime - lastScrollTime >= 0.1f)
-                    {
-                        if (joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)])
-                        {
-#if LIN
-                            Scroll(1, display);
-#else
-                            Scroll(1);
-#endif
-                            lastScrollTime = currentTime;
-                        }
-                        if (joystickButtonValues[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)])
-                        {
-#if LIN
-                            Scroll(-1, display);
-#else
-                            Scroll(-1);
-#endif
-                            lastScrollTime = currentTime;
-                        }
-                    }
                 }
                 else
                 {
@@ -2946,9 +3139,19 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     trimModifierCommand = XPLMCreateCommand(TRIM_MODIFIER_COMMAND, "Trim Modifier");
     trimResetCommand = XPLMCreateCommand(TRIM_RESET_COMMAND_NAME_LOWERCASE, "Trim Reset");
     toggleBetaOrToggleReverseCommand = XPLMCreateCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND, "Toggle Beta / Toggle Reverse");
-    toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_POINTER_CONTROL_COMMAND, "Toggle Mouse Pointer Control");
+    toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND, "Toggle Mouse or Keyboard Control");
     pushToTalkCommand = XPLMCreateCommand(PUSH_TO_TALK_COMMAND, "Push-To-Talk");
     toggleBrakesCommand = XPLMCreateCommand(TOGGLE_BRAKES_COMMAND, "Toggle Brakes");
+    toggleLeftMouseButtonCommand = XPLMCreateCommand(TOGGLE_LEFT_MOUSE_BUTTON_COMMAND, "Toggle Left Mouse Button");
+    toggleRightMouseButtonCommand = XPLMCreateCommand(TOGGLE_RIGHT_MOUSE_BUTTON_COMMAND, "Toggle Right Mouse Button");
+    scrollUpCommand = XPLMCreateCommand(SCROLL_UP_COMMAND, "Scroll Up");
+    scrollDownCommand = XPLMCreateCommand(SCROLL_DOWN_COMMAND, "Scroll Down");
+    keyboardSelectorUpCommand = XPLMCreateCommand(KEYBOARD_SELECTOR_UP_COMMAND, "Keyboard Selector Up");
+    keyboardSelectorDownCommand = XPLMCreateCommand(KEYBOARD_SELECTOR_DOWN_COMMAND, "Keyboard Selector Down");
+    keyboardSelectorLeftCommand = XPLMCreateCommand(KEYBOARD_SELECTOR_LEFT_COMMAND, "Keyboard Selector Left");
+    keyboardSelectorRightCommand = XPLMCreateCommand(KEYBOARD_SELECTOR_RIGHT_COMMAND, "Keyboard Selector Right");
+    pressKeyboardKeyCommand = XPLMCreateCommand(PRESS_KEYBOARD_KEY_COMMAND, "Press Keyboard Key");
+    lockKeyboardKeyCommand = XPLMCreateCommand(LOCK_KEYBOARD_KEY_COMMAND, "Lock Keyboard Key");
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommandHandler, 1, NULL);
@@ -2961,9 +3164,19 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterCommandHandler(trimModifierCommand, TrimModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(trimResetCommand, TrimResetCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleBetaOrToggleReverseCommand, ToggleBetaOrToggleReverseCommandHandler, 1, NULL);
-    XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMouseOrKeyboardControlCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(pushToTalkCommand, PushToTalkCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleLeftMouseButtonCommand, ToggleLeftMouseButtonCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(toggleRightMouseButtonCommand, ToggleRightMouseButtonCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(scrollUpCommand, ScrollUpCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(scrollDownCommand, ScrollDownCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(keyboardSelectorUpCommand, KeyboardSelectorUpCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(keyboardSelectorDownCommand, KeyboardSelectorDownCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(keyboardSelectorLeftCommand, KeyboardSelectorLeftCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(keyboardSelectorRightCommand, KeyboardSelectorRightCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(pressKeyboardKeyCommand, PressKeyboardKeyCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(lockKeyboardKeyCommand, LockKeyboardKeyCommandHandler, 1, NULL);
 
     // initialize indicator default position
     int right = 0, bottom = 0;
@@ -3018,7 +3231,7 @@ PLUGIN_API void XPluginStop(void)
     XPLMUnregisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(trimModifierCommand, TrimModifierCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(toggleBetaOrToggleReverseCommand, ToggleBetaOrToggleReverseCommandHandler, 1, NULL);
-    XPLMUnregisterCommandHandler(toggleMousePointerControlCommand, ToggleMousePointerControlCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(toggleMousePointerControlCommand, ToggleMouseOrKeyboardControlCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(pushToTalkCommand, PushToTalkCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommandHandler, 1, NULL);
 
