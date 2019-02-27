@@ -301,7 +301,7 @@
 #define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE "/mixture_control_modifier"
 #define COWL_FLAP_MODIFIER_COMMAND NAME_LOWERCASE "/cowl_flap_modifier"
 #define TRIM_MODIFIER_COMMAND NAME_LOWERCASE "/trim_modifier"
-#define TRIM_RESET_COMMAND_NAME_LOWERCASE "/trim_reset"
+#define TRIM_RESET_COMMAND NAME_LOWERCASE "/trim_reset"
 #define TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND NAME_LOWERCASE "/toggle_beta_or_toggle_reverse"
 #define TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_or_keyboard_control"
 #define PUSH_TO_TALK_COMMAND NAME_LOWERCASE "/push_to_talk"
@@ -310,12 +310,12 @@
 #define TOGGLE_RIGHT_MOUSE_BUTTON_COMMAND NAME_LOWERCASE "/toggle_right_mouse_button"
 #define SCROLL_UP_COMMAND NAME_LOWERCASE "/scroll_up"
 #define SCROLL_DOWN_COMMAND NAME_LOWERCASE "/scroll_down"
-#define KEYBOARD_SELECTOR_UP_COMMAND "/keyboard_selector_up"
-#define KEYBOARD_SELECTOR_DOWN_COMMAND "/keyboard_selector_down"
-#define KEYBOARD_SELECTOR_LEFT_COMMAND "/keyboard_selector_left"
-#define KEYBOARD_SELECTOR_RIGHT_COMMAND "/keyboard_selector_right"
-#define PRESS_KEYBOARD_KEY_COMMAND "/press_keyboard_key"
-#define LOCK_KEYBOARD_KEY_COMMAND "/lock_keyboard_key"
+#define KEYBOARD_SELECTOR_UP_COMMAND NAME_LOWERCASE "/keyboard_selector_up"
+#define KEYBOARD_SELECTOR_DOWN_COMMAND NAME_LOWERCASE "/keyboard_selector_down"
+#define KEYBOARD_SELECTOR_LEFT_COMMAND NAME_LOWERCASE "/keyboard_selector_left"
+#define KEYBOARD_SELECTOR_RIGHT_COMMAND NAME_LOWERCASE "/keyboard_selector_right"
+#define PRESS_KEYBOARD_KEY_COMMAND NAME_LOWERCASE "/press_keyboard_key"
+#define LOCK_KEYBOARD_KEY_COMMAND NAME_LOWERCASE "/lock_keyboard_key"
 
 // define auto-center view limit
 #define AUTO_CENTER_VIEW_DISTANCE_LIMIT 0.03f
@@ -338,39 +338,50 @@
 #define INDICATOR_LEVER_WIDTH 16
 #define INDICATOR_LEVER_HEIGHT 120
 
+// define key size
+#define KEY_BASE_SIZE 55
+
 // define dualshock 4 touchpad stuff
 #define TOUCHPAD_MAX_DELTA 150
 #define TOUCHPAD_CURSOR_SENSITIVITY 1.0f
 #define TOUCHPAD_SCROLL_SENSITIVITY 0.1f
 
 // fragment-shader code
-#define FRAGMENT_SHADER "#version 130\n"\
-                        "uniform float throttle;"\
-                        "uniform float prop;"\
-                        "uniform float mixture;"\
-                        "uniform vec4 bounds;"\
-                        "void main()"\
-                        "{"\
-                            "vec2 size = vec2(bounds.z - bounds.x, bounds.y - bounds.w);"\
-                            "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.1);"\
-                            "if (round(gl_FragCoord.x) == round(bounds.x) || round(gl_FragCoord.x) == round(bounds.z) || round(gl_FragCoord.y) == round(bounds.y) || round(gl_FragCoord.y) == round(bounds.w) || round(mod(gl_FragCoord.y - bounds.w, (size.y / 4.0))) == 0)"\
-                                "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.5);"\
-                            "else"\
-                            "{"\
-                                "float segments = 3.0;"\
-                                "if (prop < -0.5)"\
-                                    "segments -= 1.0;"\
-                                "if (mixture < -0.5)"\
-                                    "segments -= 1.0;"\
-                                "float segmentWidth = size.x / segments;"\
-                                "if (gl_FragCoord.x < bounds.z - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"\
-                                    "gl_FragColor = vec4(0.0, 0.0, 0.0, 0.5);"\
-                                "else if (gl_FragCoord.x >= bounds.z - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"\
-                                    "gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);"\
-                                "else if (gl_FragCoord.x >= bounds.z - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + bounds.w + 1.0)"\
-                                    "gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);"\
-                            "}"\
+#define FRAGMENT_SHADER "#version 130\n"                                                                                                                                                                                                                                  \
+                        "uniform float throttle;"                                                                                                                                                                                                                         \
+                        "uniform float prop;"                                                                                                                                                                                                                             \
+                        "uniform float mixture;"                                                                                                                                                                                                                          \
+                        "uniform vec4 bounds;"                                                                                                                                                                                                                            \
+                        "void main()"                                                                                                                                                                                                                                     \
+                        "{"                                                                                                                                                                                                                                               \
+                        "vec2 size = vec2(bounds.z - bounds.x, bounds.y - bounds.w);"                                                                                                                                                                                     \
+                        "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.1);"                                                                                                                                                                                                        \
+                        "if (round(gl_FragCoord.x) == round(bounds.x) || round(gl_FragCoord.x) == round(bounds.z) || round(gl_FragCoord.y) == round(bounds.y) || round(gl_FragCoord.y) == round(bounds.w) || round(mod(gl_FragCoord.y - bounds.w, (size.y / 4.0))) == 0)" \
+                        "gl_FragColor = vec4(1.0, 1.0, 1.0, 0.5);"                                                                                                                                                                                                        \
+                        "else"                                                                                                                                                                                                                                            \
+                        "{"                                                                                                                                                                                                                                               \
+                        "float segments = 3.0;"                                                                                                                                                                                                                           \
+                        "if (prop < -0.5)"                                                                                                                                                                                                                                \
+                        "segments -= 1.0;"                                                                                                                                                                                                                                \
+                        "if (mixture < -0.5)"                                                                                                                                                                                                                             \
+                        "segments -= 1.0;"                                                                                                                                                                                                                                \
+                        "float segmentWidth = size.x / segments;"                                                                                                                                                                                                         \
+                        "if (gl_FragCoord.x < bounds.z - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"                                                                                                               \
+                        "gl_FragColor = vec4(0.0, 0.0, 0.0, 0.5);"                                                                                                                                                                                                        \
+                        "else if (gl_FragCoord.x >= bounds.z - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"                                             \
+                        "gl_FragColor = vec4(0.0, 0.0, 1.0, 0.5);"                                                                                                                                                                                                        \
+                        "else if (gl_FragCoord.x >= bounds.z - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + bounds.w + 1.0)"                                                                                                                             \
+                        "gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);"                                                                                                                                                                                                        \
+                        "}"                                                                                                                                                                                                                                               \
                         "}"
+
+#if IBM
+#define KEY_CODE_0 1
+#elif APL
+#define KEY_CODE_0 2
+#elif LIN
+#define KEY_CODE_0 3
+#endif
 
 // define controller types
 typedef enum
@@ -410,6 +421,29 @@ typedef enum
     DONE
 } ConfigurationStep;
 
+typedef enum
+{
+    UP,
+    DOWN,
+    LOCKED
+} KeyState;
+
+struct KeyboardKey
+{
+    const char* title;
+    void *code;
+    int width;
+    KeyState state;
+};
+
+static KeyboardKey InitKeyboardKey(const char *title, void *code, float widthFactor = 1.0f)
+{
+    int width = (int) KEY_BASE_SIZE * widthFactor;
+
+    KeyboardKey key = {title, code, width, UP};
+    return key;
+}
+
 // define xinput state structure
 #if IBM
 struct XInputState
@@ -426,18 +460,24 @@ struct XInputState
 #endif
 
 // global internal variables
-static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0;
+static const KeyboardKey keyboardRows[][3] = {
+    {InitKeyboardKey("1", (void *)KEY_CODE_0), InitKeyboardKey("2", (void *)KEY_CODE_0)},
+    {InitKeyboardKey("Q", (void *)KEY_CODE_0), InitKeyboardKey("W", (void *)KEY_CODE_0, 0.5f)},
+    {InitKeyboardKey("Space", (void *)KEY_CODE_0, 4.0f)},
+    {InitKeyboardKey("Y", (void *)KEY_CODE_0), InitKeyboardKey("X", (void *)KEY_CODE_0), InitKeyboardKey("C", (void *)KEY_CODE_0)}
+};
+static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0, keyboardSelectorX = 0, keyboardSelectorY = 0, keyboardRight = 0, keyboardBottom = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
 static ConfigurationStep configurationStep = START;
 static GLuint program = 0, fragmentShader = 0;
-static std::stack <int*> buttonAssignmentsStack;
-static XPLMWindowID indicatorsWindow = NULL;
+static std::stack<int *> buttonAssignmentsStack;
+static XPLMWindowID indicatorsWindow = NULL, keyboardWindow = NULL;
 
 #if IBM
 static HINSTANCE hGetProcIDDLL = NULL;
-typedef int(__stdcall * pICFUNC) (int, XInputState&);
+typedef int(__stdcall *pICFUNC)(int, XInputState &);
 pICFUNC XInputGetStateEx = NULL;
 static HANDLE hidDeviceThread = 0;
 #elif APL
@@ -463,7 +503,7 @@ static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL,
 // push the current button assignments to the stack
 static void PushButtonAssignments(void)
 {
-    int *joystickButtonAssignments = (int*) malloc(sizeof(int) * 1600);
+    int *joystickButtonAssignments = (int *)malloc(sizeof(int) * 1600);
 
     XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
     buttonAssignmentsStack.push(joystickButtonAssignments);
@@ -495,12 +535,12 @@ static int Has2DPanel(void)
 
     // search the '.acf' file for a special string which indicates that the aircraft shows the 3D cockpit object in the 2D forward panel view
     FILE *file = fopen(path, "r");
-    if(file != NULL)
+    if (file != NULL)
     {
         char temp[512];
-        while(fgets(temp, 512, file) != NULL)
+        while (fgets(temp, 512, file) != NULL)
         {
-            if((strstr(temp, ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS)) != NULL)
+            if ((strstr(temp, ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS)) != NULL)
             {
                 has2DPanel = 0;
                 break;
@@ -636,11 +676,11 @@ static int ResetSwitchViewCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
             int joystickButtonAssignments[1600];
             XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/view/chase");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/view/forward_with_hud");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/view/chase");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/view/forward_with_hud");
             int has2DPanel = Has2DPanel();
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(has2DPanel ? "sim/view/forward_with_2d_panel" : "sim/view/3d_cockpit_cmnd_look");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand(has2DPanel ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_2d_panel");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand(has2DPanel ? "sim/view/forward_with_2d_panel" : "sim/view/3d_cockpit_cmnd_look");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand(has2DPanel ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_2d_panel");
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         }
@@ -689,7 +729,7 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCo
             // toggle speedbrake
             if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
             {
-                float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f
+                float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
             }
             beginTime = 0.0f;
@@ -704,7 +744,7 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler(XPLMCommandRef inCo
 
             if (acfNumEngines > 0)
             {
-                float* carbHeatRatio = (float*) malloc(acfNumEngines * sizeof(float));
+                float *carbHeatRatio = (float *)malloc(acfNumEngines * sizeof(float));
                 XPLMGetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
 
                 float newCarbHeatRatio = carbHeatRatio[0] <= 0.5f ? 1.0f : 0.0f;
@@ -730,7 +770,7 @@ static int IsDefaultB738(void)
 }
 
 // check if a plugin with a given signature is enabled
-static int IsPluginEnabled(const char* pluginSignature)
+static int IsPluginEnabled(const char *pluginSignature)
 {
     XPLMPluginID pluginId = XPLMFindPluginBySignature(pluginSignature);
 
@@ -906,18 +946,18 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             int joystickButtonAssignments[1600];
             XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/general/left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/general/right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand("sim/general/up");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand("sim/general/down");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t) XPLMFindCommand("sim/general/rot_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t) XPLMFindCommand("sim/general/rot_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t) XPLMFindCommand("sim/general/forward");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t) XPLMFindCommand("sim/general/backward");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand("sim/general/up");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("sim/general/down");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/rot_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/rot_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand("sim/general/forward");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand("sim/general/backward");
 
             // assign push-to-talk controls
             if (controllerType == DS4)
-                joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t) XPLMFindCommand(PUSH_TO_TALK_COMMAND);
+                joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand(PUSH_TO_TALK_COMMAND);
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
@@ -1012,39 +1052,39 @@ static int TrimModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         // custom handling for DreamFoil AS350
         if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE))
         {
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t) XPLMFindCommand(TRIM_RESET_COMMAND_NAME_LOWERCASE);
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_RESET_COMMAND);
 
             XPLMCommandBegin(XPLMFindCommand("AS350/Trim/Force_Trim"));
         }
         // custom handling for DreamFoil B407
         else if (IsPluginEnabled(DREAMFOIL_B407_PLUGIN_SIGNATURE))
         {
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t) XPLMFindCommand(TRIM_RESET_COMMAND_NAME_LOWERCASE);
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_RESET_COMMAND);
 
             XPLMCommandBegin(XPLMFindCommand("B407/flight_controls/force_trim"));
         }
         // custom handling for RotorSim EC135
         else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE))
         {
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_fwd");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand("ec135/autopilot/beep_aft");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("ec135/autopilot/beep_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("ec135/autopilot/beep_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand("ec135/autopilot/beep_fwd");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("ec135/autopilot/beep_aft");
         }
         // default handling
         else
         {
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/aileron_trim_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_down");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand("sim/flight_controls/pitch_trim_up");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/rudder_trim_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t) XPLMFindCommand(TRIM_RESET_COMMAND_NAME_LOWERCASE);
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/aileron_trim_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/aileron_trim_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand("sim/flight_controls/pitch_trim_down");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("sim/flight_controls/pitch_trim_up");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_RESET_COMMAND);
         }
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
@@ -1178,19 +1218,19 @@ static void ToggleMouseButton(MouseButton button, int down, void *display = NULL
 #elif LIN
     if (display != NULL)
     {
-        XTestFakeButtonEvent((Display*) display, button == LEFT ? 1 : 3, !down ? False : True, CurrentTime);
-        XFlush((Display*) display);
+        XTestFakeButtonEvent((Display *)display, button == LEFT ? 1 : 3, !down ? False : True, CurrentTime);
+        XFlush((Display *)display);
     }
 #endif
 }
 
 static void HandleToggleMouseButtonCommand(XPLMCommandPhase phase, MouseButton button)
 {
-    if (inPhase != xplm_CommandContinue)
+    if (phase != xplm_CommandContinue)
 #if LIN
-        ToggleMouseButton(button, inCommand == xplm_CommandBegin, display);
+        ToggleMouseButton(button, phase == xplm_CommandBegin, display);
 #else
-        ToggleMouseButton(button, inCommand == xplm_CommandBegin);
+        ToggleMouseButton(button, phase == xplm_CommandBegin);
 #endif
 }
 
@@ -1206,12 +1246,45 @@ static int ToggleRightMouseButtonCommandHandler(XPLMCommandRef inCommand, XPLMCo
     return 0;
 }
 
+// scroll up or down
+static void Scroll(int clicks, void *display = NULL)
+{
+    if (clicks == 0)
+        return;
+
+#if IBM
+    INPUT input[1];
+    input[0].type = INPUT_MOUSE;
+    input[0].mi.mouseData = clicks * WHEEL_DELTA;
+    input[0].mi.dwFlags = MOUSEEVENTF_WHEEL;
+    SendInput((UINT)1, input, sizeof(INPUT));
+#elif APL
+    CGEventRef event = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, clicks);
+    CGEventPost(kCGHIDEventTap, event);
+    if (event != NULL)
+        CFRelease(event);
+#elif LIN
+    if (display != NULL)
+    {
+        int button = clicks > 0 ? 4 : 5;
+
+        for (int i = 0; i < abs(clicks); i++)
+        {
+            XTestFakeButtonEvent((Display *)display, button, True, CurrentTime);
+            XTestFakeButtonEvent((Display *)display, button, False, CurrentTime);
+        }
+
+        XFlush((Display *)display);
+    }
+#endif
+}
+
 static void HandleScrollCommand(XPLMCommandPhase phase, int clicks)
 {
     static float lastScrollTime = 0.0f;
     float currentTime = XPLMGetElapsedTime();
 
-    if (inPhase == xplm_CommandBegin || currentTime - lastScrollTime >= 0.1f)
+    if (phase == xplm_CommandBegin || currentTime - lastScrollTime >= 0.1f)
     {
 #if LIN
         Scroll(clicks, display);
@@ -1233,6 +1306,8 @@ static int ScrollDownCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
     HandleScrollCommand(inPhase, -1);
     return 0;
 }
+
+static void ToggleKeyboardControl(void);
 
 static void ToggleMouseControl(void)
 {
@@ -1261,10 +1336,10 @@ static void ToggleMouseControl(void)
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = toggleLeftMouseButtonCommand;
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = toggleRightMouseButtonCommand;
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = scrollUpCommand;
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = scrollDownCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(TOGGLE_LEFT_MOUSE_BUTTON_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand(TOGGLE_RIGHT_MOUSE_BUTTON_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand(SCROLL_UP_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand(SCROLL_DOWN_COMMAND);
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
@@ -1303,36 +1378,44 @@ static int KeyboardSelectorUpCommandHandler(XPLMCommandRef inCommand, XPLMComman
     if (keyboardSelectorY > 0)
         keyboardSelectorY--;
     else
-        keyboardSelector = sizeof(keyboardRows) / sizeof KeyboardKey* - 1;
+        keyboardSelectorY = (int)sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1;
+
+    return 0;
 }
 
 static int KeyboardSelectorDownCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-     if (keyboardSelectorY < sizeof(keyboardRows) / sizeof KeyboardKey* - 1)
+    if (keyboardSelectorY < (int)(sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1))
         keyboardSelectorY++;
-     else
+    else
         keyboardSelectorY = 0;
+
+    return 0;
 }
 
 static int KeyboardSelectorLeftCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-     if (keyboardSelectorX > 0)
-         keyboardSelectorX--;
-     else
-     {
-         KeyboardKey *row = keyboardRows[keyboardSelectorY];
-         keyboardSlectorX = sizeof(row) / sizeof KeyboardKey - 1;
-     }
+    if (keyboardSelectorX > 0)
+        keyboardSelectorX--;
+    else
+    {
+        const KeyboardKey *row = keyboardRows[keyboardSelectorY];
+        keyboardSelectorX = (int)(sizeof(row) / sizeof(KeyboardKey) - 1);
+    }
+
+    return 0;
 }
 
 static int KeyboardSelectorRightCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-     KeyboardKey *row = keyboardRows[keyboardSelectorY];
+    const KeyboardKey *row = keyboardRows[keyboardSelectorY];
 
-     if (keyboardSelectorX < sizeof(row) / sizeof KeyboardKey - 1)
+    if (keyboardSelectorX < (int)(sizeof(row) / sizeof(KeyboardKey) - 1))
         keyboardSelectorX++;
-     else
+    else
         keyboardSelectorX = 0;
+
+    return 0;
 }
 
 static void SetKeyState(void *code, KeyState state)
@@ -1348,7 +1431,7 @@ static int PressKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandP
 
         if (inPhase == xplm_CommandBegin)
         {
-            if(key.state == LOCKED)
+            if (key.state == LOCKED)
             {
                 SetKeyState(key.code, UP);
                 key.state = UP;
@@ -1375,7 +1458,7 @@ static int LockKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
     {
         KeyboardKey key = keyboardRows[keyboardSelectorY][keyboardSelectorX];
 
-        if(key.state == LOCKED)
+        if (key.state == LOCKED)
         {
             SetKeyState(key.code, UP);
             key.state = UP;
@@ -1387,6 +1470,147 @@ static int LockKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
         }
     }
 
+    return 0;
+}
+
+static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
+{
+    XPLMSetGraphicsState(0, 0, 0, 0, 1, 0, 0);
+
+    int l = 0, t = 0, r = 0, b = 0;
+    XPLMGetWindowGeometry(keyboardWindow, &l, &t, &r, &b);
+
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f);
+    glVertex2f((GLfloat)l, (GLfloat)b);
+    glTexCoord2f(0.0f, 1.0f);
+    glVertex2f((GLfloat)l, (GLfloat)t);
+    glTexCoord2f(1.0f, 1.0f);
+    glVertex2f((GLfloat)r, (GLfloat)t);
+    glTexCoord2f(1.0f, 0.0f);
+    glVertex2f((GLfloat)r, (GLfloat)b);
+    glEnd();
+}
+
+static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus)
+{
+}
+
+// modifies the supplied window bounds accordingly to ensure they are within the global screen bounds
+static void FitGeometryWithinScreenBounds(int *left, int *top, int *right, int *bottom)
+{
+    int minLeft = 0, maxTop = 0, maxRight = 0, minBottom = 0;
+    XPLMGetScreenBoundsGlobal(&minLeft, &maxTop, &maxRight, &minBottom);
+
+    int leftOverflow = minLeft - *left;
+    if (leftOverflow > 0)
+    {
+        *left = minLeft;
+        *right += leftOverflow;
+    }
+
+    int topOverflow = maxTop - *top;
+    if (topOverflow < 0)
+    {
+        *top = maxTop;
+        *bottom += topOverflow;
+    }
+
+    int rightOverflow = maxRight - *right;
+    if (rightOverflow < 0)
+    {
+        *right = maxRight;
+        *left += rightOverflow;
+    }
+
+    int bottomOverflow = minBottom - *bottom;
+    if (bottomOverflow > 0)
+    {
+        *bottom = minBottom;
+        *top += bottomOverflow;
+    }
+}
+
+// saves current settings to the config file
+static void SaveSettings(void)
+{
+    std::fstream file;
+    file.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
+
+    if (file.is_open())
+    {
+        file << "controllerType=" << controllerType << std::endl;
+        file << "axisOffset=" << axisOffset << std::endl;
+        file << "buttonOffset=" << buttonOffset << std::endl;
+        file << "showIndicators=" << showIndicators << std::endl;
+        file << "indicatorsRight=" << indicatorsRight << std::endl;
+        file << "indicatorsBottom=" << indicatorsBottom << std::endl;
+
+        file.close();
+    }
+}
+
+// handles the dragging of the indicators window and storing its position
+static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
+{
+    static int lastX = -1, lastY = -1;
+
+    switch (inMouse)
+    {
+    case xplm_MouseDrag:
+        if (lastX > 0 && lastY > 0)
+        {
+            int *right, *bottom;
+            if (inWindowID == indicatorsWindow)
+            {
+                right = &indicatorsRight;
+                bottom = &indicatorsBottom;
+            }
+            else if (inWindowID == keyboardWindow)
+            {
+                right = &keyboardRight;
+                bottom = &keyboardBottom;
+            }
+            else
+                return 0;
+
+            int left = 0, top = 0;
+            XPLMGetWindowGeometry(inWindowID, &left, &top, right, bottom);
+
+            int deltaX = x - lastX;
+            int deltaY = y - lastY;
+
+            left += deltaX;
+            top += deltaY;
+            indicatorsRight += deltaX;
+            indicatorsBottom += deltaY;
+
+            FitGeometryWithinScreenBounds(&left, &top, right, bottom);
+            XPLMSetWindowGeometry(inWindowID, left, top, *right, *bottom);
+        }
+    case xplm_MouseDown:
+        lastX = x;
+        lastY = y;
+        break;
+    case xplm_MouseUp:
+        lastX = lastY = -1;
+        SaveSettings();
+        break;
+    default:
+        break;
+    }
+
+    return 1;
+}
+
+static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon)
+{
+    return xplm_CursorArrow;
+}
+
+static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, int clicks, void *inRefcon)
+{
     return 0;
 }
 
@@ -1410,21 +1634,52 @@ static void ToggleKeyboardControl(void)
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = keyboardSelectorUpCommand;
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = keyboardSelectorDownCommand;
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = keyboardSelectorLeftCommand;
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = keyboardSelectorRightCommand;
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = pressKeyboardKeyCommand;
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = lockKeyboardKeyCommand;
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand(KEYBOARD_SELECTOR_UP_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand(KEYBOARD_SELECTOR_DOWN_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand(KEYBOARD_SELECTOR_LEFT_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand(KEYBOARD_SELECTOR_RIGHT_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(PRESS_KEYBOARD_KEY_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand(LOCK_KEYBOARD_KEY_COMMAND);
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        if (keyboardWindow == NULL)
+        {
+            XPLMCreateWindow_t keyboardWindowParameters;
+            keyboardWindowParameters.structSize = sizeof keyboardWindowParameters;
+            keyboardWindowParameters.top = keyboardBottom + 600;
+            keyboardWindowParameters.left = keyboardRight - 1024;
+            keyboardWindowParameters.right = keyboardRight;
+            keyboardWindowParameters.bottom = keyboardBottom;
+            FitGeometryWithinScreenBounds(&keyboardWindowParameters.left, &keyboardWindowParameters.top, &keyboardWindowParameters.right, &keyboardWindowParameters.bottom);
+            keyboardWindowParameters.visible = 1;
+            keyboardWindowParameters.drawWindowFunc = DrawKeyboardWindow;
+            keyboardWindowParameters.handleKeyFunc = HandleKey;
+            keyboardWindowParameters.handleMouseClickFunc = HandleMouseClick;
+            keyboardWindowParameters.handleCursorFunc = HandleCursor;
+            keyboardWindowParameters.handleMouseWheelFunc = HandleMouseWheel;
+            keyboardWindowParameters.decorateAsFloatingWindow = xplm_WindowDecorationSelfDecorated;
+            keyboardWindowParameters.layer = xplm_WindowLayerFloatingWindows;
+            keyboardWindowParameters.handleRightClickFunc = HandleMouseClick;
+            keyboardWindow = XPLMCreateWindowEx(&keyboardWindowParameters);
+        }
+        else
+            XPLMSetWindowIsVisible(keyboardWindow, 1);
     }
     else if (mode == KEYBOARD)
     {
-        // TODO: release all keys that are still down
+        // release all keys that are still down
+        for (int y = 0; y < (int)(sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1); y++)
+        {
+                const KeyboardKey *row = keyboardRows[keyboardSelectorY];
+                for (int x = 0; x < (int)(sizeof(row) / sizeof(KeyboardKey) - 1); x++)
+                    SetKeyState((void*) row[x].code, UP);
+        }
 
         // restore the default button assignments
         PopButtonAssignments();
+
+        XPLMSetWindowIsVisible(keyboardWindow, 0);
 
         mode = DEFAULT;
     }
@@ -1465,39 +1720,6 @@ static int ToggleMouseOrKeyboardControlCommandHandler(XPLMCommandRef inCommand, 
     return 0;
 }
 
-// scroll up or down
-static void Scroll(int clicks, void *display = NULL)
-{
-    if (clicks == 0)
-        return;
-
-#if IBM
-    INPUT input[1];
-    input[0].type = INPUT_MOUSE;
-    input[0].mi.mouseData = clicks * WHEEL_DELTA;
-    input[0].mi.dwFlags = MOUSEEVENTF_WHEEL;
-    SendInput((UINT)1, input, sizeof(INPUT));
-#elif APL
-    CGEventRef event = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, clicks);
-    CGEventPost(kCGHIDEventTap, event);
-    if (event != NULL)
-        CFRelease(event);
-#elif LIN
-    if (display != NULL)
-    {
-        int button = clicks > 0 ? 4 : 5;
-
-        for (int i = 0; i < abs(clicks); i++)
-        {
-            XTestFakeButtonEvent((Display*) display, button, True, CurrentTime);
-            XTestFakeButtonEvent((Display*) display, button, False, CurrentTime);
-        }
-
-        XFlush((Display*) display);
-    }
-#endif
-}
-
 // command-handler that handles the push-to-talk command
 static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
@@ -1513,7 +1735,7 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
 #if IBM
             INPUT input[1];
             input[0].type = INPUT_KEYBOARD;
-            input[0].ki.wScan = (WORD) 24;
+            input[0].ki.wScan = (WORD)24;
             DWORD flags;
             if (inPhase == xplm_CommandBegin)
                 flags = KEYEVENTF_SCANCODE;
@@ -1521,10 +1743,10 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
                 flags = KEYEVENTF_KEYUP | KEYEVENTF_SCANCODE;
             input[0].ki.dwFlags = flags;
 
-            SendInput((UINT) 1, input, sizeof(INPUT));
+            SendInput((UINT)1, input, sizeof(INPUT));
 #elif APL
             static CGEventSourceRef eventSource = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-            CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode) kVK_ANSI_O, inPhase == xplm_CommandBegin);
+            CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode)kVK_ANSI_O, inPhase == xplm_CommandBegin);
             CGEventPost(kCGHIDEventTap, event);
             if (event != NULL)
                 CFRelease(event);
@@ -1615,11 +1837,11 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
 #if IBM
     INPUT input[1];
     input[0].type = INPUT_MOUSE;
-    input[0].mi.dx = (long) distX;
-    input[0].mi.dy = (long) distY;
+    input[0].mi.dx = (long)distX;
+    input[0].mi.dy = (long)distY;
     input[0].mi.dwFlags = MOUSEEVENTF_MOVE;
 
-    SendInput((UINT) 1, input, sizeof(INPUT));
+    SendInput((UINT)1, input, sizeof(INPUT));
 #elif APL
     // get current mouse pointer location
     CGEventRef getLocationEvent = CGEventCreate(NULL);
@@ -1639,7 +1861,7 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
     // get display ids of the display on which the mouse pointer was contained before and will be once moved - values of -1 indicate that the pointer is outside of all displays
     int oldContainingDisplay = -1;
     int newContainingDisplay = -1;
-    for (int i = 0; i < (int) displayCount; i++)
+    for (int i = 0; i < (int)displayCount; i++)
     {
         CGRect screenBounds = CGDisplayBounds(activeDisplays[i]);
 
@@ -1654,10 +1876,10 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
     if (newContainingDisplay == -1 && oldContainingDisplay > -1)
     {
         CGRect screenBounds = CGDisplayBounds(activeDisplays[oldContainingDisplay]);
-        int minX = (int) screenBounds.origin.x;
-        int minY = (int) screenBounds.origin.y;
-        int maxX = (int) minX + screenBounds.size.width - 1;
-        int maxY = (int) minY + screenBounds.size.height - 1;
+        int minX = (int)screenBounds.origin.x;
+        int minY = (int)screenBounds.origin.y;
+        int maxX = (int)minX + screenBounds.size.width - 1;
+        int maxY = (int)minY + screenBounds.size.height - 1;
 
         newLocation.x = newLocation.x >= minX ? newLocation.x : minX;
         newLocation.x = newLocation.x <= maxX ? newLocation.x : maxX;
@@ -1673,8 +1895,8 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
 #elif LIN
     if (display != NULL)
     {
-        XWarpPointer((Display*) display, None, None, 0, 0, 0, 0, distX, distY);
-        XFlush((Display*) display);
+        XWarpPointer((Display *)display, None, None, 0, 0, 0, 0, distX, distY);
+        XFlush((Display *)display);
     }
 #endif
 }
@@ -1696,10 +1918,10 @@ static void DeviceThreadCleanup(hid_device *handle, hid_device_info *dev)
 #if IBM
 static void DeviceThread(void *argument)
 #elif APL
-static void* DeviceThread(void *argument)
+static void *DeviceThread(void *argument)
 #endif
 {
-    struct hid_device_info *dev = (hid_device_info*) argument;
+    struct hid_device_info *dev = (hid_device_info *)argument;
     hid_device *handle = hid_open(dev->vendor_id, dev->product_id, dev->serial_number);
     if (handle == NULL)
     {
@@ -1707,7 +1929,7 @@ static void* DeviceThread(void *argument)
 #if IBM
         return;
 #elif APL
-        return (void*) 1;
+        return (void *)1;
 #endif
     }
 
@@ -1722,7 +1944,7 @@ static void* DeviceThread(void *argument)
 #if IBM
             return;
 #elif APL
-            return (void*) 1;
+            return (void *)1;
 #endif
         }
 
@@ -1758,14 +1980,14 @@ static void* DeviceThread(void *argument)
             int distX = 0, distY = 0;
 
             if (prevX1 > 0 && abs(dX1) < TOUCHPAD_MAX_DELTA)
-                distX = (int) (dX1 * TOUCHPAD_CURSOR_SENSITIVITY);
+                distX = (int)(dX1 * TOUCHPAD_CURSOR_SENSITIVITY);
             if (prevY1 > 0 && abs(dY1) < TOUCHPAD_MAX_DELTA)
-                distY = (int) (dY1 * TOUCHPAD_CURSOR_SENSITIVITY);
+                distY = (int)(dY1 * TOUCHPAD_CURSOR_SENSITIVITY);
 
             MoveMousePointer(distX, distY);
         }
         else if (prevY1 > 0 && abs(dY1) < TOUCHPAD_MAX_DELTA)
-            scrollClicks = (int) (-dY1 * TOUCHPAD_SCROLL_SENSITIVITY);
+            scrollClicks = (int)(-dY1 * TOUCHPAD_SCROLL_SENSITIVITY);
 
         Scroll(scrollClicks);
 
@@ -1781,7 +2003,7 @@ static void* DeviceThread(void *argument)
 #if IBM
     _endthread();
 #elif APL
-    return (void*) 0;
+    return (void *)0;
 #endif
 }
 #endif
@@ -1789,55 +2011,36 @@ static void* DeviceThread(void *argument)
 // updates all caption widgets and slider positions associated with settings variables
 static void UpdateSettingsWidgets(void)
 {
-    XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, (int) (controllerType == XBOX360));
-    XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, (int) (controllerType == DS4));
+    XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, (int)(controllerType == XBOX360));
+    XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, (int)(controllerType == DS4));
 
     const char *configurationStatusString;
     switch (configurationStep)
     {
-        case START:
-            configurationStatusString = "Click 'Start Configuration' to configure X-Plane for the selected controller type.";
-            break;
-        case AXES:
-            configurationStatusString = "Move the right stick of your controller up and down.";
-            break;
-        case BUTTONS:
-            configurationStatusString = "Now press and release the 'X'-Button on your controller.";
-            break;
-        case DONE:
-            configurationStatusString = "Success! Your controller is now fully configured.";
-            break;
-        case ABORT:
-            configurationStatusString = "Configuration aborted!";
-            break;
-        default:
-            break;
+    case START:
+        configurationStatusString = "Click 'Start Configuration' to configure X-Plane for the selected controller type.";
+        break;
+    case AXES:
+        configurationStatusString = "Move the right stick of your controller up and down.";
+        break;
+    case BUTTONS:
+        configurationStatusString = "Now press and release the 'X'-Button on your controller.";
+        break;
+    case DONE:
+        configurationStatusString = "Success! Your controller is now fully configured.";
+        break;
+    case ABORT:
+        configurationStatusString = "Configuration aborted!";
+        break;
+    default:
+        break;
     }
     XPSetWidgetDescriptor(configurationStatusCaption, configurationStatusString);
     XPSetWidgetProperty(configurationStatusCaption, xpProperty_CaptionLit, configurationStep != START);
-    
+
     XPSetWidgetDescriptor(startConfigurationtButton, configurationStep == AXES || configurationStep == BUTTONS ? "Abort Configuration" : "Start Configuration");
 
     XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, showIndicators);
-}
-
-// saves current settings to the config file
-static void SaveSettings(void)
-{
-    std::fstream file;
-    file.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
-
-    if (file.is_open())
-    {
-        file << "controllerType=" << controllerType << std::endl;
-        file << "axisOffset=" << axisOffset << std::endl;
-        file << "buttonOffset=" << buttonOffset << std::endl;
-        file << "showIndicators=" << showIndicators << std::endl;
-        file << "indicatorsRight=" << indicatorsRight << std::endl;
-        file << "indicatorsBottom=" << indicatorsBottom << std::endl;
-
-        file.close();
-    }
 }
 
 // set the default axis and button assignments
@@ -1875,34 +2078,34 @@ static void SetDefaultAssignments(void)
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_up");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t) XPLMFindCommand("sim/flight_controls/flaps_down");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t) XPLMFindCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t) XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_UP)] = (std::size_t) XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_DOWN)] = (std::size_t) XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_UP)] = (std::size_t) XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_DOWN)] = (std::size_t) XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t) XPLMFindCommand(CYCLE_RESET_VIEW_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t) XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t) XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t) XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t) XPLMFindCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t) XPLMFindCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (std::size_t) XPLMFindCommand(TRIM_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t) XPLMFindCommand(VIEW_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT)] = (std::size_t) XPLMFindCommand("sim/general/zoom_out");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT)] = (std::size_t) XPLMFindCommand("sim/general/zoom_in");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/flaps_up");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/flaps_down");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_UP)] = (std::size_t)XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_DOWN)] = (std::size_t)XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_UP)] = (std::size_t)XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_DOWN)] = (std::size_t)XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand(CYCLE_RESET_VIEW_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t)XPLMFindCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t)XPLMFindCommand(VIEW_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/zoom_out");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/zoom_in");
         switch (controllerType)
         {
 #if !IBM
         case XBOX360:
-            joystickButtonAssignments[JOYSTICK_BUTTON_XBOX360_GUIDE + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
+            joystickButtonAssignments[JOYSTICK_BUTTON_XBOX360_GUIDE + buttonOffset] = (std::size_t)XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
             break;
 #endif
         case DS4:
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t) XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t) XPLMFindCommand("sim/autopilot/control_wheel_steer");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t)XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand("sim/autopilot/control_wheel_steer");
             break;
         }
 
@@ -1988,12 +2191,12 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     {
                         if (currentDev->vendor_id == 0x54C && (currentDev->product_id == 0x5C4 || currentDev->product_id == 0x9CC || currentDev->product_id == 0xBA0))
                         {
-                            struct hid_device_info *currentDevCopy = (hid_device_info*) calloc(1, sizeof(hid_device_info));
+                            struct hid_device_info *currentDevCopy = (hid_device_info *)calloc(1, sizeof(hid_device_info));
                             currentDevCopy->vendor_id = currentDev->vendor_id;
                             currentDevCopy->product_id = currentDev->product_id;
 
 #if IBM
-                            HANDLE threadHandle = (HANDLE) _beginthread(DeviceThread, 0, currentDevCopy);
+                            HANDLE threadHandle = (HANDLE)_beginthread(DeviceThread, 0, currentDevCopy);
                             if (threadHandle > 0)
                             {
                                 hidDeviceThread = threadHandle;
@@ -2022,55 +2225,55 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         int joystickButtonValues[1600];
         XPLMGetDatavi(joystickButtonValuesDataRef, joystickButtonValues, 0, 1600);
 
-        static int potentialAxes[100] = { 0 };
-        static int potentialButtons[1600] = { 0 };
+        static int potentialAxes[100] = {0};
+        static int potentialButtons[1600] = {0};
 
         switch (configurationStep)
         {
-            case AXES:
-                // we go through all axes and mark the indices of the axes with values above 0.75, if we see a previously marked axis taking a value below -0.75 we can assume it is the axis the user is moving
-                for (int i = 0; i < 100; i++)
+        case AXES:
+            // we go through all axes and mark the indices of the axes with values above 0.75, if we see a previously marked axis taking a value below -0.75 we can assume it is the axis the user is moving
+            for (int i = 0; i < 100; i++)
+            {
+                if (joystickAxisValues[i] > 0.75f)
+                    potentialAxes[i] = 1;
+                else if (potentialAxes[i])
                 {
-                    if (joystickAxisValues[i] > 0.75f)
-                        potentialAxes[i] = 1;
-                    else if (potentialAxes[i])
-                    {
-                        axisOffset = i - (controllerType == XBOX360 ? JOYSTICK_AXIS_XBOX360_RIGHT_Y : JOYSTICK_AXIS_DS4_RIGHT_Y);
-memset(potentialAxes, 0, sizeof potentialAxes);
-                        configurationStep = BUTTONS;
-                        UpdateSettingsWidgets();
-                        return -1.0f;
-                    }
+                    axisOffset = i - (controllerType == XBOX360 ? JOYSTICK_AXIS_XBOX360_RIGHT_Y : JOYSTICK_AXIS_DS4_RIGHT_Y);
+                    memset(potentialAxes, 0, sizeof potentialAxes);
+                    configurationStep = BUTTONS;
+                    UpdateSettingsWidgets();
+                    return -1.0f;
                 }
-                return -1.0f;
-            case BUTTONS:
-                // because some joysticks have buttons that are in a depressed state by default, we go through all buttons and mark the indices of the buttons that are not pressed, if we see a previously marked button getting pressed we can assume it is the button the user pressed
-                for (int i = 0; i < 1600; i++)
+            }
+            return -1.0f;
+        case BUTTONS:
+            // because some joysticks have buttons that are in a depressed state by default, we go through all buttons and mark the indices of the buttons that are not pressed, if we see a previously marked button getting pressed we can assume it is the button the user pressed
+            for (int i = 0; i < 1600; i++)
+            {
+                if (joystickButtonValues[i])
+                    potentialButtons[i] = 1;
+                else if (potentialButtons[i])
                 {
-                    if (joystickButtonValues[i])
-                        potentialButtons[i] = 1;
-                    else if (potentialButtons[i])
-                    {
-                        buttonOffset = i - (XBOX360 ? JOYSTICK_BUTTON_XBOX360_X : JOYSTICK_BUTTON_DS4_CROSS);
-                        SetDefaultAssignments();
-                        SaveSettings();
-                        memset(potentialButtons, 0, sizeof potentialButtons);
-                        configurationStep = DONE;
-                        UpdateSettingsWidgets();
-                        return -1.0f;
-                    }
+                    buttonOffset = i - (XBOX360 ? JOYSTICK_BUTTON_XBOX360_X : JOYSTICK_BUTTON_DS4_CROSS);
+                    SetDefaultAssignments();
+                    SaveSettings();
+                    memset(potentialButtons, 0, sizeof potentialButtons);
+                    configurationStep = DONE;
+                    UpdateSettingsWidgets();
+                    return -1.0f;
                 }
-                return -1.0f;
-            case ABORT:
-                // we need to cleanup the arrays in case of an abort
-                memset(potentialAxes, 0, sizeof potentialAxes);
-                memset(potentialButtons, 0, sizeof potentialButtons);
-                // we first update the window to display the aborted message
-                UpdateSettingsWidgets();
-                configurationStep = START;
-                return -1.0f;
-            default:
-                break;
+            }
+            return -1.0f;
+        case ABORT:
+            // we need to cleanup the arrays in case of an abort
+            memset(potentialAxes, 0, sizeof potentialAxes);
+            memset(potentialButtons, 0, sizeof potentialButtons);
+            // we first update the window to display the aborted message
+            UpdateSettingsWidgets();
+            configurationStep = START;
+            return -1.0f;
+        default:
+            break;
         }
 
         float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
@@ -2104,11 +2307,11 @@ memset(potentialAxes, 0, sizeof potentialAxes);
 
             if (
 #if IBM
-                    (controllerType == XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= -0.75f) ||
+                (controllerType == XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= -0.75f) ||
 #else
-                    (controllerType == XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + axisOffset] >= 0.5f) ||
+                (controllerType == XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + axisOffset] >= 0.5f) ||
 #endif
-                    (controllerType == DS4 && joystickAxisValues[JOYSTICK_AXIS_DS4_R2 + axisOffset] >= 0.5f))
+                (controllerType == DS4 && joystickAxisValues[JOYSTICK_AXIS_DS4_R2 + axisOffset] >= 0.5f))
             {
                 if (!brakeMode && mode == DEFAULT)
                 {
@@ -2117,7 +2320,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                     int joystickButtonAssignments[1600];
                     XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-                    joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t) XPLMFindCommand(TOGGLE_BRAKES_COMMAND);
+                    joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(TOGGLE_BRAKES_COMMAND);
 
                     XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
@@ -2178,7 +2381,6 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         XPLMCommandEnd(pushToTalkCommand);
                     else
                         XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
-
                 }
                 else if (!leftTriggerDown && rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] > 0.15f)
                     rightTriggerDown = 0;
@@ -2268,7 +2470,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2) and round to integer
-                        int n = (int) (powf(2.0f * d, 2.0f) + 0.5f);
+                        int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
 
                         // apply the command
                         for (int i = 0; i < n; i++)
@@ -2281,7 +2483,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2) and round to integer
-                        int n = (int) (powf(2.0f * d, 2.0f) + 0.5f);
+                        int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
 
                         // apply the command
                         for (int i = 0; i < n; i++)
@@ -2295,7 +2497,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2) and round to integer
-                        int n = (int) (powf(2.0f * d, 2.0f) + 0.5f);
+                        int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
 
                         // apply the command
                         for (int i = 0; i < n; i++)
@@ -2308,7 +2510,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2) and round to integer
-                        int n = (int) (powf(2.0f * d, 2.0f) + 0.5f);
+                        int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
 
                         // apply the command
                         for (int i = 0; i < n; i++)
@@ -2378,7 +2580,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                 }
                 else if (mode == COWL)
                 {
-                    float* cowlFlapRatio = (float*) malloc(acfNumEngines * sizeof(float));
+                    float *cowlFlapRatio = (float *)malloc(acfNumEngines * sizeof(float));
                     XPLMGetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
 
                     // decrease cowl flap setting
@@ -2422,7 +2624,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2)
-                        distX -= (int) (powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
+                        distX -= (int)(powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
                     }
                     // move mouse pointer right
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] > 0.5f + joystickPitchNullzone)
@@ -2431,7 +2633,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2)
-                        distX += (int) (powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
+                        distX += (int)(powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
                     }
 
                     // move mouse pointer up
@@ -2441,7 +2643,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2)
-                        distY -= (int) (powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
+                        distY -= (int)(powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
                     }
                     // move mouse pointer down
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
@@ -2450,7 +2652,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2)
-                        distY += (int) (powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
+                        distY += (int)(powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
                     }
 
                     // handle mouse pointer movement
@@ -2468,7 +2670,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         XPLMGetDatavf(acfMinPitchDataRef, acfMinPitch, 0, 8);
                         float acfMaxPitch[8];
                         XPLMGetDatavf(acfMaxPitchDataRef, acfMaxPitch, 0, 8);
-                        float* propPitchDeg = (float*) malloc(acfNumEngines * sizeof(float));
+                        float *propPitchDeg = (float *)malloc(acfNumEngines * sizeof(float));
                         XPLMGetDatavf(propPitchDegDataRef, propPitchDeg, 0, acfNumEngines);
 
                         for (int i = 0; i < acfNumEngines; i++)
@@ -2541,7 +2743,7 @@ memset(potentialAxes, 0, sizeof potentialAxes);
                         {
                             float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
 
-                            float* thrustReverserDeployRatio = (float*) malloc(acfNumEngines * sizeof(float));
+                            float *thrustReverserDeployRatio = (float *)malloc(acfNumEngines * sizeof(float));
 
                             XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
 
@@ -2632,7 +2834,7 @@ static void InitShader(const char *fragmentShaderString)
         GLsizei maxLength = 2048;
         GLchar *log = new GLchar[maxLength];
         glGetShaderInfoLog(fragmentShader, maxLength, &maxLength, log);
-        XPLMDebugString(NAME": The following error occured while compiling the fragment shader:\n");
+        XPLMDebugString(NAME ": The following error occured while compiling the fragment shader:\n");
         XPLMDebugString(log);
         delete[] log;
 
@@ -2649,7 +2851,7 @@ static void InitShader(const char *fragmentShaderString)
         GLsizei maxLength = 2048;
         GLchar *log = new GLchar[maxLength];
         glGetShaderInfoLog(fragmentShader, maxLength, &maxLength, log);
-        XPLMDebugString(NAME": The following error occured while linking the shader program:\n");
+        XPLMDebugString(NAME ": The following error occured while linking the shader program:\n");
         XPLMDebugString(log);
         delete[] log;
 
@@ -2704,111 +2906,24 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
     int l = 0, t = 0, r = 0, b = 0;
     XPLMGetWindowGeometry(indicatorsWindow, &l, &t, &r, &b);
     int boundsLocation = glGetUniformLocation(program, "bounds");
-    glUniform4f(boundsLocation, (GLfloat) l, (GLfloat) t, (GLfloat) r, (GLfloat) b);
+    glUniform4f(boundsLocation, (GLfloat)l, (GLfloat)t, (GLfloat)r, (GLfloat)b);
 
     glColor3f(1.0f, 1.0f, 1.0f);
     glBegin(GL_QUADS);
     glTexCoord2f(0.0f, 0.0f);
-    glVertex2f((GLfloat) l, (GLfloat) b);
+    glVertex2f((GLfloat)l, (GLfloat)b);
     glTexCoord2f(0.0f, 1.0f);
-    glVertex2f((GLfloat) l, (GLfloat) t);
+    glVertex2f((GLfloat)l, (GLfloat)t);
     glTexCoord2f(1.0f, 1.0f);
-    glVertex2f((GLfloat) r, (GLfloat) t);
+    glVertex2f((GLfloat)r, (GLfloat)t);
     glTexCoord2f(1.0f, 0.0f);
-    glVertex2f((GLfloat) r, (GLfloat) b);
+    glVertex2f((GLfloat)r, (GLfloat)b);
     glEnd();
 
     glUseProgram(0);
 }
 
-static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus)
-{
-}
-
-// modifies the supplied window bounds accordingly to ensure they are within the global screen bounds
-static void FitGeometryWithinScreenBounds(int *left, int *top, int *right, int *bottom)
-{
-    int minLeft = 0, maxTop = 0, maxRight = 0, minBottom = 0;
-    XPLMGetScreenBoundsGlobal(&minLeft, &maxTop, &maxRight, &minBottom);
-
-    int leftOverflow = minLeft - *left;
-    if (leftOverflow > 0)
-    {
-        *left = minLeft;
-        *right += leftOverflow;
-    }
-
-    int topOverflow = maxTop - *top;
-    if (topOverflow < 0)
-    {
-        *top = maxTop;
-        *bottom += topOverflow;
-    }
-
-    int rightOverflow = maxRight - *right;
-    if (rightOverflow < 0)
-    {
-        *right = maxRight;
-        *left += rightOverflow;
-    }
-
-    int bottomOverflow = minBottom - *bottom;
-    if (bottomOverflow > 0)
-    {
-        *bottom = minBottom;
-        *top += bottomOverflow;
-    }
-}
-
-// handles the dragging of the indicators window and storing its position
-static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
-{
-    static int lastX = -1, lastY = -1;
-
-    switch (inMouse) {
-       case xplm_MouseDrag:
-           if (lastX > 0 && lastY > 0)
-           {
-               int left = 0, top = 0;
-               XPLMGetWindowGeometry(inWindowID, &left, &top, &indicatorsRight, &indicatorsBottom);
-
-               int deltaX = x - lastX;
-               int deltaY = y - lastY;
-
-               left += deltaX;
-               top += deltaY;
-               indicatorsRight += deltaX;
-               indicatorsBottom += deltaY;
-
-               FitGeometryWithinScreenBounds(&left, &top, &indicatorsRight, &indicatorsBottom);
-               XPLMSetWindowGeometry(inWindowID, left, top, indicatorsRight, indicatorsBottom);
-           }
-       case xplm_MouseDown:
-           lastX = x;
-           lastY = y;
-           break;
-       case xplm_MouseUp:
-           lastX = lastY = -1;
-           SaveSettings();
-           break;
-       default:
-           break;
-    }
-
-    return 1;
-}
-
-static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon)
-{
-    return xplm_CursorArrow;
-}
-
-static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, int clicks, void *inRefcon)
-{
-    return 0;
-}
-
-static void UpdateIndicatorsWindow()
+static void UpdateIndicatorsWindow(void)
 {
     if (indicatorsWindow)
     {
@@ -2837,7 +2952,7 @@ static void UpdateIndicatorsWindow()
             if (acfPropType[i] >= 1 && acfPropType[i] <= 3)
                 numPropLevers++;
 
-            if (acfEnType[i] <  2 || (acfEnType[i] == 2 && !helicopter) || acfEnType[i] == 8)
+            if (acfEnType[i] < 2 || (acfEnType[i] == 2 && !helicopter) || acfEnType[i] == 8)
                 numMixtureLevers++;
         }
     }
@@ -2891,33 +3006,33 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
     }
     else if (inMessage == xpMsg_ButtonStateChanged)
     {
-        if (inParam1 == (long) xbox360ControllerRadioButton)
+        if (inParam1 == (long)xbox360ControllerRadioButton)
         {
-            if ((int) XPGetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, 0))
+            if ((int)XPGetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, 0))
             {
                 StopConfiguration();
                 controllerType = XBOX360;
                 UpdateSettingsWidgets();
             }
         }
-        else if (inParam1 == (long) dualShock4ControllerRadioButton)
+        else if (inParam1 == (long)dualShock4ControllerRadioButton)
         {
-            if ((int) XPGetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, 0))
+            if ((int)XPGetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, 0))
             {
                 StopConfiguration();
                 controllerType = DS4;
                 UpdateSettingsWidgets();
             }
         }
-        else if (inParam1 == (long) showIndicatorsCheckbox)
+        else if (inParam1 == (long)showIndicatorsCheckbox)
         {
-            showIndicators = (int) XPGetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, 0);
+            showIndicators = (int)XPGetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, 0);
             UpdateIndicatorsWindow();
         }
     }
     else if (inMessage == xpMsg_PushButtonPressed)
     {
-        if (inParam1 == (long) startConfigurationtButton)
+        if (inParam1 == (long)startConfigurationtButton)
         {
             if (configurationStep == AXES || configurationStep == BUTTONS)
                 configurationStep = ABORT;
@@ -2945,7 +3060,7 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
         int y2 = y - h;
 
         // widget window
-        settingsWidget = XPCreateWidget(x, y, x2, y2, 1, NAME" Settings", 1, 0, xpWidgetClass_MainWindow);
+        settingsWidget = XPCreateWidget(x, y, x2, y2, 1, NAME " Settings", 1, 0, xpWidgetClass_MainWindow);
 
         // add close box
         XPSetWidgetProperty(settingsWidget, xpProperty_MainWindowHasCloseBoxes, 1);
@@ -3005,7 +3120,7 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
         UpdateSettingsWidgets();
 
         // register widget handler
-        XPAddWidgetCallback(settingsWidget, (XPWidgetFunc_t) SettingsWidgetHandler);
+        XPAddWidgetCallback(settingsWidget, (XPWidgetFunc_t)SettingsWidgetHandler);
     }
     else
     {
@@ -3034,7 +3149,7 @@ static void LoadSettings(void)
             {
                 int v = 0;
                 iss >> v;
-                controllerType = (ControllerType) v;
+                controllerType = (ControllerType)v;
             }
             else if (line.find("axisOffset") != std::string::npos)
                 iss >> axisOffset;
@@ -3056,14 +3171,14 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 {
 #if IBM
     hGetProcIDDLL = LoadLibrary("XInput1_3.dll");
-    FARPROC lpfnGetProcessID = GetProcAddress(HMODULE(hGetProcIDDLL), (LPCSTR) 100);
+    FARPROC lpfnGetProcessID = GetProcAddress(HMODULE(hGetProcIDDLL), (LPCSTR)100);
     XInputGetStateEx = pICFUNC(lpfnGetProcessID);
 #endif
 
     // set plugin info
     strcpy(outName, NAME);
     strcpy(outSig, "de.bwravencl." NAME_LOWERCASE);
-    strcpy(outDesc, NAME" allows flying X-Plane by gamepad!");
+    strcpy(outDesc, NAME " allows flying X-Plane by gamepad!");
 
     // get paths in POSIX format
     XPLMEnableFeature("XPLM_USE_NATIVE_PATHS", 1);
@@ -3073,8 +3188,8 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     GLenum err = glewInit();
     if (err != GLEW_OK)
     {
-        XPLMDebugString(NAME": The following error occured while initializing GLEW:\n");
-        XPLMDebugString((const char*) glewGetErrorString(err));
+        XPLMDebugString(NAME ": The following error occured while initializing GLEW:\n");
+        XPLMDebugString((const char *)glewGetErrorString(err));
     }
 #endif
 
@@ -3137,7 +3252,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     mixtureControlModifierCommand = XPLMCreateCommand(MIXTURE_CONTROL_MODIFIER_COMMAND, "Mixture Control Modifier");
     cowlFlapModifierCommand = XPLMCreateCommand(COWL_FLAP_MODIFIER_COMMAND, "Cowl Flap Modifier");
     trimModifierCommand = XPLMCreateCommand(TRIM_MODIFIER_COMMAND, "Trim Modifier");
-    trimResetCommand = XPLMCreateCommand(TRIM_RESET_COMMAND_NAME_LOWERCASE, "Trim Reset");
+    trimResetCommand = XPLMCreateCommand(TRIM_RESET_COMMAND, "Trim Reset");
     toggleBetaOrToggleReverseCommand = XPLMCreateCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND, "Toggle Beta / Toggle Reverse");
     toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND, "Toggle Mouse or Keyboard Control");
     pushToTalkCommand = XPLMCreateCommand(PUSH_TO_TALK_COMMAND, "Push-To-Talk");
@@ -3203,7 +3318,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
 #if LIN
     display = XOpenDisplay(NULL);
-    if(display != NULL)
+    if (display != NULL)
     {
         XEvent event;
         XQueryPointer(display, RootWindow(display, DefaultScreen(display)), &event.xbutton.root, &event.xbutton.window, &event.xbutton.x_root, &event.xbutton.y_root, &event.xbutton.x, &event.xbutton.y, &event.xbutton.state);
@@ -3245,14 +3360,13 @@ PLUGIN_API void XPluginStop(void)
     if (hGetProcIDDLL != NULL)
         FreeLibrary(hGetProcIDDLL);
 
-
     hidDeviceThreadRun = 0;
     if (hidDeviceThread != 0)
         WaitForSingleObject(hidDeviceThread, INFINITE);
 
     hid_exit();
 #elif LIN
-    if(display != NULL)
+    if (display != NULL)
         XCloseDisplay(display);
 #endif
 }
