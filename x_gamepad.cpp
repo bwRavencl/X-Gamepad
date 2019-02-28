@@ -428,21 +428,38 @@ typedef enum
     LOCKED
 } KeyState;
 
+typedef enum
+{
+    LEFT_END,
+    RIGHT_END,
+    BETWEEN
+} KeyPosition;
+
 struct KeyboardKey
 {
     char *title;
     void *code;
     int width;
+    KeyPosition position;
     KeyState state;
+    KeyboardKey *above;
+    KeyboardKey *below;
+    KeyboardKey *left;
+    KeyboardKey *right;
 };
 
-static KeyboardKey InitKeyboardKey(const char *title, void *code, float widthFactor = 1.0f)
+static KeyboardKey InitKeyboardKey(const char *title, void *code, float widthFactor = 1.0f, KeyPosition position = BETWEEN)
 {
     int width = (int)(KEY_BASE_SIZE * widthFactor);
 
-    KeyboardKey key = {strdup(title), code, width, UP};
+    KeyboardKey key = {strdup(title), code, width, position, UP, NULL, NULL, NULL, NULL};
     return key;
 }
+
+struct KeyboardRow
+{
+    KeyboardKey keys[];
+};
 
 // define xinput state structure
 #if IBM
@@ -460,11 +477,33 @@ struct XInputState
 #endif
 
 // global internal variables
-static const KeyboardKey keyboardRows[][3] = {
-    {InitKeyboardKey("1", (void *)KEY_CODE_0), InitKeyboardKey("2", (void *)KEY_CODE_0)},
-    {InitKeyboardKey("Q", (void *)KEY_CODE_0), InitKeyboardKey("W", (void *)KEY_CODE_0, 0.5f)},
-    {InitKeyboardKey("Space", (void *)KEY_CODE_0, 4.0f)},
-    {InitKeyboardKey("Y", (void *)KEY_CODE_0), InitKeyboardKey("X", (void *)KEY_CODE_0), InitKeyboardKey("C", (void *)KEY_CODE_0)}};
+static KeyboardKey QKey = InitKeyboardKey("Q", (void *)KEY_CODE_0, 1.0f, LEFT_END);
+static KeyboardKey WKey = InitKeyboardKey("W", (void *)KEY_CODE_0);
+static KeyboardKey EKey = InitKeyboardKey("E", (void *)KEY_CODE_0, 1.0f, RIGHT_END);
+static KeyboardKey AKey = InitKeyboardKey("A", (void *)KEY_CODE_0, 1.0f, LEFT_END);
+static KeyboardKey SKey = InitKeyboardKey("S", (void *)KEY_CODE_0);
+static KeyboardKey DKey = InitKeyboardKey("D", (void *)KEY_CODE_0, 1.0f, RIGHT_END);
+static KeyboardKey ZKey = InitKeyboardKey("Z", (void *)KEY_CODE_0, 1.0f, LEFT_END);
+static KeyboardKey XKey = InitKeyboardKey("X", (void *)KEY_CODE_0);
+static KeyboardKey CKey = InitKeyboardKey("C", (void *)KEY_CODE_0, 1.0f, RIGHT_END);
+
+static const KeyboardKey keyboardKeys[] = { QKey, WKey, EKey, AKey, SKey, DKey, ZKey, XKey, CKey };
+static KeyboardKey *selectedKey = &SKey;
+
+static void WireKey(KeyboardKey key, KeyboardKey left, KeyboardKey right, KeyboardKey above, KeyboardKey below)
+{
+    key.left = &left;
+    key.right = &right;
+    key.above = &above;
+    key.below = &below;
+}
+
+static void WireKeys(void) {
+    WireKey(QKey, EKey, WKey, ZKey, AKey); WireKey(WKey, QKey, EKey, XKey, SKey); WireKey(EKey, WKey, QKey, CKey, DKey);
+    WireKey(AKey, DKey, SKey, QKey, ZKey); WireKey(SKey, AKey, DKey, WKey, XKey); WireKey(DKey, SKey, AKey, EKey, CKey);
+    WireKey(ZKey, CKey, XKey, AKey, QKey); WireKey(XKey, ZKey, CKey, SKey, WKey); WireKey(CKey, XKey, ZKey, DKey, EKey);
+}
+
 static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0, keyboardSelectorX = 0, keyboardSelectorY = 0, keyboardRight = 0, keyboardBottom = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
@@ -1374,45 +1413,28 @@ static void ToggleMouseControl(void)
 
 static int KeyboardSelectorUpCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (keyboardSelectorY > 0)
-        keyboardSelectorY--;
-    else
-        keyboardSelectorY = (int)sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1;
+    selectedKey = (*selectedKey).above;
 
     return 0;
 }
 
 static int KeyboardSelectorDownCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (keyboardSelectorY < (int)(sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1))
-        keyboardSelectorY++;
-    else
-        keyboardSelectorY = 0;
+    selectedKey = (*selectedKey).below;
 
     return 0;
 }
 
 static int KeyboardSelectorLeftCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (keyboardSelectorX > 0)
-        keyboardSelectorX--;
-    else
-    {
-        const KeyboardKey *row = keyboardRows[keyboardSelectorY];
-        keyboardSelectorX = (int)(sizeof(row) / sizeof(KeyboardKey) - 1);
-    }
+    selectedKey = (*selectedKey).left;
 
     return 0;
 }
 
 static int KeyboardSelectorRightCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    const KeyboardKey *row = keyboardRows[keyboardSelectorY];
-
-    if (keyboardSelectorX < (int)(sizeof(row) / sizeof(KeyboardKey) - 1))
-        keyboardSelectorX++;
-    else
-        keyboardSelectorX = 0;
+    selectedKey = (*selectedKey).right;
 
     return 0;
 }
@@ -1426,25 +1448,23 @@ static int PressKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandP
 {
     if (inPhase != xplm_CommandContinue)
     {
-        KeyboardKey key = keyboardRows[keyboardSelectorY][keyboardSelectorX];
-
         if (inPhase == xplm_CommandBegin)
         {
-            if (key.state == LOCKED)
+            if ((*selectedKey).state == LOCKED)
             {
-                SetKeyState(key.code, UP);
-                key.state = UP;
+                SetKeyState((*selectedKey).code, UP);
+                (*selectedKey).state = UP;
             }
-            else if (key.state == UP)
+            else if ((*selectedKey).state == UP)
             {
-                key.state = DOWN;
-                SetKeyState(key.code, DOWN);
+                (*selectedKey).state = DOWN;
+                SetKeyState((*selectedKey).code, DOWN);
             }
         }
-        else if (inPhase == xplm_CommandEnd && key.state == DOWN)
+        else if (inPhase == xplm_CommandEnd && (*selectedKey).state == DOWN)
         {
-            SetKeyState(key.code, UP);
-            key.state = UP;
+            SetKeyState((*selectedKey).code, UP);
+            (*selectedKey).state = UP;
         }
     }
 
@@ -1455,17 +1475,15 @@ static int LockKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
 {
     if (inPhase == xplm_CommandBegin)
     {
-        KeyboardKey key = keyboardRows[keyboardSelectorY][keyboardSelectorX];
-
-        if (key.state == LOCKED)
+        if ((*selectedKey).state == LOCKED)
         {
-            SetKeyState(key.code, UP);
-            key.state = UP;
+            SetKeyState((*selectedKey).code, UP);
+            (*selectedKey).state = UP;
         }
-        else if (key.state == UP)
+        else if ((*selectedKey).state == UP)
         {
-            key.state = LOCKED;
-            SetKeyState(key.code, DOWN);
+            (*selectedKey).state = LOCKED;
+            SetKeyState((*selectedKey).code, DOWN);
         }
     }
 
@@ -1481,38 +1499,44 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
 
     glColor3f(1.0f, 1.0f, 1.0f);
 
-    for (int y = 0; y < (int)(sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1); y++)
-    {
-        char out[1024];
-        sprintf(out, "Drawing Row %d\n", y);
-        XPLMDebugString(out);
+    KeyboardKey key = QKey;
+    int left = windowLeft;
+    int top = windowTop;
 
-        int left = windowLeft;
-        int top = windowTop - y * KEY_BASE_SIZE;
+    int dir = 0;
 
-        const KeyboardKey *row = keyboardRows[keyboardSelectorY];
-        for (int x = 0; x < (int)(sizeof(row) / sizeof(KeyboardKey) - 1); x++)
+    while(1) {
+        const int right = left + key.width;
+        const int bottom = top - KEY_BASE_SIZE;
+
+        glBegin(GL_QUADS);
+        glVertex2f((GLfloat)left, (GLfloat)bottom);
+        glVertex2f((GLfloat)left, (GLfloat)top);
+        glVertex2f((GLfloat)right, (GLfloat)top);
+        glVertex2f((GLfloat)right, (GLfloat)bottom);
+        glEnd();
+
+        float col_white[] = {1.0, 1.0, 1.0};
+        XPLMDrawString(col_white, left, top - KEY_BASE_SIZE / 2 , key.title, NULL, xplmFont_Proportional);
+
+        if (&key == &CKey)
+            break;
+        
+        if (key.position != BETWEEN)
         {
-            KeyboardKey key = row[x];
+            dir = !dir;
+            top = bottom;
+        }
 
-            char out[1024];
-            sprintf(out, "Drawing Key %d %d = %s\n", y, x, key.title);
-            XPLMDebugString(out);
-
-            int right = left + key.width;
-            int bottom = top - KEY_BASE_SIZE;
-
-            glBegin(GL_QUADS);
-            glVertex2f((GLfloat)left, (GLfloat)bottom);
-            glVertex2f((GLfloat)left, (GLfloat)top);
-            glVertex2f((GLfloat)right, (GLfloat)top);
-            glVertex2f((GLfloat)right, (GLfloat)bottom);
-            glEnd();
-
-            float col_white[] = {1.0, 1.0, 1.0};
-            XPLMDrawString(col_white, left, top - KEY_BASE_SIZE / 2 , key.title, NULL, xplmFont_Proportional);
-
+        if (dir == 0)
+        {
+            key = *key.right;
             left = right;
+        }
+        else
+        {
+            key = *key.left;
+            left -= key.width;
         }
     }
 }
@@ -1699,12 +1723,9 @@ static void ToggleKeyboardControl(void)
         XPLMDebugString("ToggleKeyboardControl() -> Off\n");
 
         // release all keys that are still down
-        for (int y = 0; y < (int)(sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1); y++)
-        {
-            const KeyboardKey *row = keyboardRows[keyboardSelectorY];
-            for (int x = 0; x < (int)(sizeof(row) / sizeof(KeyboardKey) - 1); x++)
-                SetKeyState((void *)row[x].code, UP);
-        }
+        for (int i = 0; i < sizeof (keyboardKeys) / sizeof(KeyboardKey) - 1; i++)
+            if (keyboardKeys[i].state != UP)
+                SetKeyState((void *)keyboardKeys[i].code, UP);
 
         // restore the default button assignments
         PopButtonAssignments();
@@ -3329,6 +3350,8 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMGetScreenBoundsGlobal(NULL, NULL, &right, &bottom);
     indicatorsRight = right;
     indicatorsBottom = bottom;
+
+    WireKeys();
 
     // read and apply config file
     LoadSettings();
