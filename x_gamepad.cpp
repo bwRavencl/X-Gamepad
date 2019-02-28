@@ -436,11 +436,11 @@ struct KeyboardKey
     KeyState state;
 };
 
-static KeyboardKey InitKeyboardKey(char *title, void *code, float widthFactor = 1.0f)
+static KeyboardKey InitKeyboardKey(const char *title, void *code, float widthFactor = 1.0f)
 {
     int width = (int)(KEY_BASE_SIZE * widthFactor);
 
-    KeyboardKey key = {title, code, width, UP};
+    KeyboardKey key = {strdup(title), code, width, UP};
     return key;
 }
 
