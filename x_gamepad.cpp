@@ -430,15 +430,15 @@ typedef enum
 
 struct KeyboardKey
 {
-    const char* title;
+    char *title;
     void *code;
     int width;
     KeyState state;
 };
 
-static KeyboardKey InitKeyboardKey(const char *title, void *code, float widthFactor = 1.0f)
+static KeyboardKey InitKeyboardKey(char *title, void *code, float widthFactor = 1.0f)
 {
-    int width = (int) KEY_BASE_SIZE * widthFactor;
+    int width = (int)(KEY_BASE_SIZE * widthFactor);
 
     KeyboardKey key = {title, code, width, UP};
     return key;
@@ -464,8 +464,7 @@ static const KeyboardKey keyboardRows[][3] = {
     {InitKeyboardKey("1", (void *)KEY_CODE_0), InitKeyboardKey("2", (void *)KEY_CODE_0)},
     {InitKeyboardKey("Q", (void *)KEY_CODE_0), InitKeyboardKey("W", (void *)KEY_CODE_0, 0.5f)},
     {InitKeyboardKey("Space", (void *)KEY_CODE_0, 4.0f)},
-    {InitKeyboardKey("Y", (void *)KEY_CODE_0), InitKeyboardKey("X", (void *)KEY_CODE_0), InitKeyboardKey("C", (void *)KEY_CODE_0)}
-};
+    {InitKeyboardKey("Y", (void *)KEY_CODE_0), InitKeyboardKey("X", (void *)KEY_CODE_0), InitKeyboardKey("C", (void *)KEY_CODE_0)}};
 static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0, keyboardSelectorX = 0, keyboardSelectorY = 0, keyboardRight = 0, keyboardBottom = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
@@ -1477,20 +1476,45 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
 {
     XPLMSetGraphicsState(0, 0, 0, 0, 1, 0, 0);
 
-    int l = 0, t = 0, r = 0, b = 0;
-    XPLMGetWindowGeometry(keyboardWindow, &l, &t, &r, &b);
+    int windowLeft = 0, windowTop = 0;
+    XPLMGetWindowGeometry(indicatorsWindow, &windowLeft, &windowTop, NULL, NULL);
 
     glColor3f(1.0f, 1.0f, 1.0f);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0.0f, 0.0f);
-    glVertex2f((GLfloat)l, (GLfloat)b);
-    glTexCoord2f(0.0f, 1.0f);
-    glVertex2f((GLfloat)l, (GLfloat)t);
-    glTexCoord2f(1.0f, 1.0f);
-    glVertex2f((GLfloat)r, (GLfloat)t);
-    glTexCoord2f(1.0f, 0.0f);
-    glVertex2f((GLfloat)r, (GLfloat)b);
-    glEnd();
+
+    for (int y = 0; y < (int)(sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1); y++)
+    {
+        char out[1024];
+        sprintf(out, "Drawing Row %d\n", y);
+        XPLMDebugString(out);
+
+        int left = windowLeft;
+        int top = windowTop - y * KEY_BASE_SIZE;
+
+        const KeyboardKey *row = keyboardRows[keyboardSelectorY];
+        for (int x = 0; x < (int)(sizeof(row) / sizeof(KeyboardKey) - 1); x++)
+        {
+            KeyboardKey key = row[x];
+
+            char out[1024];
+            sprintf(out, "Drawing Key %d %d = %s\n", y, x, key.title);
+            XPLMDebugString(out);
+
+            int right = left + key.width;
+            int bottom = top - KEY_BASE_SIZE;
+
+            glBegin(GL_QUADS);
+            glVertex2f((GLfloat)left, (GLfloat)bottom);
+            glVertex2f((GLfloat)left, (GLfloat)top);
+            glVertex2f((GLfloat)right, (GLfloat)top);
+            glVertex2f((GLfloat)right, (GLfloat)bottom);
+            glEnd();
+
+            float col_white[] = {1.0, 1.0, 1.0};
+            XPLMDrawString(col_white, left, top - KEY_BASE_SIZE / 2 , key.title, NULL, xplmFont_Proportional);
+
+            left = right;
+        }
+    }
 }
 
 static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus)
@@ -1583,8 +1607,8 @@ static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStat
 
             left += deltaX;
             top += deltaY;
-            indicatorsRight += deltaX;
-            indicatorsBottom += deltaY;
+            *right += deltaX;
+            *bottom += deltaY;
 
             FitGeometryWithinScreenBounds(&left, &top, right, bottom);
             XPLMSetWindowGeometry(inWindowID, left, top, *right, *bottom);
@@ -1616,15 +1640,19 @@ static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, in
 
 static void ToggleKeyboardControl(void)
 {
+    XPLMDebugString("ToggleKeyboardControl()\n");
+
     // if we are in mouse mode we actually want to toggle it off instead of toggling keyboard mode
     if (mode == MOUSE)
     {
+        XPLMDebugString("ToggleKeyboardControl() -> Mouse\n");
         ToggleMouseControl();
         return;
     }
 
     if (mode == DEFAULT)
     {
+        XPLMDebugString("ToggleKeyboardControl() -> On\n");
         mode = KEYBOARD;
 
         // store the default button assignments
@@ -1668,12 +1696,14 @@ static void ToggleKeyboardControl(void)
     }
     else if (mode == KEYBOARD)
     {
+        XPLMDebugString("ToggleKeyboardControl() -> Off\n");
+
         // release all keys that are still down
         for (int y = 0; y < (int)(sizeof(keyboardRows) / sizeof(KeyboardKey *) - 1); y++)
         {
-                const KeyboardKey *row = keyboardRows[keyboardSelectorY];
-                for (int x = 0; x < (int)(sizeof(row) / sizeof(KeyboardKey) - 1); x++)
-                    SetKeyState((void*) row[x].code, UP);
+            const KeyboardKey *row = keyboardRows[keyboardSelectorY];
+            for (int x = 0; x < (int)(sizeof(row) / sizeof(KeyboardKey) - 1); x++)
+                SetKeyState((void *)row[x].code, UP);
         }
 
         // restore the default button assignments
@@ -1694,6 +1724,7 @@ static int ToggleMouseOrKeyboardControlCommandHandler(XPLMCommandRef inCommand, 
     if (!hidInitialized)
 #endif
     {
+        XPLMDebugString("!hidInitialized!!\n");
         static float beginTime = 0.0f;
 
         if (inPhase == xplm_CommandBegin)
@@ -1835,13 +1866,13 @@ static void MoveMousePointer(int distX, int distY, void *display = NULL)
         return;
 
 #if IBM
-    INPUT input[1];
-    input[0].type = INPUT_MOUSE;
-    input[0].mi.dx = (long)distX;
-    input[0].mi.dy = (long)distY;
-    input[0].mi.dwFlags = MOUSEEVENTF_MOVE;
+    INPUT input = {0};
+    input.type = INPUT_MOUSE;
+    input.mi.dx = (long)distX;
+    input.mi.dy = (long)distY;
+    input.mi.dwFlags = MOUSEEVENTF_MOVE;
 
-    SendInput((UINT)1, input, sizeof(INPUT));
+    SendInput((UINT)1, &input, sizeof(INPUT));
 #elif APL
     // get current mouse pointer location
     CGEventRef getLocationEvent = CGEventCreate(NULL);
@@ -2903,21 +2934,21 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
     int mixtureLocation = glGetUniformLocation(program, "mixture");
     glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -1.0f : XPLMGetDataf(mixtureRatioAllDataRef));
 
-    int l = 0, t = 0, r = 0, b = 0;
-    XPLMGetWindowGeometry(indicatorsWindow, &l, &t, &r, &b);
+    int left = 0, top = 0, right = 0, bottom = 0;
+    XPLMGetWindowGeometry(indicatorsWindow, &left, &top, &right, &bottom);
     int boundsLocation = glGetUniformLocation(program, "bounds");
-    glUniform4f(boundsLocation, (GLfloat)l, (GLfloat)t, (GLfloat)r, (GLfloat)b);
+    glUniform4f(boundsLocation, (GLfloat)left, (GLfloat)top, (GLfloat)right, (GLfloat)bottom);
 
     glColor3f(1.0f, 1.0f, 1.0f);
     glBegin(GL_QUADS);
     glTexCoord2f(0.0f, 0.0f);
-    glVertex2f((GLfloat)l, (GLfloat)b);
+    glVertex2f((GLfloat)left, (GLfloat)bottom);
     glTexCoord2f(0.0f, 1.0f);
-    glVertex2f((GLfloat)l, (GLfloat)t);
+    glVertex2f((GLfloat)left, (GLfloat)top);
     glTexCoord2f(1.0f, 1.0f);
-    glVertex2f((GLfloat)r, (GLfloat)t);
+    glVertex2f((GLfloat)right, (GLfloat)top);
     glTexCoord2f(1.0f, 0.0f);
-    glVertex2f((GLfloat)r, (GLfloat)b);
+    glVertex2f((GLfloat)right, (GLfloat)bottom);
     glEnd();
 
     glUseProgram(0);
@@ -3359,13 +3390,18 @@ PLUGIN_API void XPluginStop(void)
 #if IBM
     if (hGetProcIDDLL != NULL)
         FreeLibrary(hGetProcIDDLL);
+#endif
 
+#if !LIN
     hidDeviceThreadRun = 0;
     if (hidDeviceThread != 0)
+#if IBM
         WaitForSingleObject(hidDeviceThread, INFINITE);
-
+#elif APL
+        pthread_join(hidDeviceThread, NULL);
+#endif
     hid_exit();
-#elif LIN
+#else
     if (display != NULL)
         XCloseDisplay(display);
 #endif
