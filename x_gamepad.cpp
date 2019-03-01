@@ -411,6 +411,8 @@ typedef enum
     RIGHT
 } MouseButton;
 
+typedef MouseButton Direction;
+
 // define configuration steps
 typedef enum
 {
@@ -456,11 +458,6 @@ static KeyboardKey InitKeyboardKey(const char *title, void *code, float widthFac
     return key;
 }
 
-struct KeyboardRow
-{
-    KeyboardKey keys[];
-};
-
 // define xinput state structure
 #if IBM
 struct XInputState
@@ -504,7 +501,7 @@ static void WireKeys(void) {
     WireKey(ZKey, CKey, XKey, AKey, QKey); WireKey(XKey, ZKey, CKey, SKey, WKey); WireKey(CKey, XKey, ZKey, DKey, EKey);
 }
 
-static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0, keyboardSelectorX = 0, keyboardSelectorY = 0, keyboardRight = 0, keyboardBottom = 0;
+static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0, keyboardRight = 0, keyboardBottom = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
@@ -1503,7 +1500,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
     int left = windowLeft;
     int top = windowTop;
 
-    int dir = 0;
+    Direction direction = RIGHT;
 
     while(1) {
         const int right = left + key.width;
@@ -1521,19 +1518,23 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
 
         if (&key == &CKey)
             break;
-        
-        if (key.position != BETWEEN)
+
+        if (key.position == RIGHT_END && direction == RIGHT)
         {
-            dir = !dir;
+            direction = LEFT;
+            top = bottom;
+        } else if (key.position == LEFT_END && direction == LEFT)
+        {
+            direction = RIGHT;
             top = bottom;
         }
 
-        if (dir == 0)
+        if (direction == LEFT)
         {
             key = *key.right;
             left = right;
         }
-        else
+        else if (direction == RIGHT)
         {
             key = *key.left;
             left -= key.width;
@@ -1723,7 +1724,7 @@ static void ToggleKeyboardControl(void)
         XPLMDebugString("ToggleKeyboardControl() -> Off\n");
 
         // release all keys that are still down
-        for (int i = 0; i < sizeof (keyboardKeys) / sizeof(KeyboardKey) - 1; i++)
+        for (int i = 0; i < (int) (sizeof (keyboardKeys) / sizeof(KeyboardKey) - 1); i++)
             if (keyboardKeys[i].state != UP)
                 SetKeyState((void *)keyboardKeys[i].code, UP);
 
