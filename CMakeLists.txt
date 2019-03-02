@@ -32,6 +32,7 @@ if(UNIX)
     set(PLATFORM_COMPILE_OPTIONS -Wall -Wunreachable-code -Wextra -Wshadow -Wfloat-equal -Wno-unused-parameter -pedantic -O3 -pthread)
 else()
     set(PLATFORM_COMPILE_OPTIONS /wd4100 /wd4267 /wd4996)
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_LINK_FLAGS} /MANIFEST:NO")
 endif()
 
 if(APPLE)
