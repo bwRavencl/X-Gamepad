@@ -341,7 +341,9 @@
 
 #define KEY_SELECTOR_MOVEMENT_MIN_ELAPSE_TIME 0.15f
 #define KEY_BASE_SIZE 48
+#define KEY_BORDER_WIDTH 1
 #define KEY_ALPHA 0.75f
+#define KEY_REPEAT_INTERVAL 0.1f
 
 // define dualshock 4 touchpad stuff
 #define TOUCHPAD_MAX_DELTA 150
@@ -378,36 +380,114 @@
                         "}"
 
 #if IBM
-#define KEY_CODE_Q 'Q'
-#define KEY_CODE_W 'W'
-#define KEY_CODE_E 'E'
-#define KEY_CODE_O 'O'
-#define KEY_CODE_A 'A'
-#define KEY_CODE_S 'S'
-#define KEY_CODE_D 'D'
-#define KEY_CODE_Z 'Z'
-#define KEY_CODE_X 'X'
-#define KEY_CODE_C 'C'
+#define KEY_CODE_ESCAPE 0x1
+#define KEY_CODE_F1 0x3B
+#define KEY_CODE_F2 0x3C
+#define KEY_CODE_F3 0x3D
+#define KEY_CODE_F4 0x3E
+#define KEY_CODE_F5 0x3F
+#define KEY_CODE_F6 0x40
+#define KEY_CODE_F7 0x41
+#define KEY_CODE_F8 0x42
+#define KEY_CODE_F9 0x43
+#define KEY_CODE_F10 0x44
+#define KEY_CODE_F11 0x57
+#define KEY_CODE_F12 0x58
+#define KEY_CODE_SYSRQ 0xB7
+#define KEY_CODE_SCROLL 0x46
+#define KEY_CODE_PAUSE 0xC5
+#define KEY_CODE_INSERT 0xD2
+#define KEY_CODE_DELETE 0xD3
+#define KEY_CODE_HOME 0xC7
+#define KEY_CODE_END 0xCF
+#define KEY_CODE_GRAVE 0x29
+#define KEY_CODE_1 0x2
+#define KEY_CODE_2 0x3
+#define KEY_CODE_3 0x4
+#define KEY_CODE_4 0x5
+#define KEY_CODE_5 0x6
+#define KEY_CODE_6 0x7
+#define KEY_CODE_7 0x8
+#define KEY_CODE_8 0x9
+#define KEY_CODE_9 0xA
+#define KEY_CODE_0 0xB
+#define KEY_CODE_MINUS 0xC
+#define KEY_CODE_EQUALS 0xD
+#define KEY_CODE_BACK 0xE
+#define KEY_CODE_NUMLOCK 0x45
+#define KEY_CODE_DIVIDE 0xB5
+#define KEY_CODE_MULTIPLY 0x37
+#define KEY_CODE_SUBTRACT 0x4A
+#define KEY_CODE_TAB 0xF
+#define KEY_CODE_Q 0x10
+#define KEY_CODE_W 0x11
+#define KEY_CODE_E 0x12
+#define KEY_CODE_R 0x13
+#define KEY_CODE_T 0x14
+#define KEY_CODE_Y 0x15
+#define KEY_CODE_U 0x16
+#define KEY_CODE_I 0x17
+#define KEY_CODE_O 0x18
+#define KEY_CODE_P 0x19
+#define KEY_CODE_LBRACKET 0x1A
+#define KEY_CODE_RBRACKET 0x1B
+#define KEY_CODE_BACKSLASH 0x2B
+#define KEY_CODE_NUMPAD7 0x47
+#define KEY_CODE_NUMPAD8 0x48
+#define KEY_CODE_NUMPAD9 0x49
+#define KEY_CODE_ADD 0x4E
+#define KEY_CODE_CAPITAL 0x3A
+#define KEY_CODE_A 0x1E
+#define KEY_CODE_S 0x1F
+#define KEY_CODE_D 0x20
+#define KEY_CODE_F 0x21
+#define KEY_CODE_G 0x22
+#define KEY_CODE_H 0x23
+#define KEY_CODE_J 0x24
+#define KEY_CODE_K 0x25
+#define KEY_CODE_L 0x26
+#define KEY_CODE_SEMICOLON 0x27
+#define KEY_CODE_APOSTROPHE 0x28
+#define KEY_CODE_RETURN 0x1C
+#define KEY_CODE_NUMPAD4 0x4B
+#define KEY_CODE_NUMPAD5 0x4C
+#define KEY_CODE_NUMPAD6 0x4D
+#define KEY_CODE_PRIOR 0xC9
+#define KEY_CODE_LSHIFT 0x2A
+#define KEY_CODE_Z 0x2C
+#define KEY_CODE_X 0x2D
+#define KEY_CODE_C 0x2E
+#define KEY_CODE_V 0x2F
+#define KEY_CODE_B 0x30
+#define KEY_CODE_N 0x31
+#define KEY_CODE_M 0x32
+#define KEY_CODE_COMMA 0x33
+#define KEY_CODE_PERIOD 0x34
+#define KEY_CODE_SLASH 0x35
+#define KEY_CODE_RSHIFT 0x36
+#define KEY_CODE_NUMPAD1 0x4F
+#define KEY_CODE_NUMPAD2 0x50
+#define KEY_CODE_NUMPAD3 0x51
+#define KEY_CODE_NEXT 0xD1
+#define KEY_CODE_LCONTROl 0x1D
+#define KEY_CODE_LWIN 0xDB
+#define KEY_CODE_LMENU 0x38
+#define KEY_CODE_SPACE 0x39
+#define KEY_CODE_RMENU 0xB8
+#define KEY_CODE_RWIN 0xDC
+#define KEY_CODE_APPS 0xDD
+#define KEY_CODE_RCONTROL 0x9D
+#define KEY_CODE_UP 0xC8
+#define KEY_CODE_DOWN 0xD0
+#define KEY_CODE_LEFT 0xCB
+#define KEY_CODE_RIGHT 0xCD
+#define KEY_CODE_NUMPAD0 0x52
+#define KEY_CODE_NUMPADCOMMA 0xB3
+#define KEY_CODE_NUMPADENTER 0x9C
 #elif APL
-#define KEY_CODE_Q 1
-#define KEY_CODE_W 2
-#define KEY_CODE_E 3
-#define KEY_CODE_A 4
-#define KEY_CODE_S 5
-#define KEY_CODE_D 6
-#define KEY_CODE_Z 7
-#define KEY_CODE_X 8
-#define KEY_CODE_C 9
+// TODO
 #elif LIN
-#define KEY_CODE_Q 1
-#define KEY_CODE_W 2
-#define KEY_CODE_E 3
-#define KEY_CODE_A 4
-#define KEY_CODE_S 5
-#define KEY_CODE_D 6
-#define KEY_CODE_Z 7
-#define KEY_CODE_X 8
-#define KEY_CODE_C 9
+// TODO
 #endif
 
 // define controller types
@@ -503,19 +583,113 @@ struct XInputState
 #endif
 
 // global internal variables
-static KeyboardKey qKey = InitKeyboardKey("Q", KEY_CODE_Q, 1.0f, LEFT_END);
+static KeyboardKey escapeKey = InitKeyboardKey("Esc", KEY_CODE_ESCAPE, 1.0f, LEFT_END);
+static KeyboardKey f1Key = InitKeyboardKey("F1", KEY_CODE_F1);
+static KeyboardKey f2Key = InitKeyboardKey("F2", KEY_CODE_F2);
+static KeyboardKey f3Key = InitKeyboardKey("F3", KEY_CODE_F3);
+static KeyboardKey f4Key = InitKeyboardKey("F4", KEY_CODE_F4);
+static KeyboardKey f5Key = InitKeyboardKey("F5", KEY_CODE_F5);
+static KeyboardKey f6Key = InitKeyboardKey("F6", KEY_CODE_F6);
+static KeyboardKey f7Key = InitKeyboardKey("F7", KEY_CODE_F7);
+static KeyboardKey f8Key = InitKeyboardKey("F8", KEY_CODE_F8);
+static KeyboardKey f9Key = InitKeyboardKey("F9", KEY_CODE_F9);
+static KeyboardKey f10Key = InitKeyboardKey("F10", KEY_CODE_F10);
+static KeyboardKey f11Key = InitKeyboardKey("F11", KEY_CODE_F11);
+static KeyboardKey f12Key = InitKeyboardKey("F12", KEY_CODE_F12);
+static KeyboardKey sysRqKey = InitKeyboardKey("SysRq", KEY_CODE_SYSRQ);
+static KeyboardKey scrollLockKey = InitKeyboardKey("ScrollLk", KEY_CODE_SCROLL);
+static KeyboardKey pauseKey = InitKeyboardKey("Pause", KEY_CODE_PAUSE);
+static KeyboardKey insertKey = InitKeyboardKey("Ins", KEY_CODE_INSERT, 0.88f);
+static KeyboardKey deleteKey = InitKeyboardKey("Del", KEY_CODE_DELETE, 0.88f);
+static KeyboardKey homeKey = InitKeyboardKey("Home", KEY_CODE_HOME, 0.88f);
+static KeyboardKey endKey = InitKeyboardKey("End", KEY_CODE_END, 0.88f, RIGHT_END);
+static KeyboardKey graveKey = InitKeyboardKey("`", KEY_CODE_GRAVE, 1.0f, LEFT_END);
+static KeyboardKey d1Key = InitKeyboardKey("1", KEY_CODE_1);
+static KeyboardKey d2Key = InitKeyboardKey("2", KEY_CODE_2);
+static KeyboardKey d3Key = InitKeyboardKey("3", KEY_CODE_3);
+static KeyboardKey d4Key = InitKeyboardKey("4", KEY_CODE_4);
+static KeyboardKey d5Key = InitKeyboardKey("5", KEY_CODE_5);
+static KeyboardKey d6Key = InitKeyboardKey("6", KEY_CODE_6);
+static KeyboardKey d7Key = InitKeyboardKey("7", KEY_CODE_7);
+static KeyboardKey d8Key = InitKeyboardKey("8", KEY_CODE_8);
+static KeyboardKey d9Key = InitKeyboardKey("9", KEY_CODE_9);
+static KeyboardKey d0Key = InitKeyboardKey("0", KEY_CODE_0);
+static KeyboardKey minusKey = InitKeyboardKey("-", KEY_CODE_MINUS);
+static KeyboardKey equalsKey = InitKeyboardKey("=", KEY_CODE_EQUALS);
+static KeyboardKey backKey = InitKeyboardKey("Back", KEY_CODE_BACK, 2.5f);
+static KeyboardKey numLockKey = InitKeyboardKey("NumLk", KEY_CODE_NUMLOCK);
+static KeyboardKey divideKey = InitKeyboardKey("/", KEY_CODE_DIVIDE);
+static KeyboardKey multiplyKey = InitKeyboardKey("*", KEY_CODE_MULTIPLY);
+static KeyboardKey subtractKey = InitKeyboardKey("-", KEY_CODE_SUBTRACT, 1.0f, RIGHT_END);
+static KeyboardKey tabKey = InitKeyboardKey("Tab", KEY_CODE_TAB, 1.5f, LEFT_END);
+static KeyboardKey qKey = InitKeyboardKey("Q", KEY_CODE_Q);
 static KeyboardKey wKey = InitKeyboardKey("W", KEY_CODE_W);
 static KeyboardKey eKey = InitKeyboardKey("E", KEY_CODE_E);
-static KeyboardKey oKey = InitKeyboardKey("O", KEY_CODE_O, 1.0f, RIGHT_END);
-static KeyboardKey aKey = InitKeyboardKey("A", KEY_CODE_A, 1.0f, LEFT_END);
+static KeyboardKey rKey = InitKeyboardKey("R", KEY_CODE_R);
+static KeyboardKey tKey = InitKeyboardKey("T", KEY_CODE_T);
+static KeyboardKey yKey = InitKeyboardKey("Y", KEY_CODE_Y);
+static KeyboardKey uKey = InitKeyboardKey("U", KEY_CODE_U);
+static KeyboardKey iKey = InitKeyboardKey("I", KEY_CODE_I);
+static KeyboardKey oKey = InitKeyboardKey("O", KEY_CODE_O);
+static KeyboardKey pKey = InitKeyboardKey("P", KEY_CODE_P);
+static KeyboardKey leftBracketKey = InitKeyboardKey("[", KEY_CODE_LBRACKET);
+static KeyboardKey rightBracketKey = InitKeyboardKey("]", KEY_CODE_RBRACKET);
+static KeyboardKey backslashKey = InitKeyboardKey("\\", KEY_CODE_BACKSLASH, 2.0f);
+static KeyboardKey numpad7Key = InitKeyboardKey("7", KEY_CODE_NUMPAD7);
+static KeyboardKey numpad8Key = InitKeyboardKey("8", KEY_CODE_NUMPAD8);
+static KeyboardKey numpad9Key = InitKeyboardKey("9", KEY_CODE_NUMPAD9);
+static KeyboardKey addKey = InitKeyboardKey("+", KEY_CODE_ADD, 1.0f, RIGHT_END);
+static KeyboardKey capsLockKey = InitKeyboardKey("Caps Lock", KEY_CODE_CAPITAL, 2.0f, LEFT_END);
+static KeyboardKey aKey = InitKeyboardKey("A", KEY_CODE_A);
 static KeyboardKey sKey = InitKeyboardKey("S", KEY_CODE_S);
-static KeyboardKey dKey = InitKeyboardKey("D", KEY_CODE_D, 1.0f, RIGHT_END);
-static KeyboardKey zKey = InitKeyboardKey("Z", KEY_CODE_Z, 1.0f, LEFT_END);
-static KeyboardKey xKey = InitKeyboardKey("X Key", KEY_CODE_X, 3.0f);
-static KeyboardKey cKey = InitKeyboardKey("C", KEY_CODE_C, 1.0f, RIGHT_END);
+static KeyboardKey dKey = InitKeyboardKey("D", KEY_CODE_D);
+static KeyboardKey fKey = InitKeyboardKey("F", KEY_CODE_F);
+static KeyboardKey gKey = InitKeyboardKey("G", KEY_CODE_G);
+static KeyboardKey hKey = InitKeyboardKey("H", KEY_CODE_H);
+static KeyboardKey jKey = InitKeyboardKey("J", KEY_CODE_J);
+static KeyboardKey kKey = InitKeyboardKey("K", KEY_CODE_K);
+static KeyboardKey lKey = InitKeyboardKey("L", KEY_CODE_L);
+static KeyboardKey semicolonKey = InitKeyboardKey(";", KEY_CODE_SEMICOLON);
+static KeyboardKey apostropheKey = InitKeyboardKey("'", KEY_CODE_APOSTROPHE);
+static KeyboardKey returnKey = InitKeyboardKey("Return", KEY_CODE_RETURN, 2.5f);
+static KeyboardKey numpad4Key = InitKeyboardKey("4", KEY_CODE_NUMPAD4);
+static KeyboardKey numpad5Key = InitKeyboardKey("5", KEY_CODE_NUMPAD5);
+static KeyboardKey numpad6Key = InitKeyboardKey("6", KEY_CODE_NUMPAD6);
+static KeyboardKey pageUpKey = InitKeyboardKey("PgUp", KEY_CODE_PRIOR, 1.0f, RIGHT_END);
+static KeyboardKey leftShiftKey = InitKeyboardKey("Shift", KEY_CODE_LSHIFT, 2.5f, LEFT_END);
+static KeyboardKey zKey = InitKeyboardKey("Z", KEY_CODE_Z);
+static KeyboardKey xKey = InitKeyboardKey("X", KEY_CODE_X);
+static KeyboardKey cKey = InitKeyboardKey("C", KEY_CODE_C);
+static KeyboardKey vKey = InitKeyboardKey("V", KEY_CODE_V);
+static KeyboardKey bKey = InitKeyboardKey("B", KEY_CODE_B);
+static KeyboardKey nKey = InitKeyboardKey("N", KEY_CODE_N);
+static KeyboardKey mKey = InitKeyboardKey("M", KEY_CODE_M);
+static KeyboardKey commaKey = InitKeyboardKey(",", KEY_CODE_COMMA);
+static KeyboardKey periodKey = InitKeyboardKey(".", KEY_CODE_PERIOD);
+static KeyboardKey slashKey = InitKeyboardKey("/", KEY_CODE_SLASH);
+static KeyboardKey rightShiftKey = InitKeyboardKey("Shift", KEY_CODE_RSHIFT, 3.0f);
+static KeyboardKey numpad1Key = InitKeyboardKey("1", KEY_CODE_NUMPAD1);
+static KeyboardKey numpad2Key = InitKeyboardKey("2", KEY_CODE_NUMPAD2);
+static KeyboardKey numpad3Key = InitKeyboardKey("3", KEY_CODE_NUMPAD3);
+static KeyboardKey pageDownKey = InitKeyboardKey("PgDn", KEY_CODE_NEXT, 1.0f, RIGHT_END);
+static KeyboardKey leftControlKey = InitKeyboardKey("Ctrl", KEY_CODE_LCONTROl, 1.0f, LEFT_END);
+static KeyboardKey leftWindowsKey = InitKeyboardKey("Win", KEY_CODE_LWIN);
+static KeyboardKey leftAltKey = InitKeyboardKey("Alt", KEY_CODE_LMENU);
+static KeyboardKey spaceKey = InitKeyboardKey("Space", KEY_CODE_SPACE, 4.5f);
+static KeyboardKey rightAltKey = InitKeyboardKey("Alt", KEY_CODE_RMENU);
+static KeyboardKey rightWindowsKey = InitKeyboardKey("Win", KEY_CODE_RWIN);
+static KeyboardKey appsKey = InitKeyboardKey("Menu", KEY_CODE_APPS);
+static KeyboardKey rightControlKey = InitKeyboardKey("Ctrl", KEY_CODE_RCONTROL);
+static KeyboardKey upKey = InitKeyboardKey("Up", KEY_CODE_UP);
+static KeyboardKey downKey = InitKeyboardKey("Down", KEY_CODE_DOWN);
+static KeyboardKey leftKey = InitKeyboardKey("Left", KEY_CODE_LEFT);
+static KeyboardKey rightKey = InitKeyboardKey("Right", KEY_CODE_RIGHT);
+static KeyboardKey numpad0Key = InitKeyboardKey("0", KEY_CODE_NUMPAD0, 2.0f);
+static KeyboardKey numpadCommaKey = InitKeyboardKey(",", KEY_CODE_NUMPADCOMMA);
+static KeyboardKey numpadEnterKey = InitKeyboardKey("Enter", KEY_CODE_NUMPADENTER, 1.0f, RIGHT_END);
 
-static KeyboardKey *keyboardKeys[] = {&qKey, &wKey, &eKey, &oKey, &aKey, &sKey, &dKey, &zKey, &xKey, &cKey};
-static KeyboardKey *selectedKey = &sKey;
+static KeyboardKey *keyboardKeys[] = {&escapeKey, &f1Key, &f2Key, &f3Key, &f4Key, &f5Key, &f6Key, &f7Key, &f8Key, &f9Key, &f10Key, &f11Key, &f12Key, &sysRqKey, &scrollLockKey, &pauseKey, &insertKey, &deleteKey, &homeKey, &endKey, &graveKey, &d1Key, &d2Key, &d3Key, &d4Key, &d5Key, &d6Key, &d7Key, &d8Key, &d9Key, &d0Key, &minusKey, &equalsKey, &backKey, &numLockKey, &divideKey, &multiplyKey, &subtractKey, &tabKey, &qKey, &wKey, &eKey, &rKey, &tKey, &yKey, &uKey, &iKey, &oKey, &pKey, &leftBracketKey, &rightBracketKey, &backslashKey, &numpad7Key, &numpad8Key, &numpad9Key, &addKey, &capsLockKey, &aKey, &sKey, &dKey, &fKey, &gKey, &hKey, &jKey, &kKey, &lKey, &semicolonKey, &apostropheKey, &returnKey, &numpad4Key, &numpad5Key, &numpad6Key, &pageUpKey, &leftShiftKey, &zKey, &xKey, &cKey, &vKey, &bKey, &nKey, &mKey, &commaKey, &periodKey, &slashKey, &rightShiftKey, &numpad1Key, &numpad2Key, &numpad3Key, &pageDownKey, &leftControlKey, &leftWindowsKey, &leftAltKey, &spaceKey, &rightAltKey, &rightWindowsKey, &appsKey, &rightControlKey, &upKey, &downKey, &leftKey, &rightKey, &numpad0Key, &numpadCommaKey, &numpadEnterKey};
+static KeyboardKey *selectedKey = &kKey;
 
 static void WireKey(KeyboardKey *key, KeyboardKey *left, KeyboardKey *right, KeyboardKey *above, KeyboardKey *below)
 {
@@ -527,16 +701,110 @@ static void WireKey(KeyboardKey *key, KeyboardKey *left, KeyboardKey *right, Key
 
 static void WireKeys(void)
 {
-    WireKey(&qKey, &eKey, &wKey, &zKey, &aKey);
-    WireKey(&wKey, &qKey, &eKey, &xKey, &sKey);
-    WireKey(&eKey, &wKey, &oKey, &cKey, &dKey);
-    WireKey(&oKey, &eKey, &qKey, &cKey, &dKey);
-    WireKey(&aKey, &dKey, &sKey, &qKey, &zKey);
-    WireKey(&sKey, &aKey, &dKey, &wKey, &xKey);
-    WireKey(&dKey, &sKey, &aKey, &eKey, &cKey);
-    WireKey(&zKey, &cKey, &xKey, &aKey, &qKey);
-    WireKey(&xKey, &zKey, &cKey, &sKey, &wKey);
-    WireKey(&cKey, &xKey, &zKey, &dKey, &eKey);
+    WireKey(&escapeKey, &endKey, &f1Key, &leftControlKey, &graveKey);
+    WireKey(&f1Key, &escapeKey, &f2Key, &leftWindowsKey, &d1Key);
+    WireKey(&f2Key, &f1Key, &f3Key, &leftAltKey, &d2Key);
+    WireKey(&f3Key, &f2Key, &f4Key, &spaceKey, &d3Key);
+    WireKey(&f4Key, &f3Key, &f5Key, &spaceKey, &d4Key);
+    WireKey(&f5Key, &f4Key, &f6Key, &spaceKey, &d5Key);
+    WireKey(&f6Key, &f5Key, &f7Key, &spaceKey, &d6Key);
+    WireKey(&f7Key, &f6Key, &f8Key, &rightAltKey, &d7Key);
+    WireKey(&f8Key, &f7Key, &f9Key, &rightWindowsKey, &d8Key);
+    WireKey(&f9Key, &f8Key, &f10Key, &appsKey, &d9Key);
+    WireKey(&f10Key, &f9Key, &f11Key, &rightControlKey, &d0Key);
+    WireKey(&f11Key, &f10Key, &f12Key, &upKey, &minusKey);
+    WireKey(&f12Key, &f11Key, &sysRqKey, &downKey, &equalsKey);
+    WireKey(&sysRqKey, &f12Key, &scrollLockKey, &downKey, &backKey);
+    WireKey(&scrollLockKey, &sysRqKey, &pauseKey, &leftKey, &backKey);
+    WireKey(&pauseKey, &scrollLockKey, &insertKey, &rightKey, &numLockKey);
+    WireKey(&insertKey, &pauseKey, &deleteKey, &divideKey, &numpadCommaKey);
+    WireKey(&deleteKey, &insertKey, &homeKey, &numpadCommaKey, &multiplyKey);
+    WireKey(&homeKey, &deleteKey, &endKey, &numpadCommaKey, &multiplyKey);
+    WireKey(&endKey, &homeKey, &escapeKey, &numpadEnterKey, &subtractKey);
+    WireKey(&graveKey, &subtractKey, &d1Key, &escapeKey, &tabKey);
+    WireKey(&d1Key, &graveKey, &d2Key, &f1Key, &qKey);
+    WireKey(&d2Key, &d1Key, &d3Key, &f2Key, &wKey);
+    WireKey(&d3Key, &d2Key, &d4Key, &f3Key, &eKey);
+    WireKey(&d4Key, &d3Key, &d5Key, &f4Key, &rKey);
+    WireKey(&d5Key, &d4Key, &d6Key, &f5Key, &tKey);
+    WireKey(&d6Key, &d5Key, &d7Key, &f6Key, &yKey);
+    WireKey(&d7Key, &d6Key, &d8Key, &f7Key, &uKey);
+    WireKey(&d8Key, &d7Key, &d9Key, &f8Key, &iKey);
+    WireKey(&d9Key, &d8Key, &d0Key, &f9Key, &oKey);
+    WireKey(&d0Key, &d9Key, &minusKey, &f10Key, &pKey);
+    WireKey(&minusKey, &d0Key, &equalsKey, &f11Key, &leftBracketKey);
+    WireKey(&equalsKey, &minusKey, &backKey, &f12Key, &rightBracketKey);
+    WireKey(&backKey, &equalsKey, &numLockKey, &scrollLockKey, &backslashKey);
+    WireKey(&numLockKey, &backKey, &divideKey, &insertKey, &numpad7Key);
+    WireKey(&divideKey, &numLockKey, &multiplyKey, &deleteKey, &numpad8Key);
+    WireKey(&multiplyKey, &divideKey, &subtractKey, &homeKey, &numpad9Key);
+    WireKey(&subtractKey, &multiplyKey, &graveKey, &endKey, &addKey);
+    WireKey(&tabKey, &addKey, &qKey, &graveKey, &capsLockKey);
+    WireKey(&qKey, &tabKey, &wKey, &d1Key, &aKey);
+    WireKey(&wKey, &qKey, &eKey, &d2Key, &aKey);
+    WireKey(&eKey, &wKey, &rKey, &d3Key, &sKey);
+    WireKey(&rKey, &eKey, &tKey, &d4Key, &dKey);
+    WireKey(&tKey, &rKey, &yKey, &d5Key, &fKey);
+    WireKey(&yKey, &tKey, &uKey, &d6Key, &gKey);
+    WireKey(&uKey, &yKey, &iKey, &d7Key, &hKey);
+    WireKey(&iKey, &uKey, &oKey, &d8Key, &jKey);
+    WireKey(&oKey, &iKey, &pKey, &d9Key, &kKey);
+    WireKey(&pKey, &oKey, &leftBracketKey, &d0Key, &lKey);
+    WireKey(&leftBracketKey, &pKey, &rightBracketKey, &minusKey, &semicolonKey);
+    WireKey(&rightBracketKey, &leftBracketKey, &backslashKey, &equalsKey, &apostropheKey);
+    WireKey(&backslashKey, &rightBracketKey, &numpad7Key, &backKey, &returnKey);
+    WireKey(&numpad7Key, &backslashKey, &numpad8Key, &numLockKey, &numpad4Key);
+    WireKey(&numpad8Key, &numpad7Key, &numpad9Key, &divideKey, &numpad5Key);
+    WireKey(&numpad9Key, &numpad8Key, &addKey, &multiplyKey, &numpad6Key);
+    WireKey(&addKey, &numpad9Key, &tabKey, &subtractKey, &pageUpKey);
+    WireKey(&capsLockKey, &pageUpKey, &aKey, &tabKey, &leftShiftKey);
+    WireKey(&aKey, &capsLockKey, &sKey, &wKey, &zKey);
+    WireKey(&sKey, &aKey, &dKey, &eKey, &xKey);
+    WireKey(&dKey, &sKey, &fKey, &rKey, &cKey);
+    WireKey(&fKey, &dKey, &gKey, &tKey, &vKey);
+    WireKey(&gKey, &fKey, &hKey, &yKey, &bKey);
+    WireKey(&hKey, &gKey, &jKey, &uKey, &nKey);
+    WireKey(&jKey, &hKey, &kKey, &iKey, &mKey);
+    WireKey(&kKey, &jKey, &lKey, &iKey, &commaKey);
+    WireKey(&lKey, &kKey, &semicolonKey, &pKey, &periodKey);
+    WireKey(&semicolonKey, &lKey, &apostropheKey, &leftBracketKey, &slashKey);
+    WireKey(&apostropheKey, &semicolonKey, &returnKey, &rightBracketKey, &slashKey);
+    WireKey(&returnKey, &apostropheKey, &numpad4Key, &backslashKey, &rightShiftKey);
+    WireKey(&numpad4Key, &returnKey, &numpad5Key, &numpad7Key, &numpad1Key);
+    WireKey(&numpad5Key, &numpad4Key, &numpad6Key, &numpad8Key, &numpad2Key);
+    WireKey(&numpad6Key, &numpad5Key, &pageUpKey, &numpad9Key, &numpad3Key);
+    WireKey(&pageUpKey, &numpad6Key, &capsLockKey, &addKey, &pageDownKey);
+    WireKey(&leftShiftKey, &pageDownKey, &zKey, &capsLockKey, &leftWindowsKey);
+    WireKey(&zKey, &leftShiftKey, &xKey, &aKey, &leftAltKey);
+    WireKey(&xKey, &zKey, &cKey, &sKey, &spaceKey);
+    WireKey(&cKey, &xKey, &vKey, &dKey, &spaceKey);
+    WireKey(&vKey, &cKey, &bKey, &fKey, &spaceKey);
+    WireKey(&bKey, &vKey, &nKey, &gKey, &spaceKey);
+    WireKey(&nKey, &bKey, &mKey, &hKey, &rightAltKey);
+    WireKey(&mKey, &nKey, &commaKey, &jKey, &rightWindowsKey);
+    WireKey(&commaKey, &mKey, &periodKey, &kKey, &appsKey);
+    WireKey(&periodKey, &commaKey, &slashKey, &lKey, &rightControlKey);
+    WireKey(&slashKey, &periodKey, &rightShiftKey, &semicolonKey, &upKey);
+    WireKey(&rightShiftKey, &slashKey, &numpad1Key, &returnKey, &leftKey);
+    WireKey(&numpad1Key, &rightShiftKey, &numpad2Key, &numpad4Key, &numpad0Key);
+    WireKey(&numpad2Key, &numpad1Key, &numpad3Key, &numpad5Key, &numpad0Key);
+    WireKey(&numpad3Key, &numpad2Key, &pageDownKey, &numpad6Key, &numpadCommaKey);
+    WireKey(&pageDownKey, &numpad3Key, &leftShiftKey, &pageDownKey, &numpadEnterKey);
+    WireKey(&leftControlKey, &numpadEnterKey, &leftWindowsKey, &leftShiftKey, &escapeKey);
+    WireKey(&leftWindowsKey, &leftControlKey, &leftAltKey, &leftShiftKey, &f1Key);
+    WireKey(&leftAltKey, &leftWindowsKey, &spaceKey, &zKey, &f2Key);
+    WireKey(&spaceKey, &leftAltKey, &rightAltKey, &cKey, &f5Key);
+    WireKey(&rightAltKey, &spaceKey, &rightWindowsKey, &nKey, &f7Key);
+    WireKey(&rightWindowsKey, &rightAltKey, &appsKey, &mKey, &f8Key);
+    WireKey(&appsKey, &rightWindowsKey, &rightControlKey, &commaKey, &f9Key);
+    WireKey(&rightControlKey, &appsKey, &upKey, &periodKey, &f10Key);
+    WireKey(&upKey, &rightControlKey, &downKey, &slashKey, &f11Key);
+    WireKey(&downKey, &upKey, &leftKey, &rightShiftKey, &f12Key);
+    WireKey(&leftKey, &downKey, &rightKey, &rightShiftKey, &sysRqKey);
+    WireKey(&rightKey, &leftKey, &numpad0Key, &rightShiftKey, &scrollLockKey);
+    WireKey(&numpad0Key, &rightKey, &numpadCommaKey, &numpad2Key, &insertKey);
+    WireKey(&numpadCommaKey, &numpad0Key, &numpadEnterKey, &numpad3Key, &homeKey);
+    WireKey(&numpadEnterKey, &numpadCommaKey, &leftControlKey, &pageDownKey, &endKey);
 }
 
 static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0, keyboardRight = 0, keyboardBottom = 0, keyPressActive = 0;
@@ -1549,7 +1817,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
     glVertex2f((GLfloat)windowRight, (GLfloat)windowBottom + 1);
     glEnd();
 
-    KeyboardKey key = qKey;
+    KeyboardKey key = escapeKey;
     int left = windowLeft + 2;
     int top = windowTop - 2;
     Direction direction = RIGHT;
@@ -1563,7 +1831,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         const int right = left + key.width;
         const int bottom = top - KEY_BASE_SIZE;
 
-        int lockKey = key.keyCode == KEY_CODE_E;
+        int lockKey = key.keyCode == KEY_CODE_SCROLL || key.keyCode == KEY_CODE_NUMLOCK || key.keyCode == KEY_CODE_CAPITAL;
 
         int specialColor = 0;
         if ((key.state == NEW_DOWN || key.state == DOWN) && !lockKey)
@@ -1604,7 +1872,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         const int labelOffsetX = (int)XPLMMeasureString(xplmFont_Basic, key.label, strlen(key.label)) / 2;
         XPLMDrawString(labelColor, left + key.width / 2 - labelOffsetX, top - KEY_BASE_SIZE / 2 - labelOffsetY, key.label, NULL, xplmFont_Basic);
 
-        if (key.keyCode == cKey.keyCode)
+        if (key.keyCode == leftControlKey.keyCode)
             break;
 
         if (key.position == RIGHT_END && direction == RIGHT)
@@ -1757,14 +2025,10 @@ static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, in
 
 static void MakeInput(int keyCode, KeyState state)
 {
-    char out[32];
-    sprintf(out, (state == DOWN ? "Set Key Down: %d\n" : "Set Key Up: %d\n"), keyCode);
-    XPLMDebugString(out);
-
 #if IBM
     INPUT input[1];
     input[0].type = INPUT_KEYBOARD;
-    input[0].ki.wScan = (WORD)MapVirtualKeyA(keyCode, MAPVK_VK_TO_VSC);
+    input[0].ki.wScan = (WORD)keyCode;
     DWORD flags = KEYEVENTF_SCANCODE;
     if (state == UP)
         flags |= KEYEVENTF_KEYUP;
@@ -1833,8 +2097,8 @@ static void ToggleKeyboardControl(void)
         {
             XPLMCreateWindow_t keyboardWindowParameters;
             keyboardWindowParameters.structSize = sizeof keyboardWindowParameters;
-            keyboardWindowParameters.top = keyboardBottom + 600;
-            keyboardWindowParameters.left = keyboardRight - 1024;
+            keyboardWindowParameters.top = keyboardBottom + (KEY_BASE_SIZE + KEY_BORDER_WIDTH * 2) * 6 + KEY_BORDER_WIDTH * 2;
+            keyboardWindowParameters.left = keyboardRight - ((KEY_BASE_SIZE + KEY_BORDER_WIDTH * 2) * 17 + (int) ((KEY_BASE_SIZE + KEY_BORDER_WIDTH * 2) * 2.5f) + KEY_BORDER_WIDTH * 2);
             keyboardWindowParameters.right = keyboardRight;
             keyboardWindowParameters.bottom = keyboardBottom;
             FitGeometryWithinScreenBounds(&keyboardWindowParameters.left, &keyboardWindowParameters.top, &keyboardWindowParameters.right, &keyboardWindowParameters.bottom);
@@ -2292,7 +2556,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             (**ptr).lastInputTime = currentTime;
             break;
         case DOWN:
-            if (currentTime - (**ptr).lastInputTime > 0.15f)
+            if (currentTime - (**ptr).lastInputTime > KEY_REPEAT_INTERVAL)
             {
                 MakeInput((**ptr).keyCode, DOWN);
                 (**ptr).lastInputTime = currentTime;
