@@ -357,7 +357,7 @@
                         "void main()"                                                                                                                                                                                                                      \
                         "{"                                                                                                                                                                                                                                \
                         "vec2 size = vec2(bounds.z - bounds.x, bounds.y - bounds.w);"                                                                                                                                                                      \
-                        "gl_FragColor = vec4(0.5, 0.5, 0.5, 0.75);"                                                                                                                                                                                         \
+                        "gl_FragColor = vec4(0.5, 0.5, 0.5, 0.75);"                                                                                                                                                                                        \
                         "if (abs(gl_FragCoord.x - bounds.x) < 1.0 || abs(gl_FragCoord.x - bounds.z) < 1.0 || abs(gl_FragCoord.y - bounds.y) < 1.0 || abs(gl_FragCoord.y - bounds.w) < 1.0 || round(mod(gl_FragCoord.y - bounds.w, (size.y / 4.0))) < 1.0)" \
                         "gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);"                                                                                                                                                                                         \
                         "else"                                                                                                                                                                                                                             \
@@ -369,24 +369,25 @@
                         "segments -= 1.0;"                                                                                                                                                                                                                 \
                         "float segmentWidth = size.x / segments;"                                                                                                                                                                                          \
                         "if (gl_FragCoord.x < bounds.z - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"                                                                                                \
-                        "gl_FragColor = vec4(0.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                         \
+                        "gl_FragColor = vec4(0.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                        \
                         "else if (gl_FragCoord.x >= bounds.z - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"                              \
-                        "gl_FragColor = vec4(0.0, 0.0, 1.0, 0.75);"                                                                                                                                                                                         \
+                        "gl_FragColor = vec4(0.0, 0.0, 1.0, 0.75);"                                                                                                                                                                                        \
                         "else if (gl_FragCoord.x >= bounds.z - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + bounds.w + 1.0)"                                                                                                              \
-                        "gl_FragColor = vec4(1.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                         \
+                        "gl_FragColor = vec4(1.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                        \
                         "}"                                                                                                                                                                                                                                \
                         "}"
 
 #if IBM
-#define KEY_CODE_Q 0x51
-#define KEY_CODE_W 0x57
-#define KEY_CODE_E 0x45
-#define KEY_CODE_A 0x41
-#define KEY_CODE_S 0x53
-#define KEY_CODE_D 0x44
-#define KEY_CODE_Z 0x5A
-#define KEY_CODE_X 0x58
-#define KEY_CODE_C 0x43
+#define KEY_CODE_Q 'Q'
+#define KEY_CODE_W 'W'
+#define KEY_CODE_E 'E'
+#define KEY_CODE_O 'O'
+#define KEY_CODE_A 'A'
+#define KEY_CODE_S 'S'
+#define KEY_CODE_D 'D'
+#define KEY_CODE_Z 'Z'
+#define KEY_CODE_X 'X'
+#define KEY_CODE_C 'C'
 #elif APL
 #define KEY_CODE_Q 1
 #define KEY_CODE_W 2
@@ -452,7 +453,9 @@ typedef enum
 typedef enum
 {
     UP,
-    DOWN
+    DOWN,
+    NEW_DOWN,
+    NEW_UP
 } KeyState;
 
 typedef enum
@@ -465,21 +468,22 @@ typedef enum
 struct KeyboardKey
 {
     char *label;
-    int code;
+    int keyCode;
     int width;
     KeyPosition position;
     KeyState state;
+    float lastInputTime;
     KeyboardKey *above;
     KeyboardKey *below;
     KeyboardKey *left;
     KeyboardKey *right;
 };
 
-static KeyboardKey InitKeyboardKey(const char *label, int code, float widthFactor = 1.0f, KeyPosition position = BETWEEN)
+static KeyboardKey InitKeyboardKey(const char *label, int keyCode, float widthFactor = 1.0f, KeyPosition position = BETWEEN)
 {
     int width = (int)(KEY_BASE_SIZE * widthFactor);
 
-    KeyboardKey key = {strdup(label), code, width, position, UP, NULL, NULL, NULL, NULL};
+    KeyboardKey key = {strdup(label), keyCode, width, position, UP, 0.0f, NULL, NULL, NULL, NULL};
     return key;
 }
 
@@ -499,18 +503,19 @@ struct XInputState
 #endif
 
 // global internal variables
-static KeyboardKey QKey = InitKeyboardKey("Q", KEY_CODE_Q, 1.0f, LEFT_END);
-static KeyboardKey WKey = InitKeyboardKey("W", KEY_CODE_W);
-static KeyboardKey EKey = InitKeyboardKey("E", KEY_CODE_E, 1.0f, RIGHT_END);
-static KeyboardKey AKey = InitKeyboardKey("A", KEY_CODE_A, 1.0f, LEFT_END);
-static KeyboardKey SKey = InitKeyboardKey("S", KEY_CODE_S);
-static KeyboardKey DKey = InitKeyboardKey("D", KEY_CODE_D, 1.0f, RIGHT_END);
-static KeyboardKey ZKey = InitKeyboardKey("Z", KEY_CODE_Z, 1.0f, LEFT_END);
-static KeyboardKey XKey = InitKeyboardKey("X Key", KEY_CODE_X, 3.0f);
-static KeyboardKey CKey = InitKeyboardKey("C", KEY_CODE_C, 1.0f, RIGHT_END);
+static KeyboardKey qKey = InitKeyboardKey("Q", KEY_CODE_Q, 1.0f, LEFT_END);
+static KeyboardKey wKey = InitKeyboardKey("W", KEY_CODE_W);
+static KeyboardKey eKey = InitKeyboardKey("E", KEY_CODE_E);
+static KeyboardKey oKey = InitKeyboardKey("O", KEY_CODE_O, 1.0f, RIGHT_END);
+static KeyboardKey aKey = InitKeyboardKey("A", KEY_CODE_A, 1.0f, LEFT_END);
+static KeyboardKey sKey = InitKeyboardKey("S", KEY_CODE_S);
+static KeyboardKey dKey = InitKeyboardKey("D", KEY_CODE_D, 1.0f, RIGHT_END);
+static KeyboardKey zKey = InitKeyboardKey("Z", KEY_CODE_Z, 1.0f, LEFT_END);
+static KeyboardKey xKey = InitKeyboardKey("X Key", KEY_CODE_X, 3.0f);
+static KeyboardKey cKey = InitKeyboardKey("C", KEY_CODE_C, 1.0f, RIGHT_END);
 
-static KeyboardKey *keyboardKeys[] = {&QKey, &WKey, &EKey, &AKey, &SKey, &DKey, &ZKey, &XKey, &CKey};
-static KeyboardKey *selectedKey = &SKey;
+static KeyboardKey *keyboardKeys[] = {&qKey, &wKey, &eKey, &oKey, &aKey, &sKey, &dKey, &zKey, &xKey, &cKey};
+static KeyboardKey *selectedKey = &sKey;
 
 static void WireKey(KeyboardKey *key, KeyboardKey *left, KeyboardKey *right, KeyboardKey *above, KeyboardKey *below)
 {
@@ -522,15 +527,16 @@ static void WireKey(KeyboardKey *key, KeyboardKey *left, KeyboardKey *right, Key
 
 static void WireKeys(void)
 {
-    WireKey(&QKey, &EKey, &WKey, &ZKey, &AKey);
-    WireKey(&WKey, &QKey, &EKey, &XKey, &SKey);
-    WireKey(&EKey, &WKey, &QKey, &CKey, &DKey);
-    WireKey(&AKey, &DKey, &SKey, &QKey, &ZKey);
-    WireKey(&SKey, &AKey, &DKey, &WKey, &XKey);
-    WireKey(&DKey, &SKey, &AKey, &EKey, &CKey);
-    WireKey(&ZKey, &CKey, &XKey, &AKey, &QKey);
-    WireKey(&XKey, &ZKey, &CKey, &SKey, &WKey);
-    WireKey(&CKey, &XKey, &ZKey, &DKey, &EKey);
+    WireKey(&qKey, &eKey, &wKey, &zKey, &aKey);
+    WireKey(&wKey, &qKey, &eKey, &xKey, &sKey);
+    WireKey(&eKey, &wKey, &oKey, &cKey, &dKey);
+    WireKey(&oKey, &eKey, &qKey, &cKey, &dKey);
+    WireKey(&aKey, &dKey, &sKey, &qKey, &zKey);
+    WireKey(&sKey, &aKey, &dKey, &wKey, &xKey);
+    WireKey(&dKey, &sKey, &aKey, &eKey, &cKey);
+    WireKey(&zKey, &cKey, &xKey, &aKey, &qKey);
+    WireKey(&xKey, &zKey, &cKey, &sKey, &wKey);
+    WireKey(&cKey, &xKey, &zKey, &dKey, &eKey);
 }
 
 static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0, keyboardRight = 0, keyboardBottom = 0, keyPressActive = 0;
@@ -998,7 +1004,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
 
-        if (inPhase == xplm_CommandBegin && mode == DEFAULT)
+        if (inPhase == xplm_CommandBegin && (mode == DEFAULT || mode == KEYBOARD))
         {
             mode = VIEW;
 
@@ -1483,55 +1489,27 @@ static int KeyboardSelectorRightCommandHandler(XPLMCommandRef inCommand, XPLMCom
     return 0;
 }
 
-static void SetKeyState(int keyCode, KeyState state)
+/*static void SetKeyState(int keyCode, KeyState state)
 {
-#if IBM
-    INPUT input[1];
-    input[0].type = INPUT_KEYBOARD;
-    input[0].ki.wScan = (WORD)keyCode;
-    DWORD flags;
     if (state == DOWN)
-        flags = KEYEVENTF_SCANCODE;
-    else
-        flags = KEYEVENTF_KEYUP | KEYEVENTF_SCANCODE;
-    input[0].ki.dwFlags = flags;
-
-    SendInput((UINT)1, input, sizeof(INPUT));
-#elif APL
-    static CGEventSourceRef eventSource = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-    CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode)keyCode, state == DOWN);
-    CGEventPost(kCGHIDEventTap, event);
-    if (event != NULL)
-        CFRelease(event);
-#elif LIN
-    if (display != NULL)
-    {
-        XTestFakeKeyEvent(display, keyCode, state == DOWN, CurrentTime);
-        XFlush(display);
-    }
-#endif
-}
+        newDownKeys.insert(keyCode);
+    else if (state == UP)
+        upKeys.insert(keyCode);
+}*/
 
 static int PressKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase == xplm_CommandBegin)
     {
-         if ((*selectedKey).state == UP)
-        {
-            (*selectedKey).state = DOWN;
-            SetKeyState((*selectedKey).code, DOWN);
-            keyPressActive = 1;
-        }
-        else if ((*selectedKey).state == DOWN)
-        {
-            SetKeyState((*selectedKey).code, UP);
-            (*selectedKey).state = UP;
-        }
+        if ((*selectedKey).state == UP || (*selectedKey).state == NEW_UP)
+            (*selectedKey).state = NEW_DOWN;
+        else if ((*selectedKey).state == DOWN || (*selectedKey).state == NEW_DOWN)
+            (*selectedKey).state = NEW_UP;
     }
-    else if (inPhase == xplm_CommandEnd && (*selectedKey).state == DOWN)
+    else if (inPhase == xplm_CommandEnd && ((*selectedKey).state == DOWN || (*selectedKey).state == NEW_DOWN))
     {
-        SetKeyState((*selectedKey).code, UP);
-        (*selectedKey).state = UP;
+        // SetKeyState((*selectedKey).code, UP);
+        (*selectedKey).state = NEW_UP;
         keyPressActive = 0;
     }
 
@@ -1542,16 +1520,10 @@ static int LockKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
 {
     if (!keyPressActive && inPhase == xplm_CommandBegin)
     {
-        if ((*selectedKey).state == UP)
-        {
-            (*selectedKey).state = DOWN;
-            SetKeyState((*selectedKey).code, DOWN);
-        }
-        else if ((*selectedKey).state == DOWN)
-        {
-            SetKeyState((*selectedKey).code, UP);
-            (*selectedKey).state = UP;
-        }
+        if ((*selectedKey).state == UP || (*selectedKey).state == NEW_UP)
+            (*selectedKey).state = NEW_DOWN;
+        else if ((*selectedKey).state == DOWN || (*selectedKey).state == NEW_DOWN)
+            (*selectedKey).state = NEW_UP;
     }
 
     return 0;
@@ -1577,7 +1549,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
     glVertex2f((GLfloat)windowRight, (GLfloat)windowBottom + 1);
     glEnd();
 
-    KeyboardKey key = QKey;
+    KeyboardKey key = qKey;
     int left = windowLeft + 2;
     int top = windowTop - 2;
     Direction direction = RIGHT;
@@ -1591,10 +1563,10 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         const int right = left + key.width;
         const int bottom = top - KEY_BASE_SIZE;
 
-        int lockKey = key.code == KEY_CODE_E;
+        int lockKey = key.keyCode == KEY_CODE_E;
 
         int specialColor = 0;
-        if (key.state == DOWN && !lockKey)
+        if ((key.state == NEW_DOWN || key.state == DOWN) && !lockKey)
         {
             glColor4f(0.0f, 0.0f, 0.0f, KEY_ALPHA);
             specialColor = 1;
@@ -1607,7 +1579,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         glVertex2f((GLfloat)right, (GLfloat)bottom);
         glEnd();
 
-        if (key.code == (*selectedKey).code)
+        if (key.keyCode == (*selectedKey).keyCode)
         {
             glColor3f(1.0f, 0.0f, 0.0f);
             specialColor = 1;
@@ -1623,7 +1595,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
             SetDefaultKeyColor();
 
         float labelColor[] = {1.0f, 1.0f, 1.0f};
-        if (lockKey && key.state == DOWN)
+        if (lockKey && (key.state == DOWN || key.state == NEW_DOWN))
         {
             labelColor[0] = 0.0f;
             labelColor[2] = 0.0f;
@@ -1632,7 +1604,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         const int labelOffsetX = (int)XPLMMeasureString(xplmFont_Basic, key.label, strlen(key.label)) / 2;
         XPLMDrawString(labelColor, left + key.width / 2 - labelOffsetX, top - KEY_BASE_SIZE / 2 - labelOffsetY, key.label, NULL, xplmFont_Basic);
 
-        if (key.code == CKey.code)
+        if (key.keyCode == cKey.keyCode)
             break;
 
         if (key.position == RIGHT_END && direction == RIGHT)
@@ -1783,6 +1755,51 @@ static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, in
     return 0;
 }
 
+static void MakeInput(int keyCode, KeyState state)
+{
+    char out[32];
+    sprintf(out, (state == DOWN ? "Set Key Down: %d\n" : "Set Key Up: %d\n"), keyCode);
+    XPLMDebugString(out);
+
+#if IBM
+    INPUT input[1];
+    input[0].type = INPUT_KEYBOARD;
+    input[0].ki.wScan = (WORD)MapVirtualKeyA(keyCode, MAPVK_VK_TO_VSC);
+    DWORD flags = KEYEVENTF_SCANCODE;
+    if (state == UP)
+        flags |= KEYEVENTF_KEYUP;
+    input[0].ki.dwFlags = flags;
+    SendInput((UINT)1, input, sizeof(INPUT));
+#elif APL
+    static CGEventSourceRef eventSource = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+    CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode)keyCode, state == DOWN);
+    CGEventPost(kCGHIDEventTap, event);
+    if (event != NULL)
+        CFRelease(event);
+#elif LIN
+    if (display != NULL)
+    {
+        XTestFakeKeyEvent(display, keyCode, state == DOWN, CurrentTime);
+        XFlush(display);
+    }
+#endif
+}
+
+static void ReleaseAllKeys(void)
+{
+    KeyboardKey **ptr = keyboardKeys;
+    KeyboardKey **endPtr = keyboardKeys + sizeof(keyboardKeys) / sizeof(keyboardKeys[0]);
+    while (ptr < endPtr)
+    {
+        if ((**ptr).state == NEW_UP || (**ptr).state == DOWN)
+        {
+            MakeInput((**ptr).keyCode, UP);
+            (**ptr).state = UP;
+        }
+        ptr++;
+    }
+}
+
 static void ToggleKeyboardControl(void)
 {
     // if we are in mouse mode we actually want to toggle it off instead of toggling keyboard mode
@@ -1837,15 +1854,7 @@ static void ToggleKeyboardControl(void)
     }
     else if (mode == KEYBOARD && !keyPressActive)
     {
-        // release all keys that are still down
-        /*for (int i = 0; i < (int)(sizeof(keyboardKeys) / sizeof(KeyboardKey *) - 1); i++)
-        {
-            if ((*keyboardKeys[i]).state != UP)
-            {
-                (*keyboardKeys[i]).state = UP;
-                SetKeyState((*keyboardKeys[i]).code, UP);
-            }
-        }*/
+        ReleaseAllKeys();
 
         // restore the default button assignments
         PopButtonAssignments();
@@ -1897,41 +1906,10 @@ static int PushToTalkCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase i
     // only do push-to-talk if X-IvAp or XSquawkBox is enabled
     if (inPhase != xplm_CommandContinue && (IsPluginEnabled(X_IVAP_PLUGIN_SIGNATURE) || IsPluginEnabled(X_XSQUAWKBOX_PLUGIN_SIGNATURE)))
     {
-        static int active = 0;
         if (inPhase == xplm_CommandBegin)
-            active = 1;
-
-        if (active)
-        {
-#if IBM
-            INPUT input[1];
-            input[0].type = INPUT_KEYBOARD;
-            input[0].ki.wScan = (WORD)24;
-            DWORD flags;
-            if (inPhase == xplm_CommandBegin)
-                flags = KEYEVENTF_SCANCODE;
-            else
-                flags = KEYEVENTF_KEYUP | KEYEVENTF_SCANCODE;
-            input[0].ki.dwFlags = flags;
-
-            SendInput((UINT)1, input, sizeof(INPUT));
-#elif APL
-            static CGEventSourceRef eventSource = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
-            CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode)kVK_ANSI_O, inPhase == xplm_CommandBegin);
-            CGEventPost(kCGHIDEventTap, event);
-            if (event != NULL)
-                CFRelease(event);
-#elif LIN
-            if (display != NULL)
-            {
-                KeyCode keycode = XKeysymToKeycode(display, XK_O);
-                XTestFakeKeyEvent(display, keycode, inPhase == xplm_CommandBegin, CurrentTime);
-                XFlush(display);
-            }
-#endif
-            if (inPhase == xplm_CommandEnd)
-                active = 0;
-        }
+            oKey.state = NEW_DOWN;
+        else if (inPhase == xplm_CommandEnd)
+            oKey.state = NEW_UP;
     }
 
     return 0;
@@ -2296,6 +2274,37 @@ static void SetDefaultAssignments(void)
 // flightloop-callback that mainly handles the joystick axis among other minor stuff
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon)
 {
+    const float currentTime = XPLMGetElapsedTime();
+
+    KeyboardKey **ptr = keyboardKeys;
+    KeyboardKey **endPtr = keyboardKeys + sizeof(keyboardKeys) / sizeof(keyboardKeys[0]);
+    while (ptr < endPtr)
+    {
+        switch ((**ptr).state)
+        {
+        case NEW_UP:
+            MakeInput((**ptr).keyCode, UP);
+            (**ptr).state = UP;
+            break;
+        case NEW_DOWN:
+            MakeInput((**ptr).keyCode, DOWN);
+            (**ptr).state = DOWN;
+            (**ptr).lastInputTime = currentTime;
+            break;
+        case DOWN:
+            if (currentTime - (**ptr).lastInputTime > 0.15f)
+            {
+                MakeInput((**ptr).keyCode, DOWN);
+                (**ptr).lastInputTime = currentTime;
+            }
+            break;
+        default:
+            break;
+        }
+
+        ptr++;
+    }
+
     // update the default head position when required
     if (FloatsEqual(defaultHeadPositionX, FLT_MAX) || FloatsEqual(defaultHeadPositionY, FLT_MAX) || FloatsEqual(defaultHeadPositionZ, FLT_MAX))
     {
@@ -2318,8 +2327,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
     if (XPLMGetDatai(hasJoystickDataRef))
     {
-        float currentTime = XPLMGetElapsedTime();
-
 #if IBM
         static int guideButtonDown = 0;
 
@@ -3506,6 +3513,8 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
 PLUGIN_API void XPluginStop(void)
 {
+    ReleaseAllKeys();
+
     CleanupShader(1);
 
     // revert any remaining button assignments
