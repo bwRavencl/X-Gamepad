@@ -342,7 +342,6 @@
 #define KEY_SELECTOR_MOVEMENT_MIN_ELAPSE_TIME 0.15f
 #define KEY_BASE_SIZE 48
 #define KEY_BORDER_WIDTH 1
-#define KEY_ALPHA 0.75f
 #define KEY_REPEAT_INTERVAL 0.1f
 
 // define dualshock 4 touchpad stuff
@@ -351,33 +350,68 @@
 #define TOUCHPAD_SCROLL_SENSITIVITY 0.1f
 
 // fragment-shader code
-#define FRAGMENT_SHADER "#version 130\n"                                                                                                                                                                                                                   \
-                        "uniform float throttle;"                                                                                                                                                                                                          \
-                        "uniform float prop;"                                                                                                                                                                                                              \
-                        "uniform float mixture;"                                                                                                                                                                                                           \
-                        "uniform vec4 bounds;"                                                                                                                                                                                                             \
-                        "void main()"                                                                                                                                                                                                                      \
-                        "{"                                                                                                                                                                                                                                \
-                        "vec2 size = vec2(bounds.z - bounds.x, bounds.y - bounds.w);"                                                                                                                                                                      \
-                        "gl_FragColor = vec4(0.5, 0.5, 0.5, 0.75);"                                                                                                                                                                                        \
-                        "if (abs(gl_FragCoord.x - bounds.x) < 1.0 || abs(gl_FragCoord.x - bounds.z) < 1.0 || abs(gl_FragCoord.y - bounds.y) < 1.0 || abs(gl_FragCoord.y - bounds.w) < 1.0 || round(mod(gl_FragCoord.y - bounds.w, (size.y / 4.0))) < 1.0)" \
-                        "gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);"                                                                                                                                                                                         \
-                        "else"                                                                                                                                                                                                                             \
-                        "{"                                                                                                                                                                                                                                \
-                        "float segments = 3.0;"                                                                                                                                                                                                            \
-                        "if (prop < -0.5)"                                                                                                                                                                                                                 \
-                        "segments -= 1.0;"                                                                                                                                                                                                                 \
-                        "if (mixture < -0.5)"                                                                                                                                                                                                              \
-                        "segments -= 1.0;"                                                                                                                                                                                                                 \
-                        "float segmentWidth = size.x / segments;"                                                                                                                                                                                          \
-                        "if (gl_FragCoord.x < bounds.z - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"                                                                                                \
-                        "gl_FragColor = vec4(0.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                        \
-                        "else if (gl_FragCoord.x >= bounds.z - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"                              \
-                        "gl_FragColor = vec4(0.0, 0.0, 1.0, 0.75);"                                                                                                                                                                                        \
-                        "else if (gl_FragCoord.x >= bounds.z - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + bounds.w + 1.0)"                                                                                                              \
-                        "gl_FragColor = vec4(1.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                        \
-                        "}"                                                                                                                                                                                                                                \
-                        "}"
+#define INDICATORS_FRAGMENT_SHADER "#version 130\n"                                                                                                                                                                                                                       \
+                                   ""                                                                                                                                                                                                                                     \
+                                   "uniform float throttle;"                                                                                                                                                                                                              \
+                                   "uniform float prop;"                                                                                                                                                                                                                  \
+                                   "uniform float mixture;"                                                                                                                                                                                                               \
+                                   "uniform vec4 bounds;"                                                                                                                                                                                                                 \
+                                   ""                                                                                                                                                                                                                                     \
+                                   "void main()"                                                                                                                                                                                                                          \
+                                   "{"                                                                                                                                                                                                                                    \
+                                   "    vec2 size = vec2(bounds.z - bounds.x, bounds.y - bounds.w);"                                                                                                                                                                      \
+                                   "    gl_FragColor = vec4(0.5, 0.5, 0.5, 0.75);"                                                                                                                                                                                        \
+                                   ""                                                                                                                                                                                                                                     \
+                                   "    if (abs(gl_FragCoord.x - bounds.x) < 1.0 || abs(gl_FragCoord.x - bounds.z) < 1.0 || abs(gl_FragCoord.y - bounds.y) < 1.0 || abs(gl_FragCoord.y - bounds.w) < 1.0 || round(mod(gl_FragCoord.y - bounds.w, (size.y / 4.0))) < 1.0)" \
+                                   "        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);"                                                                                                                                                                                     \
+                                   "    else"                                                                                                                                                                                                                             \
+                                   "    {"                                                                                                                                                                                                                                \
+                                   "        float segments = 3.0;"                                                                                                                                                                                                        \
+                                   "        if (prop < -0.5)"                                                                                                                                                                                                             \
+                                   "            segments -= 1.0;"                                                                                                                                                                                                         \
+                                   "        if (mixture < -0.5)"                                                                                                                                                                                                          \
+                                   "            segments -= 1.0;"                                                                                                                                                                                                         \
+                                   ""                                                                                                                                                                                                                                     \
+                                   "        float segmentWidth = size.x / segments;"                                                                                                                                                                                      \
+                                   ""                                                                                                                                                                                                                                     \
+                                   "        if (gl_FragCoord.x < bounds.z - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"                                                                                            \
+                                   "            gl_FragColor = vec4(0.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                \
+                                   "        else if (gl_FragCoord.x >= bounds.z - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"                          \
+                                   "            gl_FragColor = vec4(0.0, 0.0, 1.0, 0.75);"                                                                                                                                                                                \
+                                   "        else if (gl_FragCoord.x >= bounds.z - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + bounds.w + 1.0)"                                                                                                          \
+                                   "            gl_FragColor = vec4(1.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                \
+                                   "    }"                                                                                                                                                                                                                                \
+                                   "}"
+
+#define KEYBOARD_KEY_VERTEX_SHADER "#version 130\n"              \
+                                   ""                            \
+                                   "out vec2 texCoordV;"             \
+                                   ""                            \
+                                   "void main()"                 \
+                                   "{"                           \
+                                   "    texCoordV = gl_MultiTexCoord0.xy;" \
+                                   "}"
+
+#define KEYBOARD_KEY_FRAGMENT_SHADER "#version 130\n"                            \
+                                     ""                                          \
+                                     "in vec2 texCoordV;"                            \
+                                     "uniform float aspect;"                     \
+                                     "uniform vec4 borderColor;"                 \
+                                     "uniform vec4 keyColor;"                    \
+                                     ""                                          \
+                                     "void main()"                               \
+                                     "{"                                         \
+                                     "    const float borderWidth = 0.15;"       \
+                                     "    float maxX = 1.0 - borderWidth;"       \
+                                     "    float minX = borderWidth;"             \
+                                     "    float maxY = maxX / aspect;"           \
+                                     "    float minY = minX / aspect;"           \
+                                     ""                                          \
+                                     "    if (texCoordV.x < maxX && texCoordV.x > minX)" \
+                                     "        gl_FragColor = keyColor;"          \
+                                     "    else"                                  \
+                                     "        gl_FragColor = borderColor;"       \
+                                     "}"
 
 #if IBM
 #define KEY_CODE_ESCAPE 0x1
@@ -549,6 +583,7 @@ struct KeyboardKey
 {
     char *label;
     int keyCode;
+    float aspect;
     int width;
     KeyPosition position;
     KeyState state;
@@ -559,11 +594,17 @@ struct KeyboardKey
     KeyboardKey *right;
 };
 
-static KeyboardKey InitKeyboardKey(const char *label, int keyCode, float widthFactor = 1.0f, KeyPosition position = BETWEEN)
+static KeyboardKey InitKeyboardKey(const char *label, int keyCode, float aspect = 1.0f, KeyPosition position = BETWEEN)
 {
-    int width = (int)(KEY_BASE_SIZE * widthFactor);
+    int width = (int)(KEY_BASE_SIZE * aspect);
 
-    KeyboardKey key = {strdup(label), keyCode, width, position, UP, 0.0f, NULL, NULL, NULL, NULL};
+    // border correction
+    /*if (aspect > 1.0f)
+        width += (int) (aspect * KEY_BORDER_WIDTH);
+    else if (aspect < 1.0f)
+        width -= (int) (aspect * KEY_BORDER_WIDTH);*/
+
+    KeyboardKey key = {strdup(label), keyCode, aspect, width, position, UP, 0.0f, NULL, NULL, NULL, NULL};
     return key;
 }
 
@@ -812,7 +853,7 @@ static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, def
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
 static ConfigurationStep configurationStep = START;
-static GLuint program = 0, fragmentShader = 0;
+static GLuint indicatorsProgram = 0, indicatorsFragmentShader = 0, keyboardKeyProgram = 0, keyboardKeyVertexShader = 0, keyboardKeyFragmentShader = 0;
 static std::stack<int *> buttonAssignmentsStack;
 static XPLMWindowID indicatorsWindow = NULL, keyboardWindow = NULL;
 
@@ -1797,11 +1838,6 @@ static int LockKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
     return 0;
 }
 
-static inline void SetDefaultKeyColor()
-{
-    glColor4f(0.15f, 0.15f, 0.15f, KEY_ALPHA);
-}
-
 static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
 {
     XPLMSetGraphicsState(0, 0, 0, 0, 1, 0, 0);
@@ -1817,50 +1853,54 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
     glVertex2f((GLfloat)windowRight, (GLfloat)windowBottom + 1);
     glEnd();
 
+    int borderWidthLocation = glGetUniformLocation(keyboardKeyProgram, "borderWidth");
+    glUniform1f(borderWidthLocation, KEY_BORDER_WIDTH);
+
     KeyboardKey key = escapeKey;
-    int left = windowLeft + 2;
-    int top = windowTop - 2;
+    int left = windowLeft;
+    int top = windowTop;
     Direction direction = RIGHT;
-    SetDefaultKeyColor();
 
     int charHeight;
     XPLMGetFontDimensions(xplmFont_Basic, NULL, &charHeight, NULL);
     const int labelOffsetY = charHeight / 2;
     while (1)
     {
-        const int right = left + key.width;
-        const int bottom = top - KEY_BASE_SIZE;
+        glEnable(GL_POINT_SPRITE);
+        glUseProgram(keyboardKeyProgram);
+
+        int aspectLocation = glGetUniformLocation(keyboardKeyProgram, "aspect");
+        glUniform1f(aspectLocation, key.aspect);
+
+        int borderColorLocation = glGetUniformLocation(keyboardKeyProgram, "borderColor");
+        if (key.keyCode == (*selectedKey).keyCode)
+            glUniform4f(borderColorLocation, 1.0f, 0.0f, 0.0f, 1.0f);
+        else
+            glUniform4f(borderColorLocation, 1.0f, 0.0f, 1.0f, 1.0f);
 
         int lockKey = key.keyCode == KEY_CODE_SCROLL || key.keyCode == KEY_CODE_NUMLOCK || key.keyCode == KEY_CODE_CAPITAL;
 
-        int specialColor = 0;
+        int keyColorLocation = glGetUniformLocation(keyboardKeyProgram, "keyColor");
         if ((key.state == NEW_DOWN || key.state == DOWN) && !lockKey)
-        {
-            glColor4f(0.0f, 0.0f, 0.0f, KEY_ALPHA);
-            specialColor = 1;
-        }
+            glUniform4f(keyColorLocation, 0.0f, 0.0f, 0.0f, 0.75f);
+        else
+            glUniform4f(keyColorLocation, 0.15f, 0.15f, 0.15f, 0.75f);
+
+        const int right = left + key.width;
+        const int bottom = top - KEY_BASE_SIZE;
 
         glBegin(GL_QUADS);
+        glTexCoord2f(0.0f, 0.0f);
         glVertex2f((GLfloat)left, (GLfloat)bottom);
+        glTexCoord2f(0.0f, 1.0f);
         glVertex2f((GLfloat)left, (GLfloat)top);
+        glTexCoord2f(1.0f, 1.0f);
         glVertex2f((GLfloat)right, (GLfloat)top);
+        glTexCoord2f(1.0f, 0.0f);
         glVertex2f((GLfloat)right, (GLfloat)bottom);
         glEnd();
 
-        if (key.keyCode == (*selectedKey).keyCode)
-        {
-            glColor3f(1.0f, 0.0f, 0.0f);
-            specialColor = 1;
-            glBegin(GL_LINE_LOOP);
-            glVertex2f((GLfloat)left, (GLfloat)(bottom - 1));
-            glVertex2f((GLfloat)left, (GLfloat)(top + 1));
-            glVertex2f((GLfloat)(right + 1), (GLfloat)(top + 1));
-            glVertex2f((GLfloat)(right + 1), (GLfloat)bottom);
-            glEnd();
-        }
-
-        if (specialColor)
-            SetDefaultKeyColor();
+        glUseProgram(0);
 
         float labelColor[] = {1.0f, 1.0f, 1.0f};
         if (lockKey && (key.state == DOWN || key.state == NEW_DOWN))
@@ -1879,23 +1919,25 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         {
             key = *key.below;
             direction = LEFT;
-            top = bottom - 2;
+            left = windowRight - key.width;
+            top = bottom;
         }
         else if (key.position == LEFT_END && direction == LEFT)
         {
             key = *key.below;
             direction = RIGHT;
-            top = bottom - 2;
+            left = windowLeft;
+            top = bottom;
         }
         else if (direction == RIGHT)
         {
             key = *key.right;
-            left = right + 2;
+            left = right;
         }
         else if (direction == LEFT)
         {
             key = *key.left;
-            left -= key.width + 2;
+            left -= key.width;
         }
     }
 }
@@ -2097,8 +2139,8 @@ static void ToggleKeyboardControl(void)
         {
             XPLMCreateWindow_t keyboardWindowParameters;
             keyboardWindowParameters.structSize = sizeof keyboardWindowParameters;
-            keyboardWindowParameters.top = keyboardBottom + (KEY_BASE_SIZE + KEY_BORDER_WIDTH * 2) * 6 + KEY_BORDER_WIDTH * 2;
-            keyboardWindowParameters.left = keyboardRight - ((KEY_BASE_SIZE + KEY_BORDER_WIDTH * 2) * 17 + (int) ((KEY_BASE_SIZE + KEY_BORDER_WIDTH * 2) * 2.5f) + KEY_BORDER_WIDTH * 2);
+            keyboardWindowParameters.top = keyboardBottom + KEY_BASE_SIZE * 6;
+            keyboardWindowParameters.left = keyboardRight - (KEY_BASE_SIZE * 17 + (int)(KEY_BASE_SIZE * 2.5f));
             keyboardWindowParameters.right = keyboardRight;
             keyboardWindowParameters.bottom = keyboardBottom;
             FitGeometryWithinScreenBounds(&keyboardWindowParameters.left, &keyboardWindowParameters.top, &keyboardWindowParameters.right, &keyboardWindowParameters.bottom);
@@ -3250,58 +3292,90 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 }
 
 // removes the fragment-shader from video memory, if deleteProgram is set the shader-program is also removed
-static void CleanupShader(int deleteProgram = 0)
+static void CleanupShader(GLuint program, GLuint *vertexShader, GLuint *fragmentShader, int deleteProgram = 0)
 {
-    glDetachShader(program, fragmentShader);
-    glDeleteShader(fragmentShader);
+    if (vertexShader != NULL)
+    {
+        glDetachShader(program, *vertexShader);
+        glDeleteShader(*vertexShader);
+    }
+
+    if (fragmentShader != NULL)
+    {
+        glDetachShader(program, *fragmentShader);
+        glDeleteShader(*fragmentShader);
+    }
 
     if (deleteProgram)
         glDeleteProgram(program);
 }
 
 // function to load, compile and link the fragment-shader
-static void InitShader(const char *fragmentShaderString)
+static void InitShader(const char *vertexShaderString, const char *fragmentShaderString, GLuint *program, GLuint *vertexShader, GLuint *fragmentShader)
 {
-    program = glCreateProgram();
+    *program = glCreateProgram();
 
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderString, 0);
-    glCompileShader(fragmentShader);
-    glAttachShader(program, fragmentShader);
+    if (vertexShaderString != NULL)
+    {
+        *vertexShader = glCreateShader(GL_VERTEX_SHADER);
+        glShaderSource(*vertexShader, 1, &vertexShaderString, 0);
+        glCompileShader(*vertexShader);
+        glAttachShader(*program, *vertexShader);
+        GLint isVertexShaderCompiled = GL_FALSE;
+        glGetShaderiv(*vertexShader, GL_COMPILE_STATUS, &isVertexShaderCompiled);
+        if (isVertexShaderCompiled == GL_FALSE)
+        {
+            GLsizei maxLength = 2048;
+            GLchar *log = new GLchar[maxLength];
+            glGetShaderInfoLog(*vertexShader, maxLength, &maxLength, log);
+            XPLMDebugString(NAME ": The following error occured while compiling a vertex shader:\n");
+            XPLMDebugString(log);
+            delete[] log;
+
+            CleanupShader(*program, vertexShader, NULL, 1);
+
+            return;
+        }
+    }
+
+    *fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(*fragmentShader, 1, &fragmentShaderString, 0);
+    glCompileShader(*fragmentShader);
+    glAttachShader(*program, *fragmentShader);
     GLint isFragmentShaderCompiled = GL_FALSE;
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &isFragmentShaderCompiled);
+    glGetShaderiv(*fragmentShader, GL_COMPILE_STATUS, &isFragmentShaderCompiled);
     if (isFragmentShaderCompiled == GL_FALSE)
     {
         GLsizei maxLength = 2048;
         GLchar *log = new GLchar[maxLength];
-        glGetShaderInfoLog(fragmentShader, maxLength, &maxLength, log);
-        XPLMDebugString(NAME ": The following error occured while compiling the fragment shader:\n");
+        glGetShaderInfoLog(*fragmentShader, maxLength, &maxLength, log);
+        XPLMDebugString(NAME ": The following error occured while compiling a fragment shader:\n");
         XPLMDebugString(log);
         delete[] log;
 
-        CleanupShader(1);
+        CleanupShader(*program, vertexShader, fragmentShader, 1);
 
         return;
     }
 
-    glLinkProgram(program);
+    glLinkProgram(*program);
     GLint isProgramLinked = GL_FALSE;
-    glGetProgramiv(program, GL_LINK_STATUS, &isProgramLinked);
+    glGetProgramiv(*program, GL_LINK_STATUS, &isProgramLinked);
     if (isProgramLinked == GL_FALSE)
     {
         GLsizei maxLength = 2048;
         GLchar *log = new GLchar[maxLength];
-        glGetShaderInfoLog(fragmentShader, maxLength, &maxLength, log);
-        XPLMDebugString(NAME ": The following error occured while linking the shader program:\n");
+        glGetShaderInfoLog(*program, maxLength, &maxLength, log);
+        XPLMDebugString(NAME ": The following error occured while linking a shader program:\n");
         XPLMDebugString(log);
         delete[] log;
 
-        CleanupShader(1);
+        CleanupShader(*program, vertexShader, fragmentShader, 1);
 
         return;
     }
 
-    CleanupShader(0);
+    CleanupShader(*program, vertexShader, fragmentShader, 0);
 }
 
 // draws the content of the indicators window
@@ -3312,7 +3386,7 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
 
     XPLMSetGraphicsState(0, 0, 0, 0, 1, 0, 0);
 
-    glUseProgram(program);
+    glUseProgram(indicatorsProgram);
 
     float throttle = 0.0f;
     if (gliderWithSpeedbrakes)
@@ -3320,10 +3394,10 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
     else
         throttle = XPLMGetDataf(throttleRatioAllDataRef);
 
-    int throttleLocation = glGetUniformLocation(program, "throttle");
+    int throttleLocation = glGetUniformLocation(indicatorsProgram, "throttle");
     glUniform1f(throttleLocation, throttle);
 
-    int propLocation = glGetUniformLocation(program, "prop");
+    int propLocation = glGetUniformLocation(indicatorsProgram, "prop");
     float propRatio = 0.0f;
     if (helicopter)
     {
@@ -3341,15 +3415,15 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
 
     glUniform1f(propLocation, numPropLevers < 1 ? -1.0f : propRatio);
 
-    int mixtureLocation = glGetUniformLocation(program, "mixture");
+    int mixtureLocation = glGetUniformLocation(indicatorsProgram, "mixture");
     glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -1.0f : XPLMGetDataf(mixtureRatioAllDataRef));
 
     int left = 0, top = 0, right = 0, bottom = 0;
     XPLMGetWindowGeometry(indicatorsWindow, &left, &top, &right, &bottom);
-    int boundsLocation = glGetUniformLocation(program, "bounds");
+    int boundsLocation = glGetUniformLocation(indicatorsProgram, "bounds");
     glUniform4f(boundsLocation, (GLfloat)left, (GLfloat)top, (GLfloat)right, (GLfloat)bottom);
 
-    glColor3f(1.0f, 1.0f, 1.0f);
+    // Can remove? glColor3f(1.0f, 1.0f, 1.0f);
     glBegin(GL_QUADS);
     glTexCoord2f(0.0f, 0.0f);
     glVertex2f((GLfloat)left, (GLfloat)bottom);
@@ -3638,8 +3712,9 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     }
 #endif
 
-    // prepare fragment-shader
-    InitShader(FRAGMENT_SHADER);
+    // prepare fragment-shaders
+    InitShader(NULL, INDICATORS_FRAGMENT_SHADER, &indicatorsProgram, NULL, &indicatorsFragmentShader);
+    InitShader(KEYBOARD_KEY_VERTEX_SHADER, KEYBOARD_KEY_FRAGMENT_SHADER, &keyboardKeyProgram, &keyboardKeyVertexShader, &keyboardKeyFragmentShader);
 
     // obtain datarefs
     acfCockpitTypeDataRef = XPLMFindDataRef("sim/aircraft/view/acf_cockpit_type");
@@ -3779,7 +3854,8 @@ PLUGIN_API void XPluginStop(void)
 {
     ReleaseAllKeys();
 
-    CleanupShader(1);
+    CleanupShader(indicatorsProgram, NULL, &indicatorsFragmentShader, 1);
+    CleanupShader(keyboardKeyProgram, &keyboardKeyVertexShader, &keyboardKeyFragmentShader, 1);
 
     // revert any remaining button assignments
     while (!buttonAssignmentsStack.empty())
