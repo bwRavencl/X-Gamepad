@@ -28,7 +28,6 @@
 
 #include <fstream>
 #include <sstream>
-#include <stack>
 
 #ifndef VERSION
 #define VERSION "UNDEFINED"
@@ -37,8 +36,9 @@
 #if IBM
 #include "glew.h"
 #include <process.h>
+#include <timeapi.h>
 #include <windows.h>
-#include <winuser.h>
+// #include <winuser.h>
 #elif APL
 #include <pthread.h>
 #include <ApplicationServices/ApplicationServices.h>
@@ -297,7 +297,7 @@
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
 #define TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND NAME_LOWERCASE "/toggle_arm_speed_brake_or_toggle_carb_heat"
 #define TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND NAME_LOWERCASE "/toggle_autopilot_or_disable_flight_director"
-#define VIEW_MODIFIER_COMMAND NAME_LOWERCASE "/view_modifier"
+#define LOOK_MODIFIER_COMMAND NAME_LOWERCASE "/look_modifier"
 #define PROP_PITCH_THROTTLE_MODIFIER_COMMAND NAME_LOWERCASE "/prop_pitch_throttle_modifier"
 #define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE "/mixture_control_modifier"
 #define COWL_FLAP_MODIFIER_COMMAND NAME_LOWERCASE "/cowl_flap_modifier"
@@ -332,7 +332,7 @@
 #define JOYSTICK_RELATIVE_CONTROL_MULTIPLIER 2.0f
 
 // define joystick sensitivity values
-#define JOYSTICK_VIEW_SENSITIVITY 225.0f
+#define JOYSTICK_LOOK_SENSITIVITY 225.0f
 #define JOYSTICK_MOUSE_POINTER_SENSITIVITY 30.0f
 
 // define indicator size
@@ -355,7 +355,7 @@
                                    "uniform float throttle;"                                                                                                                                                                                                              \
                                    "uniform float prop;"                                                                                                                                                                                                                  \
                                    "uniform float mixture;"                                                                                                                                                                                                               \
-                                   "uniform vec4 bounds;"                                                                                                                                                                                                                 \
+                                   "uniform ivec4 bounds;"                                                                                                                                                                                                                \
                                    ""                                                                                                                                                                                                                                     \
                                    "void main()"                                                                                                                                                                                                                          \
                                    "{"                                                                                                                                                                                                                                    \
@@ -366,17 +366,17 @@
                                    "        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);"                                                                                                                                                                                     \
                                    "    else"                                                                                                                                                                                                                             \
                                    "    {"                                                                                                                                                                                                                                \
-                                   "        float segments = 3.0;"                                                                                                                                                                                                        \
+                                   "        int segments = 3;"                                                                                                                                                                                                            \
                                    "        if (prop < -0.5)"                                                                                                                                                                                                             \
-                                   "            segments -= 1.0;"                                                                                                                                                                                                         \
+                                   "            segments--;"                                                                                                                                                                                                              \
                                    "        if (mixture < -0.5)"                                                                                                                                                                                                          \
-                                   "            segments -= 1.0;"                                                                                                                                                                                                         \
+                                   "            segments--;"                                                                                                                                                                                                              \
                                    ""                                                                                                                                                                                                                                     \
                                    "        float segmentWidth = size.x / segments;"                                                                                                                                                                                      \
                                    ""                                                                                                                                                                                                                                     \
-                                   "        if (gl_FragCoord.x < bounds.z - (segments - 1.0) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"                                                                                            \
+                                   "        if (gl_FragCoord.x < bounds.z - (segments - 1) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"                                                                                              \
                                    "            gl_FragColor = vec4(0.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                \
-                                   "        else if (gl_FragCoord.x >= bounds.z - (segments - 1.0) * segmentWidth && (segments < 2.5 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"                          \
+                                   "        else if (gl_FragCoord.x >= bounds.z - (segments - 1) * segmentWidth && (segments < 3 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"                              \
                                    "            gl_FragColor = vec4(0.0, 0.0, 1.0, 0.75);"                                                                                                                                                                                \
                                    "        else if (gl_FragCoord.x >= bounds.z - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + bounds.w + 1.0)"                                                                                                          \
                                    "            gl_FragColor = vec4(1.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                \
@@ -387,8 +387,8 @@
                                      ""                                                                                                                  \
                                      "uniform int keyBaseSize;"                                                                                          \
                                      "uniform float aspect;"                                                                                             \
-                                     "uniform vec4 borderColor;"                                                                                         \
-                                     "uniform vec4 keyColor;"                                                                                            \
+                                     "uniform bool selected;"                                                                                            \
+                                     "uniform bool down;"                                                                                                \
                                      ""                                                                                                                  \
                                      "void main()"                                                                                                       \
                                      "{"                                                                                                                 \
@@ -399,9 +399,9 @@
                                      "    float minY = borderWidth;"                                                                                     \
                                      ""                                                                                                                  \
                                      "    if (gl_TexCoord[0].x < maxX && gl_TexCoord[0].x > minX && gl_TexCoord[0].y < maxY && gl_TexCoord[0].y > minY)" \
-                                     "        gl_FragColor = keyColor;"                                                                                  \
+                                     "        gl_FragColor = down ? vec4(0.0, 0.0, 0.0, 0.75) : vec4(0.15, 0.15, 0.15, 0.75);"                           \
                                      "    else"                                                                                                          \
-                                     "        gl_FragColor = borderColor;"                                                                               \
+                                     "        gl_FragColor = selected ? vec4(1.0, 0.0, 0.0, 1.0) : vec4(1.0, 1.0, 1.0, 1.0);"                            \
                                      "}"
 
 #if IBM
@@ -526,7 +526,7 @@ typedef enum
 typedef enum
 {
     DEFAULT,
-    VIEW,
+    LOOK,
     SWITCH_VIEW,
     PROP,
     MIXTURE,
@@ -576,6 +576,7 @@ struct KeyboardKey
     int keyCode;
     float aspect;
     int width;
+    int labelOffsetX;
     KeyPosition position;
     KeyState state;
     float lastInputTime;
@@ -587,15 +588,10 @@ struct KeyboardKey
 
 static KeyboardKey InitKeyboardKey(const char *label, int keyCode, float aspect = 1.0f, KeyPosition position = BETWEEN)
 {
-    int width = (int)(KEY_BASE_SIZE * aspect);
+    const int width = (int)(KEY_BASE_SIZE * aspect);
+    const int labelOffsetX = (int)XPLMMeasureString(xplmFont_Basic, label, strlen(label)) / 2;
 
-    // border correction
-    /*if (aspect > 1.0f)
-        width += (int) (aspect * KEY_BORDER_WIDTH);
-    else if (aspect < 1.0f)
-        width -= (int) (aspect * KEY_BORDER_WIDTH);*/
-
-    KeyboardKey key = {strdup(label), keyCode, aspect, width, position, UP, 0.0f, NULL, NULL, NULL, NULL};
+    KeyboardKey key = {strdup(label), keyCode, aspect, width, labelOffsetX, position, UP, 0.0f, NULL, NULL, NULL, NULL};
     return key;
 }
 
@@ -629,7 +625,7 @@ static KeyboardKey f10Key = InitKeyboardKey("F10", KEY_CODE_F10);
 static KeyboardKey f11Key = InitKeyboardKey("F11", KEY_CODE_F11);
 static KeyboardKey f12Key = InitKeyboardKey("F12", KEY_CODE_F12);
 static KeyboardKey sysRqKey = InitKeyboardKey("SysRq", KEY_CODE_SYSRQ);
-static KeyboardKey scrollLockKey = InitKeyboardKey("ScrollLk", KEY_CODE_SCROLL);
+static KeyboardKey scrollKey = InitKeyboardKey("Scroll", KEY_CODE_SCROLL);
 static KeyboardKey pauseKey = InitKeyboardKey("Pause", KEY_CODE_PAUSE);
 static KeyboardKey insertKey = InitKeyboardKey("Ins", KEY_CODE_INSERT, 0.88f);
 static KeyboardKey deleteKey = InitKeyboardKey("Del", KEY_CODE_DELETE, 0.88f);
@@ -671,7 +667,7 @@ static KeyboardKey numpad7Key = InitKeyboardKey("7", KEY_CODE_NUMPAD7);
 static KeyboardKey numpad8Key = InitKeyboardKey("8", KEY_CODE_NUMPAD8);
 static KeyboardKey numpad9Key = InitKeyboardKey("9", KEY_CODE_NUMPAD9);
 static KeyboardKey addKey = InitKeyboardKey("+", KEY_CODE_ADD, 1.0f, RIGHT_END);
-static KeyboardKey capsLockKey = InitKeyboardKey("Caps Lock", KEY_CODE_CAPITAL, 2.0f, LEFT_END);
+static KeyboardKey captialKey = InitKeyboardKey("Caps Lock", KEY_CODE_CAPITAL, 2.0f, LEFT_END);
 static KeyboardKey aKey = InitKeyboardKey("A", KEY_CODE_A);
 static KeyboardKey sKey = InitKeyboardKey("S", KEY_CODE_S);
 static KeyboardKey dKey = InitKeyboardKey("D", KEY_CODE_D);
@@ -720,7 +716,7 @@ static KeyboardKey numpad0Key = InitKeyboardKey("0", KEY_CODE_NUMPAD0, 2.0f);
 static KeyboardKey numpadCommaKey = InitKeyboardKey(",", KEY_CODE_NUMPADCOMMA);
 static KeyboardKey numpadEnterKey = InitKeyboardKey("Enter", KEY_CODE_NUMPADENTER, 1.0f, RIGHT_END);
 
-static KeyboardKey *keyboardKeys[] = {&escapeKey, &f1Key, &f2Key, &f3Key, &f4Key, &f5Key, &f6Key, &f7Key, &f8Key, &f9Key, &f10Key, &f11Key, &f12Key, &sysRqKey, &scrollLockKey, &pauseKey, &insertKey, &deleteKey, &homeKey, &endKey, &graveKey, &d1Key, &d2Key, &d3Key, &d4Key, &d5Key, &d6Key, &d7Key, &d8Key, &d9Key, &d0Key, &minusKey, &equalsKey, &backKey, &numLockKey, &divideKey, &multiplyKey, &subtractKey, &tabKey, &qKey, &wKey, &eKey, &rKey, &tKey, &yKey, &uKey, &iKey, &oKey, &pKey, &leftBracketKey, &rightBracketKey, &backslashKey, &numpad7Key, &numpad8Key, &numpad9Key, &addKey, &capsLockKey, &aKey, &sKey, &dKey, &fKey, &gKey, &hKey, &jKey, &kKey, &lKey, &semicolonKey, &apostropheKey, &returnKey, &numpad4Key, &numpad5Key, &numpad6Key, &pageUpKey, &leftShiftKey, &zKey, &xKey, &cKey, &vKey, &bKey, &nKey, &mKey, &commaKey, &periodKey, &slashKey, &rightShiftKey, &numpad1Key, &numpad2Key, &numpad3Key, &pageDownKey, &leftControlKey, &leftWindowsKey, &leftAltKey, &spaceKey, &rightAltKey, &rightWindowsKey, &appsKey, &rightControlKey, &upKey, &downKey, &leftKey, &rightKey, &numpad0Key, &numpadCommaKey, &numpadEnterKey};
+static KeyboardKey *keyboardKeys[] = {&escapeKey, &f1Key, &f2Key, &f3Key, &f4Key, &f5Key, &f6Key, &f7Key, &f8Key, &f9Key, &f10Key, &f11Key, &f12Key, &sysRqKey, &scrollKey, &pauseKey, &insertKey, &deleteKey, &homeKey, &endKey, &graveKey, &d1Key, &d2Key, &d3Key, &d4Key, &d5Key, &d6Key, &d7Key, &d8Key, &d9Key, &d0Key, &minusKey, &equalsKey, &backKey, &numLockKey, &divideKey, &multiplyKey, &subtractKey, &tabKey, &qKey, &wKey, &eKey, &rKey, &tKey, &yKey, &uKey, &iKey, &oKey, &pKey, &leftBracketKey, &rightBracketKey, &backslashKey, &numpad7Key, &numpad8Key, &numpad9Key, &addKey, &captialKey, &aKey, &sKey, &dKey, &fKey, &gKey, &hKey, &jKey, &kKey, &lKey, &semicolonKey, &apostropheKey, &returnKey, &numpad4Key, &numpad5Key, &numpad6Key, &pageUpKey, &leftShiftKey, &zKey, &xKey, &cKey, &vKey, &bKey, &nKey, &mKey, &commaKey, &periodKey, &slashKey, &rightShiftKey, &numpad1Key, &numpad2Key, &numpad3Key, &pageDownKey, &leftControlKey, &leftWindowsKey, &leftAltKey, &spaceKey, &rightAltKey, &rightWindowsKey, &appsKey, &rightControlKey, &upKey, &downKey, &leftKey, &rightKey, &numpad0Key, &numpadCommaKey, &numpadEnterKey};
 static KeyboardKey *selectedKey = &kKey;
 
 static void WireKey(KeyboardKey *key, KeyboardKey *left, KeyboardKey *right, KeyboardKey *above, KeyboardKey *below)
@@ -746,9 +742,9 @@ static void WireKeys(void)
     WireKey(&f10Key, &f9Key, &f11Key, &rightControlKey, &d0Key);
     WireKey(&f11Key, &f10Key, &f12Key, &upKey, &minusKey);
     WireKey(&f12Key, &f11Key, &sysRqKey, &downKey, &equalsKey);
-    WireKey(&sysRqKey, &f12Key, &scrollLockKey, &downKey, &backKey);
-    WireKey(&scrollLockKey, &sysRqKey, &pauseKey, &leftKey, &backKey);
-    WireKey(&pauseKey, &scrollLockKey, &insertKey, &rightKey, &numLockKey);
+    WireKey(&sysRqKey, &f12Key, &scrollKey, &downKey, &backKey);
+    WireKey(&scrollKey, &sysRqKey, &pauseKey, &leftKey, &backKey);
+    WireKey(&pauseKey, &scrollKey, &insertKey, &rightKey, &numLockKey);
     WireKey(&insertKey, &pauseKey, &deleteKey, &numpad0Key, &numLockKey);
     WireKey(&deleteKey, &insertKey, &homeKey, &numpadCommaKey, &divideKey);
     WireKey(&homeKey, &deleteKey, &endKey, &numpadCommaKey, &multiplyKey);
@@ -766,12 +762,12 @@ static void WireKeys(void)
     WireKey(&d0Key, &d9Key, &minusKey, &f10Key, &pKey);
     WireKey(&minusKey, &d0Key, &equalsKey, &f11Key, &leftBracketKey);
     WireKey(&equalsKey, &minusKey, &backKey, &f12Key, &rightBracketKey);
-    WireKey(&backKey, &equalsKey, &numLockKey, &scrollLockKey, &backslashKey);
+    WireKey(&backKey, &equalsKey, &numLockKey, &scrollKey, &backslashKey);
     WireKey(&numLockKey, &backKey, &divideKey, &insertKey, &numpad7Key);
     WireKey(&divideKey, &numLockKey, &multiplyKey, &deleteKey, &numpad8Key);
     WireKey(&multiplyKey, &divideKey, &subtractKey, &homeKey, &numpad9Key);
     WireKey(&subtractKey, &multiplyKey, &graveKey, &endKey, &addKey);
-    WireKey(&tabKey, &addKey, &qKey, &graveKey, &capsLockKey);
+    WireKey(&tabKey, &addKey, &qKey, &graveKey, &captialKey);
     WireKey(&qKey, &tabKey, &wKey, &d1Key, &aKey);
     WireKey(&wKey, &qKey, &eKey, &d2Key, &aKey);
     WireKey(&eKey, &wKey, &rKey, &d3Key, &sKey);
@@ -789,8 +785,8 @@ static void WireKeys(void)
     WireKey(&numpad8Key, &numpad7Key, &numpad9Key, &divideKey, &numpad5Key);
     WireKey(&numpad9Key, &numpad8Key, &addKey, &multiplyKey, &numpad6Key);
     WireKey(&addKey, &numpad9Key, &tabKey, &subtractKey, &pageUpKey);
-    WireKey(&capsLockKey, &pageUpKey, &aKey, &tabKey, &leftShiftKey);
-    WireKey(&aKey, &capsLockKey, &sKey, &wKey, &zKey);
+    WireKey(&captialKey, &pageUpKey, &aKey, &tabKey, &leftShiftKey);
+    WireKey(&aKey, &captialKey, &sKey, &wKey, &zKey);
     WireKey(&sKey, &aKey, &dKey, &eKey, &xKey);
     WireKey(&dKey, &sKey, &fKey, &rKey, &cKey);
     WireKey(&fKey, &dKey, &gKey, &tKey, &vKey);
@@ -805,8 +801,8 @@ static void WireKeys(void)
     WireKey(&numpad4Key, &returnKey, &numpad5Key, &numpad7Key, &numpad1Key);
     WireKey(&numpad5Key, &numpad4Key, &numpad6Key, &numpad8Key, &numpad2Key);
     WireKey(&numpad6Key, &numpad5Key, &pageUpKey, &numpad9Key, &numpad3Key);
-    WireKey(&pageUpKey, &numpad6Key, &capsLockKey, &addKey, &pageDownKey);
-    WireKey(&leftShiftKey, &pageDownKey, &zKey, &capsLockKey, &leftWindowsKey);
+    WireKey(&pageUpKey, &numpad6Key, &captialKey, &addKey, &pageDownKey);
+    WireKey(&leftShiftKey, &pageDownKey, &zKey, &captialKey, &leftWindowsKey);
     WireKey(&zKey, &leftShiftKey, &xKey, &aKey, &leftAltKey);
     WireKey(&xKey, &zKey, &cKey, &sKey, &spaceKey);
     WireKey(&cKey, &xKey, &vKey, &dKey, &spaceKey);
@@ -833,7 +829,7 @@ static void WireKeys(void)
     WireKey(&upKey, &rightControlKey, &downKey, &slashKey, &f11Key);
     WireKey(&downKey, &upKey, &leftKey, &rightShiftKey, &f12Key);
     WireKey(&leftKey, &downKey, &rightKey, &rightShiftKey, &sysRqKey);
-    WireKey(&rightKey, &leftKey, &numpad0Key, &rightShiftKey, &scrollLockKey);
+    WireKey(&rightKey, &leftKey, &numpad0Key, &rightShiftKey, &scrollKey);
     WireKey(&numpad0Key, &rightKey, &numpadCommaKey, &numpad2Key, &insertKey);
     WireKey(&numpadCommaKey, &numpad0Key, &numpadEnterKey, &numpad3Key, &homeKey);
     WireKey(&numpadEnterKey, &numpadCommaKey, &leftControlKey, &pageDownKey, &endKey);
@@ -845,7 +841,7 @@ static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
 static ConfigurationStep configurationStep = START;
 static GLuint indicatorsProgram = 0, indicatorsFragmentShader = 0, keyboardKeyProgram = 0, keyboardKeyVertexShader = 0, keyboardKeyFragmentShader = 0;
-static std::stack<int *> buttonAssignmentsStack;
+static int *pushedJoystickButtonAssignments = NULL;
 static XPLMWindowID indicatorsWindow = NULL, keyboardWindow = NULL;
 
 #if IBM
@@ -865,7 +861,7 @@ static volatile int hidDeviceThreadRun = 1;
 #endif
 
 // global commandref variables
-static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, viewModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
 
 // global dataref variables
 static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
@@ -876,25 +872,21 @@ static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL,
 // push the current button assignments to the stack
 static void PushButtonAssignments(void)
 {
-    int *joystickButtonAssignments = (int *)malloc(sizeof(int) * 1600);
-
-    XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-    buttonAssignmentsStack.push(joystickButtonAssignments);
+    if (pushedJoystickButtonAssignments == NULL)
+    {
+        pushedJoystickButtonAssignments = (int *)malloc(sizeof(int) * 1600);
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, pushedJoystickButtonAssignments, 0, 1600);
+    }
 }
 
 // pop the topmost button assignments from the stack
 static void PopButtonAssignments(void)
 {
-    if (!buttonAssignmentsStack.empty())
+    if (pushedJoystickButtonAssignments != NULL)
     {
-        int *joystickButtonAssignments = buttonAssignmentsStack.top();
-
-        if (joystickButtonAssignments != NULL)
-        {
-            XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-            free(joystickButtonAssignments);
-        }
-        buttonAssignmentsStack.pop();
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, pushedJoystickButtonAssignments, 0, 1600);
+        free(pushedJoystickButtonAssignments);
+        pushedJoystickButtonAssignments = NULL;
     }
 }
 
@@ -1297,16 +1289,16 @@ static int AxisIndex(int abstractAxisIndex)
 }
 
 // command-handler that handles the view modifier command
-static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+static int LookModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (inPhase != xplm_CommandContinue)
     {
         int joystickAxisAssignments[100];
         XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
 
-        if (inPhase == xplm_CommandBegin && (mode == DEFAULT || mode == KEYBOARD))
+        if (inPhase == xplm_CommandBegin && mode == DEFAULT)
         {
-            mode = VIEW;
+            mode = LOOK;
 
             // unassign the left joystick's axis
             joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_NONE;
@@ -1337,7 +1329,7 @@ static int ViewModifierCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase
             // temporarily gain exclusive camera controls
             OverrideCameraControls();
         }
-        else if (inPhase == xplm_CommandEnd && mode == VIEW)
+        else if (inPhase == xplm_CommandEnd && mode == LOOK)
         {
             // auto-center 3D cockpit view if it is only the defined distance or angle off from the center anyways
             if (XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && fabs(defaultHeadPositionX - XPLMGetDataf(acfPeXDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT && fabs(defaultHeadPositionY - XPLMGetDataf(acfPeYDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT && fabs(defaultHeadPositionZ - XPLMGetDataf(acfPeZDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT)
@@ -1850,40 +1842,31 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
     int top = windowTop;
     Direction direction = RIGHT;
 
-    int charHeight;
-    XPLMGetFontDimensions(xplmFont_Basic, NULL, &charHeight, NULL);
-    const int labelOffsetY = charHeight / 2;
+    static int labelOffsetY = 0;
+    if (labelOffsetY == 0)
+    {
+        int charHeight;
+        XPLMGetFontDimensions(xplmFont_Basic, NULL, &charHeight, NULL);
+        labelOffsetY = charHeight / 2;
+    }
+
+    glUseProgram(keyboardKeyProgram);
+    const int keyBaseSizeLocation = glGetUniformLocation(keyboardKeyProgram, "keyBaseSize");
+    const int aspectLocation = glGetUniformLocation(keyboardKeyProgram, "aspect");
+    const int selectedLocation = glGetUniformLocation(keyboardKeyProgram, "selected");
+    const int downLocation = glGetUniformLocation(keyboardKeyProgram, "down");
     while (1)
     {
         glUseProgram(keyboardKeyProgram);
-
-        int keyBaseSizeLocation = glGetUniformLocation(keyboardKeyProgram, "keyBaseSize");
         glUniform1i(keyBaseSizeLocation, KEY_BASE_SIZE);
-
-        int aspectLocation = glGetUniformLocation(keyboardKeyProgram, "aspect");
         glUniform1f(aspectLocation, key.aspect);
-
-        int borderColorLocation = glGetUniformLocation(keyboardKeyProgram, "borderColor");
-        if (key.keyCode == (*selectedKey).keyCode)
-            glUniform4f(borderColorLocation, 1.0f, 0.0f, 0.0f, 1.0f);
-        else
-            glUniform4f(borderColorLocation, 1.0f, 1.0f, 1.0f, 1.0f);
-
+        glUniform1i(selectedLocation, key.keyCode == (*selectedKey).keyCode);
         int lockKey = IsLockKey(key);
-        int keyColorLocation = glGetUniformLocation(keyboardKeyProgram, "keyColor");
-        if ((key.state == NEW_DOWN || key.state == DOWN) && !lockKey)
-            glUniform4f(keyColorLocation, 0.0f, 0.0f, 0.0f, 0.75f);
-        else
-            glUniform4f(keyColorLocation, 0.15f, 0.15f, 0.15f, 0.75f);
+        glUniform1i(downLocation, (key.state == NEW_DOWN || key.state == DOWN) && !lockKey);
 
         const int right = left + key.width;
         const int bottom = top - KEY_BASE_SIZE;
-
-        /*glEnableClientState( GL_TEXTURE_COORD_ARRAY );
-        const GLfloat texCoordBuffer[] = {0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f};
-        glTexCoordPointer(2, GL_FLOAT, 0, texCoordBuffer);*/
-
-        // glEnable(GL_TEXTURE_2D);
+        
         glBegin(GL_QUADS);
         glTexCoord2f(0.0f, 0.0f);
         glVertex2f((GLfloat)left, (GLfloat)bottom);
@@ -1894,9 +1877,6 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         glTexCoord2f(1.0f, 0.0f);
         glVertex2f((GLfloat)right, (GLfloat)bottom);
         glEnd();
-        // glDisable(GL_TEXTURE_2D);
-
-        glUseProgram(0);
 
         float labelColor[] = {1.0f, 1.0f, 1.0f};
         if (lockKey && (key.state == DOWN || key.state == NEW_DOWN))
@@ -1904,9 +1884,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
             labelColor[0] = 0.0f;
             labelColor[2] = 0.0f;
         }
-
-        const int labelOffsetX = (int)XPLMMeasureString(xplmFont_Basic, key.label, strlen(key.label)) / 2;
-        XPLMDrawString(labelColor, left + key.width / 2 - labelOffsetX, top - KEY_BASE_SIZE / 2 - labelOffsetY, key.label, NULL, xplmFont_Basic);
+        XPLMDrawString(labelColor, left + key.width / 2 - key.labelOffsetX, top - KEY_BASE_SIZE / 2 - labelOffsetY, key.label, NULL, xplmFont_Basic);
 
         if (key.keyCode == leftControlKey.keyCode)
             break;
@@ -1936,6 +1914,8 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
             left -= key.width;
         }
     }
+
+    glUseProgram(0);
 }
 
 static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus)
@@ -2102,6 +2082,24 @@ static void ReleaseAllKeys(void)
     }
 }
 
+inline static void SyncLockKeyState(KeyboardKey *key)
+{
+#if IBM
+    const int vk = MapVirtualKeyA((*key).keyCode, MAPVK_VSC_TO_VK);
+    const int toggled = (GetKeyState(vk) & 1) != 0;
+    (*key).state = toggled ? DOWN : UP;
+#elif APL
+// TODO
+#elif LIN
+// TODO
+#endif
+}
+
+static int inline GetKeyboardWidth(void)
+{
+    return KEY_BASE_SIZE * 17 + (int)(KEY_BASE_SIZE * 2.5f);
+}
+
 static void ToggleKeyboardControl(void)
 {
     // if we are in mouse mode we actually want to toggle it off instead of toggling keyboard mode
@@ -2136,7 +2134,7 @@ static void ToggleKeyboardControl(void)
             XPLMCreateWindow_t keyboardWindowParameters;
             keyboardWindowParameters.structSize = sizeof keyboardWindowParameters;
             keyboardWindowParameters.top = keyboardBottom + KEY_BASE_SIZE * 6;
-            keyboardWindowParameters.left = keyboardRight - (KEY_BASE_SIZE * 17 + (int)(KEY_BASE_SIZE * 2.5f));
+            keyboardWindowParameters.left = keyboardRight - GetKeyboardWidth();
             keyboardWindowParameters.right = keyboardRight;
             keyboardWindowParameters.bottom = keyboardBottom;
             FitGeometryWithinScreenBounds(&keyboardWindowParameters.left, &keyboardWindowParameters.top, &keyboardWindowParameters.right, &keyboardWindowParameters.bottom);
@@ -2543,7 +2541,7 @@ static void SetDefaultAssignments(void)
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t)XPLMFindCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t)XPLMFindCommand(VIEW_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t)XPLMFindCommand(LOOK_MODIFIER_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/zoom_out");
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/zoom_in");
         switch (controllerType)
@@ -2608,6 +2606,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         }
 
         ptr++;
+    }
+
+    if (XPLMGetWindowIsVisible(keyboardWindow))
+    {
+        SyncLockKeyState(&captialKey);
+        SyncLockKeyState(&numLockKey);
+        SyncLockKeyState(&scrollKey);
     }
 
     // update the default head position when required
@@ -2849,7 +2854,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 if (!leftTriggerDown && !rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.85f)
                 {
                     leftTriggerDown = 1;
-                    if (mode == VIEW)
+                    if (mode == LOOK)
                         XPLMCommandBegin(pushToTalkCommand);
                     else
                         XPLMCommandBegin(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
@@ -2859,7 +2864,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 else if (leftTriggerDown && !rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] < 0.85f)
                 {
                     leftTriggerDown = 0;
-                    if (mode == VIEW)
+                    if (mode == LOOK)
                         XPLMCommandEnd(pushToTalkCommand);
                     else
                         XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
@@ -2869,14 +2874,14 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 #else
                 if (joystickAxisValues[JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER + axisOffset] >= 0.5f)
                 {
-                    if (mode == VIEW)
+                    if (mode == LOOK)
                         XPLMCommandBegin(pushToTalkCommand);
                     else
                         XPLMCommandBegin(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
                 }
                 else
                 {
-                    if (mode == VIEW)
+                    if (mode == LOOK)
                         XPLMCommandEnd(pushToTalkCommand);
                     else
                         XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
@@ -2884,7 +2889,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 #endif
             }
 
-            if (mode == VIEW)
+            if (mode == LOOK)
             {
                 XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
 
@@ -2893,7 +2898,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 if (viewType == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
                 {
                     float deltaPsi = 0.0f, deltaThe = 0.0f;
-                    float viewSensitivityMultiplier = JOYSTICK_VIEW_SENSITIVITY * inElapsedSinceLastCall;
+                    float viewSensitivityMultiplier = JOYSTICK_LOOK_SENSITIVITY * inElapsedSinceLastCall;
 
                     // turn head to the left
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] < 0.5f - joystickPitchNullzone)
@@ -3388,7 +3393,7 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
     int left = 0, top = 0, right = 0, bottom = 0;
     XPLMGetWindowGeometry(indicatorsWindow, &left, &top, &right, &bottom);
     int boundsLocation = glGetUniformLocation(indicatorsProgram, "bounds");
-    glUniform4f(boundsLocation, (GLfloat)left, (GLfloat)top, (GLfloat)right, (GLfloat)bottom);
+    glUniform4i(boundsLocation, left, top, right, bottom);
 
     glBegin(GL_QUADS);
     glTexCoord2f(0.0f, 0.0f);
@@ -3733,7 +3738,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     cycleResetViewCommand = XPLMCreateCommand(CYCLE_RESET_VIEW_COMMAND, "Cycle / Reset View");
     toggleArmSpeedBrakeOrToggleCarbHeatCommand = XPLMCreateCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND, "Toggle / Arm Speedbrake / Toggle Carb Heat");
     toggleAutopilotOrDisableFlightDirectorCommand = XPLMCreateCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND, "Toggle Autopilot / Disable Flight Director");
-    viewModifierCommand = XPLMCreateCommand(VIEW_MODIFIER_COMMAND, "View Modifier");
+    lookModifierCommand = XPLMCreateCommand(LOOK_MODIFIER_COMMAND, "Look Modifier");
     propPitchOrThrottleModifierCommand = XPLMCreateCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND, "Prop Pitch / Throttle Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(MIXTURE_CONTROL_MODIFIER_COMMAND, "Mixture Control Modifier");
     cowlFlapModifierCommand = XPLMCreateCommand(COWL_FLAP_MODIFIER_COMMAND, "Cowl Flap Modifier");
@@ -3758,7 +3763,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(toggleAutopilotOrDisableFlightDirectorCommand, ToggleAutopilotOrDisableFlightDirectorCommandHandler, 1, NULL);
-    XPLMRegisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
+    XPLMRegisterCommandHandler(lookModifierCommand, LookModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(propPitchOrThrottleModifierCommand, PropPitchOrThrottleModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
     XPLMRegisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommandHandler, 1, NULL);
@@ -3784,6 +3789,10 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMGetScreenBoundsGlobal(NULL, NULL, &right, &bottom);
     indicatorsRight = right;
     indicatorsBottom = bottom;
+
+    // initialize keyboard default position
+    keyboardRight = right / 2 + GetKeyboardWidth() / 2;
+    keyboardBottom = bottom;
 
     WireKeys();
 
@@ -3824,14 +3833,13 @@ PLUGIN_API void XPluginStop(void)
     CleanupShader(keyboardKeyProgram, keyboardKeyFragmentShader, 1);
 
     // revert any remaining button assignments
-    while (!buttonAssignmentsStack.empty())
-        PopButtonAssignments();
+    PopButtonAssignments();
 
     // unregister custom commands
     XPLMUnregisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(toggleAutopilotOrDisableFlightDirectorCommand, ToggleAutopilotOrDisableFlightDirectorCommandHandler, 1, NULL);
-    XPLMUnregisterCommandHandler(viewModifierCommand, ViewModifierCommandHandler, 1, NULL);
+    XPLMUnregisterCommandHandler(lookModifierCommand, LookModifierCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(propPitchOrThrottleModifierCommand, PropPitchOrThrottleModifierCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommandHandler, 1, NULL);
     XPLMUnregisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommandHandler, 1, NULL);
