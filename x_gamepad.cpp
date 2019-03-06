@@ -383,34 +383,25 @@
                                    "    }"                                                                                                                                                                                                                                \
                                    "}"
 
-#define KEYBOARD_KEY_VERTEX_SHADER "#version 130\n"              \
-                                   ""                            \
-                                   "out vec2 texCoordV;"             \
-                                   ""                            \
-                                   "void main()"                 \
-                                   "{"                           \
-                                   "    texCoordV = gl_MultiTexCoord0.xy;" \
-                                   "}"
-
-#define KEYBOARD_KEY_FRAGMENT_SHADER "#version 130\n"                            \
-                                     ""                                          \
-                                     "in vec2 texCoordV;"                            \
-                                     "uniform float aspect;"                     \
-                                     "uniform vec4 borderColor;"                 \
-                                     "uniform vec4 keyColor;"                    \
-                                     ""                                          \
-                                     "void main()"                               \
-                                     "{"                                         \
-                                     "    const float borderWidth = 0.15;"       \
-                                     "    float maxX = 1.0 - borderWidth;"       \
-                                     "    float minX = borderWidth;"             \
-                                     "    float maxY = maxX / aspect;"           \
-                                     "    float minY = minX / aspect;"           \
-                                     ""                                          \
-                                     "    if (texCoordV.x < maxX && texCoordV.x > minX)" \
-                                     "        gl_FragColor = keyColor;"          \
-                                     "    else"                                  \
-                                     "        gl_FragColor = borderColor;"       \
+#define KEYBOARD_KEY_FRAGMENT_SHADER "#version 130\n"                                                                                                    \
+                                     ""                                                                                                                  \
+                                     "uniform int keyBaseSize;"                                                                                          \
+                                     "uniform float aspect;"                                                                                             \
+                                     "uniform vec4 borderColor;"                                                                                         \
+                                     "uniform vec4 keyColor;"                                                                                            \
+                                     ""                                                                                                                  \
+                                     "void main()"                                                                                                       \
+                                     "{"                                                                                                                 \
+                                     "    float borderWidth = 1.0f /keyBaseSize;"                                                                        \
+                                     "    float maxX = 1.0 - borderWidth / aspect;"                                                                      \
+                                     "    float minX = borderWidth / aspect;"                                                                            \
+                                     "    float maxY = 1.0 - borderWidth;"                                                                               \
+                                     "    float minY = borderWidth;"                                                                                     \
+                                     ""                                                                                                                  \
+                                     "    if (gl_TexCoord[0].x < maxX && gl_TexCoord[0].x > minX && gl_TexCoord[0].y < maxY && gl_TexCoord[0].y > minY)" \
+                                     "        gl_FragColor = keyColor;"                                                                                  \
+                                     "    else"                                                                                                          \
+                                     "        gl_FragColor = borderColor;"                                                                               \
                                      "}"
 
 #if IBM
@@ -758,8 +749,8 @@ static void WireKeys(void)
     WireKey(&sysRqKey, &f12Key, &scrollLockKey, &downKey, &backKey);
     WireKey(&scrollLockKey, &sysRqKey, &pauseKey, &leftKey, &backKey);
     WireKey(&pauseKey, &scrollLockKey, &insertKey, &rightKey, &numLockKey);
-    WireKey(&insertKey, &pauseKey, &deleteKey, &divideKey, &numpadCommaKey);
-    WireKey(&deleteKey, &insertKey, &homeKey, &numpadCommaKey, &multiplyKey);
+    WireKey(&insertKey, &pauseKey, &deleteKey, &numpad0Key, &numLockKey);
+    WireKey(&deleteKey, &insertKey, &homeKey, &numpadCommaKey, &divideKey);
     WireKey(&homeKey, &deleteKey, &endKey, &numpadCommaKey, &multiplyKey);
     WireKey(&endKey, &homeKey, &escapeKey, &numpadEnterKey, &subtractKey);
     WireKey(&graveKey, &subtractKey, &d1Key, &escapeKey, &tabKey);
@@ -830,7 +821,7 @@ static void WireKeys(void)
     WireKey(&numpad1Key, &rightShiftKey, &numpad2Key, &numpad4Key, &numpad0Key);
     WireKey(&numpad2Key, &numpad1Key, &numpad3Key, &numpad5Key, &numpad0Key);
     WireKey(&numpad3Key, &numpad2Key, &pageDownKey, &numpad6Key, &numpadCommaKey);
-    WireKey(&pageDownKey, &numpad3Key, &leftShiftKey, &pageDownKey, &numpadEnterKey);
+    WireKey(&pageDownKey, &numpad3Key, &leftShiftKey, &pageUpKey, &numpadEnterKey);
     WireKey(&leftControlKey, &numpadEnterKey, &leftWindowsKey, &leftShiftKey, &escapeKey);
     WireKey(&leftWindowsKey, &leftControlKey, &leftAltKey, &leftShiftKey, &f1Key);
     WireKey(&leftAltKey, &leftWindowsKey, &spaceKey, &zKey, &f2Key);
@@ -1798,31 +1789,9 @@ static int KeyboardSelectorRightCommandHandler(XPLMCommandRef inCommand, XPLMCom
     return 0;
 }
 
-/*static void SetKeyState(int keyCode, KeyState state)
+static int IsLockKey(KeyboardKey key)
 {
-    if (state == DOWN)
-        newDownKeys.insert(keyCode);
-    else if (state == UP)
-        upKeys.insert(keyCode);
-}*/
-
-static int PressKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
-{
-    if (inPhase == xplm_CommandBegin)
-    {
-        if ((*selectedKey).state == UP || (*selectedKey).state == NEW_UP)
-            (*selectedKey).state = NEW_DOWN;
-        else if ((*selectedKey).state == DOWN || (*selectedKey).state == NEW_DOWN)
-            (*selectedKey).state = NEW_UP;
-    }
-    else if (inPhase == xplm_CommandEnd && ((*selectedKey).state == DOWN || (*selectedKey).state == NEW_DOWN))
-    {
-        // SetKeyState((*selectedKey).code, UP);
-        (*selectedKey).state = NEW_UP;
-        keyPressActive = 0;
-    }
-
-    return 0;
+    return key.keyCode == KEY_CODE_SCROLL || key.keyCode == KEY_CODE_NUMLOCK || key.keyCode == KEY_CODE_CAPITAL;
 }
 
 static int LockKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
@@ -1835,6 +1804,29 @@ static int LockKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPh
             (*selectedKey).state = NEW_UP;
     }
 
+    return 0;
+}
+
+static int PressKeyboardKeyCommandHandler(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (IsLockKey(*selectedKey))
+        return LockKeyboardKeyCommandHandler(inCommand, inPhase, inRefcon);
+
+    if (inPhase == xplm_CommandBegin)
+    {
+        if ((*selectedKey).state == UP || (*selectedKey).state == NEW_UP)
+            (*selectedKey).state = NEW_DOWN;
+        else if ((*selectedKey).state == DOWN || (*selectedKey).state == NEW_DOWN)
+            (*selectedKey).state = NEW_UP;
+
+        keyPressActive = 1;
+    }
+    else if (inPhase == xplm_CommandEnd && ((*selectedKey).state == DOWN || (*selectedKey).state == NEW_DOWN))
+    {
+        (*selectedKey).state = NEW_UP;
+
+        keyPressActive = 0;
+    }
     return 0;
 }
 
@@ -1853,9 +1845,6 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
     glVertex2f((GLfloat)windowRight, (GLfloat)windowBottom + 1);
     glEnd();
 
-    int borderWidthLocation = glGetUniformLocation(keyboardKeyProgram, "borderWidth");
-    glUniform1f(borderWidthLocation, KEY_BORDER_WIDTH);
-
     KeyboardKey key = escapeKey;
     int left = windowLeft;
     int top = windowTop;
@@ -1866,8 +1855,10 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
     const int labelOffsetY = charHeight / 2;
     while (1)
     {
-        glEnable(GL_POINT_SPRITE);
         glUseProgram(keyboardKeyProgram);
+
+        int keyBaseSizeLocation = glGetUniformLocation(keyboardKeyProgram, "keyBaseSize");
+        glUniform1i(keyBaseSizeLocation, KEY_BASE_SIZE);
 
         int aspectLocation = glGetUniformLocation(keyboardKeyProgram, "aspect");
         glUniform1f(aspectLocation, key.aspect);
@@ -1876,10 +1867,9 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         if (key.keyCode == (*selectedKey).keyCode)
             glUniform4f(borderColorLocation, 1.0f, 0.0f, 0.0f, 1.0f);
         else
-            glUniform4f(borderColorLocation, 1.0f, 0.0f, 1.0f, 1.0f);
+            glUniform4f(borderColorLocation, 1.0f, 1.0f, 1.0f, 1.0f);
 
-        int lockKey = key.keyCode == KEY_CODE_SCROLL || key.keyCode == KEY_CODE_NUMLOCK || key.keyCode == KEY_CODE_CAPITAL;
-
+        int lockKey = IsLockKey(key);
         int keyColorLocation = glGetUniformLocation(keyboardKeyProgram, "keyColor");
         if ((key.state == NEW_DOWN || key.state == DOWN) && !lockKey)
             glUniform4f(keyColorLocation, 0.0f, 0.0f, 0.0f, 0.75f);
@@ -1889,6 +1879,11 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         const int right = left + key.width;
         const int bottom = top - KEY_BASE_SIZE;
 
+        /*glEnableClientState( GL_TEXTURE_COORD_ARRAY );
+        const GLfloat texCoordBuffer[] = {0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f};
+        glTexCoordPointer(2, GL_FLOAT, 0, texCoordBuffer);*/
+
+        // glEnable(GL_TEXTURE_2D);
         glBegin(GL_QUADS);
         glTexCoord2f(0.0f, 0.0f);
         glVertex2f((GLfloat)left, (GLfloat)bottom);
@@ -1899,6 +1894,7 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
         glTexCoord2f(1.0f, 0.0f);
         glVertex2f((GLfloat)right, (GLfloat)bottom);
         glEnd();
+        // glDisable(GL_TEXTURE_2D);
 
         glUseProgram(0);
 
@@ -2589,16 +2585,19 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         switch ((**ptr).state)
         {
         case NEW_UP:
+            if (IsLockKey(**ptr))
+                MakeInput((**ptr).keyCode, DOWN);
             MakeInput((**ptr).keyCode, UP);
             (**ptr).state = UP;
             break;
         case NEW_DOWN:
             MakeInput((**ptr).keyCode, DOWN);
+            MakeInput((**ptr).keyCode, UP);
             (**ptr).state = DOWN;
             (**ptr).lastInputTime = currentTime;
             break;
         case DOWN:
-            if (currentTime - (**ptr).lastInputTime > KEY_REPEAT_INTERVAL)
+            if (!IsLockKey(**ptr) && currentTime - (**ptr).lastInputTime > KEY_REPEAT_INTERVAL)
             {
                 MakeInput((**ptr).keyCode, DOWN);
                 (**ptr).lastInputTime = currentTime;
@@ -3292,51 +3291,19 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 }
 
 // removes the fragment-shader from video memory, if deleteProgram is set the shader-program is also removed
-static void CleanupShader(GLuint program, GLuint *vertexShader, GLuint *fragmentShader, int deleteProgram = 0)
+static void CleanupShader(GLuint program, GLuint fragmentShader, int deleteProgram = 0)
 {
-    if (vertexShader != NULL)
-    {
-        glDetachShader(program, *vertexShader);
-        glDeleteShader(*vertexShader);
-    }
-
-    if (fragmentShader != NULL)
-    {
-        glDetachShader(program, *fragmentShader);
-        glDeleteShader(*fragmentShader);
-    }
+    glDetachShader(program, fragmentShader);
+    glDeleteShader(fragmentShader);
 
     if (deleteProgram)
         glDeleteProgram(program);
 }
 
 // function to load, compile and link the fragment-shader
-static void InitShader(const char *vertexShaderString, const char *fragmentShaderString, GLuint *program, GLuint *vertexShader, GLuint *fragmentShader)
+static void InitShader(const char *fragmentShaderString, GLuint *program, GLuint *fragmentShader)
 {
     *program = glCreateProgram();
-
-    if (vertexShaderString != NULL)
-    {
-        *vertexShader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(*vertexShader, 1, &vertexShaderString, 0);
-        glCompileShader(*vertexShader);
-        glAttachShader(*program, *vertexShader);
-        GLint isVertexShaderCompiled = GL_FALSE;
-        glGetShaderiv(*vertexShader, GL_COMPILE_STATUS, &isVertexShaderCompiled);
-        if (isVertexShaderCompiled == GL_FALSE)
-        {
-            GLsizei maxLength = 2048;
-            GLchar *log = new GLchar[maxLength];
-            glGetShaderInfoLog(*vertexShader, maxLength, &maxLength, log);
-            XPLMDebugString(NAME ": The following error occured while compiling a vertex shader:\n");
-            XPLMDebugString(log);
-            delete[] log;
-
-            CleanupShader(*program, vertexShader, NULL, 1);
-
-            return;
-        }
-    }
 
     *fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(*fragmentShader, 1, &fragmentShaderString, 0);
@@ -3353,7 +3320,7 @@ static void InitShader(const char *vertexShaderString, const char *fragmentShade
         XPLMDebugString(log);
         delete[] log;
 
-        CleanupShader(*program, vertexShader, fragmentShader, 1);
+        CleanupShader(*program, *fragmentShader, 1);
 
         return;
     }
@@ -3370,12 +3337,12 @@ static void InitShader(const char *vertexShaderString, const char *fragmentShade
         XPLMDebugString(log);
         delete[] log;
 
-        CleanupShader(*program, vertexShader, fragmentShader, 1);
+        CleanupShader(*program, *fragmentShader, 1);
 
         return;
     }
 
-    CleanupShader(*program, vertexShader, fragmentShader, 0);
+    CleanupShader(*program, *fragmentShader, 0);
 }
 
 // draws the content of the indicators window
@@ -3423,7 +3390,6 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
     int boundsLocation = glGetUniformLocation(indicatorsProgram, "bounds");
     glUniform4f(boundsLocation, (GLfloat)left, (GLfloat)top, (GLfloat)right, (GLfloat)bottom);
 
-    // Can remove? glColor3f(1.0f, 1.0f, 1.0f);
     glBegin(GL_QUADS);
     glTexCoord2f(0.0f, 0.0f);
     glVertex2f((GLfloat)left, (GLfloat)bottom);
@@ -3713,8 +3679,8 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 #endif
 
     // prepare fragment-shaders
-    InitShader(NULL, INDICATORS_FRAGMENT_SHADER, &indicatorsProgram, NULL, &indicatorsFragmentShader);
-    InitShader(KEYBOARD_KEY_VERTEX_SHADER, KEYBOARD_KEY_FRAGMENT_SHADER, &keyboardKeyProgram, &keyboardKeyVertexShader, &keyboardKeyFragmentShader);
+    InitShader(INDICATORS_FRAGMENT_SHADER, &indicatorsProgram, &indicatorsFragmentShader);
+    InitShader(KEYBOARD_KEY_FRAGMENT_SHADER, &keyboardKeyProgram, &keyboardKeyFragmentShader);
 
     // obtain datarefs
     acfCockpitTypeDataRef = XPLMFindDataRef("sim/aircraft/view/acf_cockpit_type");
@@ -3854,8 +3820,8 @@ PLUGIN_API void XPluginStop(void)
 {
     ReleaseAllKeys();
 
-    CleanupShader(indicatorsProgram, NULL, &indicatorsFragmentShader, 1);
-    CleanupShader(keyboardKeyProgram, &keyboardKeyVertexShader, &keyboardKeyFragmentShader, 1);
+    CleanupShader(indicatorsProgram, indicatorsFragmentShader, 1);
+    CleanupShader(keyboardKeyProgram, keyboardKeyFragmentShader, 1);
 
     // revert any remaining button assignments
     while (!buttonAssignmentsStack.empty())
