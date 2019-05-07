@@ -638,6 +638,7 @@ static int ToggleAutopilotOrDisableFlightDirectorCommand(XPLMCommandRef inComman
 static int ToggleBetaOrToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ToggleBrakesCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void ToggleKeyboardControl(void);
+static void ToggleMode(Mode m, XPLMCommandPhase phase);
 static void ToggleMouseButton(MouseButton button, int down, void *display = NULL);
 static void ToggleMouseControl(void);
 static int ToggleMouseOrKeyboardControlCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
@@ -1198,10 +1199,7 @@ static void CleanupShader(GLuint program, GLuint fragmentShader, int deleteProgr
 
 static int CowlFlapModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase == xplm_CommandBegin && mode == DEFAULT)
-        mode = COWL;
-    else if (inPhase == xplm_CommandEnd && mode == COWL)
-        mode = DEFAULT;
+    ToggleMode(COWL, inPhase);
 
     return 0;
 }
@@ -1779,7 +1777,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (mode == LOOK)
                         XPLMCommandBegin(pushToTalkCommand);
                     else
-                        XPLMCommandBegin(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
+                        XPLMCommandBegin(XPLMFindCommand("sim/autopilot/servos_off_any"));
                 }
                 else if (!leftTriggerDown && !rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= 0.15f)
                     rightTriggerDown = 1;
@@ -1789,7 +1787,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (mode == LOOK)
                         XPLMCommandEnd(pushToTalkCommand);
                     else
-                        XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
+                        XPLMCommandEnd(XPLMFindCommand("sim/autopilot/servos_off_any"));
                 }
                 else if (!leftTriggerDown && rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] > 0.15f)
                     rightTriggerDown = 0;
@@ -1799,21 +1797,21 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (mode == LOOK)
                         XPLMCommandBegin(pushToTalkCommand);
                     else
-                        XPLMCommandBegin(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
+                        XPLMCommandBegin(XPLMFindCommand("sim/autopilot/servos_off_any"));
                 }
                 else
                 {
                     if (mode == LOOK)
                         XPLMCommandEnd(pushToTalkCommand);
                     else
-                        XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
+                        XPLMCommandEnd(XPLMFindCommand("sim/autopilot/servos_off_any"));
                 }
 #endif
             }
 
             if (mode == LOOK)
             {
-                XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
+                XPLMCommandEnd(XPLMFindCommand("sim/autopilot/servos_off_any"));
 
                 int viewType = XPLMGetDatai(viewTypeDataRef);
 
@@ -2538,45 +2536,12 @@ static int LockKeyboardKeyCommand(XPLMCommandRef inCommand, XPLMCommandPhase inP
 
 static int LookModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase != xplm_CommandContinue)
+    int joystickAxisAssignments[100];
+    XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
+
+    if (inPhase == xplm_CommandEnd)
     {
-        int joystickAxisAssignments[100];
-        XPLMGetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
-
-        if (inPhase == xplm_CommandBegin && mode == DEFAULT)
-        {
-            mode = LOOK;
-
-            // unassign the left joystick's axis
-            joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_NONE;
-            joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
-
-            // store the default button assignments
-            PushButtonAssignments();
-
-            // assign panel scrolling controls to the dpad
-            int joystickButtonAssignments[1600];
-            XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand("sim/general/up");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("sim/general/down");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/rot_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/rot_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand("sim/general/forward");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand("sim/general/backward");
-
-            // assign push-to-talk controls
-            if (controllerType == DS4)
-                joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand(PUSH_TO_TALK_COMMAND);
-
-            XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-            // temporarily gain exclusive camera controls
-            OverrideCameraControls();
-        }
-        else if (inPhase == xplm_CommandEnd && mode == LOOK)
+        if (mode == LOOK)
         {
             // auto-center 3D cockpit view if it is only the defined distance or angle off from the center anyways
             if (XPLMGetDatai(viewTypeDataRef) == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK && fabs(defaultHeadPositionX - XPLMGetDataf(acfPeXDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT && fabs(defaultHeadPositionY - XPLMGetDataf(acfPeYDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT && fabs(defaultHeadPositionZ - XPLMGetDataf(acfPeZDataRef)) <= AUTO_CENTER_VIEW_DISTANCE_LIMIT)
@@ -2606,9 +2571,42 @@ static int LookModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhas
 
             mode = DEFAULT;
         }
-
-        XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
     }
+    else if (mode == DEFAULT)
+    {
+        mode = LOOK;
+
+        // unassign the left joystick's axis
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_NONE;
+        joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
+
+        // store the default button assignments
+        PushButtonAssignments();
+
+        // assign panel scrolling controls to the dpad
+        int joystickButtonAssignments[1600];
+        XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/left");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/right");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand("sim/general/up");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("sim/general/down");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/rot_left");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/rot_right");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand("sim/general/forward");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand("sim/general/backward");
+
+        // assign push-to-talk controls
+        if (controllerType == DS4)
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand(PUSH_TO_TALK_COMMAND);
+
+        XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+        // temporarily gain exclusive camera controls
+        OverrideCameraControls();
+    }
+
+    XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
 
     return 0;
 }
@@ -2724,10 +2722,7 @@ static void MenuHandlerCallback(void *inMenuRef, void *inItemRef)
 
 static int MixtureControlModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase == xplm_CommandBegin && mode == DEFAULT)
-        mode = MIXTURE;
-    else if (inPhase == xplm_CommandEnd && mode == MIXTURE)
-        mode = DEFAULT;
+    ToggleMode(MIXTURE, inPhase);
 
     return 0;
 }
@@ -2866,10 +2861,7 @@ static int PressKeyboardKeyCommand(XPLMCommandRef inCommand, XPLMCommandPhase in
 
 static int PropPitchOrThrottleModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase == xplm_CommandBegin && mode == DEFAULT)
-        mode = PROP;
-    else if (inPhase == xplm_CommandEnd && mode == PROP)
-        mode = DEFAULT;
+    ToggleMode(PROP, inPhase);
 
     return 0;
 }
@@ -2927,7 +2919,17 @@ inline static void SyncLockKeyState(KeyboardKey *key)
 
 static int ResetSwitchViewCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    if (inPhase == xplm_CommandBegin)
+    if (inPhase == xplm_CommandEnd)
+    {
+        if (mode == SWITCH_VIEW)
+        {
+            // restore the default button assignments
+            PopButtonAssignments();
+
+            mode = DEFAULT;
+        }
+    }
+    else if (mode == DEFAULT)
     {
         // reset view
         switch (XPLMGetDatai(viewTypeDataRef))
@@ -2967,13 +2969,6 @@ static int ResetSwitchViewCommand(XPLMCommandRef inCommand, XPLMCommandPhase inP
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         }
-    }
-    else if (inPhase == xplm_CommandEnd && mode == SWITCH_VIEW)
-    {
-        // restore the default button assignments
-        PopButtonAssignments();
-
-        mode = DEFAULT;
     }
 
     return 0;
@@ -3115,7 +3110,7 @@ static void SetDefaultAssignments(void)
 #endif
         case DS4:
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t)XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand("sim/autopilot/control_wheel_steer");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand("sim/autopilot/servos_off_any");
             break;
         }
 
@@ -3444,6 +3439,17 @@ static void ToggleKeyboardControl(void)
     }
 }
 
+static void ToggleMode(Mode m, XPLMCommandPhase phase)
+{
+    if (phase == xplm_CommandEnd)
+    {
+        if (mode == m)
+            mode = DEFAULT;
+    }
+    else if (mode == DEFAULT)
+        mode = m;
+}
+
 static void ToggleMouseButton(MouseButton button, int down, void *display)
 {
 #if IBM
@@ -3613,8 +3619,24 @@ static int ToggleRightMouseButtonCommand(XPLMCommandRef inCommand, XPLMCommandPh
 
 static int TrimModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
-    // only apply the modifier if no other modifier is down which can alter any assignments
-    if (inPhase == xplm_CommandBegin && mode == DEFAULT)
+    if (inPhase == xplm_CommandEnd)
+    {
+        if (mode == TRIM)
+        {
+            // restore the default button assignments
+            PopButtonAssignments();
+
+            // custom handling for DreamFoil AS350
+            if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE))
+                XPLMCommandEnd(XPLMFindCommand("AS350/Trim/Force_Trim"));
+            // custom handling for DreamFoil B407
+            else if (IsPluginEnabled(DREAMFOIL_B407_PLUGIN_SIGNATURE))
+                XPLMCommandEnd(XPLMFindCommand("B407/flight_controls/force_trim"));
+
+            mode = DEFAULT;
+        }
+    }
+    else if (mode == DEFAULT)
     {
         mode = TRIM;
 
@@ -3664,20 +3686,6 @@ static int TrimModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhas
         }
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-    }
-    else if (inPhase == xplm_CommandEnd && mode == TRIM)
-    {
-        // restore the default button assignments
-        PopButtonAssignments();
-
-        // custom handling for DreamFoil AS350
-        if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE))
-            XPLMCommandEnd(XPLMFindCommand("AS350/Trim/Force_Trim"));
-        // custom handling for DreamFoil B407
-        else if (IsPluginEnabled(DREAMFOIL_B407_PLUGIN_SIGNATURE))
-            XPLMCommandEnd(XPLMFindCommand("B407/flight_controls/force_trim"));
-
-        mode = DEFAULT;
     }
 
     return 0;
