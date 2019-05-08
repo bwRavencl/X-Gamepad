@@ -637,7 +637,7 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommand(XPLMCommandRef inCommand, 
 static int ToggleAutopilotOrDisableFlightDirectorCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ToggleBetaOrToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ToggleBrakesCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
-static void ToggleKeyboardControl(void);
+static void ToggleKeyboardControl(int vrEnabled = -1);
 static void ToggleMode(Mode m, XPLMCommandPhase phase);
 static void ToggleMouseButton(MouseButton button, int down, void *display = NULL);
 static void ToggleMouseControl(void);
@@ -646,7 +646,7 @@ static int ToggleLeftMouseButtonCommand(XPLMCommandRef inCommand, XPLMCommandPha
 static int ToggleRightMouseButtonCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int TrimModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int TrimResetCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
-static void UpdateIndicatorsWindow(void);
+static void UpdateIndicatorsWindow(int vrEnabled = -1);
 static void UpdateSettingsWidgets(void);
 inline static void WireKey(KeyboardKey *key, KeyboardKey *left, KeyboardKey *right, KeyboardKey *above, KeyboardKey *below);
 static void WireKeys(void);
@@ -785,7 +785,7 @@ static volatile int hidDeviceThreadRun = 1;
 #endif
 
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
 static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, configurationStatusCaption = NULL, startConfigurationtButton = NULL, showIndicatorsCheckbox = NULL;
 
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
@@ -838,6 +838,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     pilotsHeadPsiDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_psi");
     pilotsHeadTheDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_the");
     viewTypeDataRef = XPLMFindDataRef("sim/graphics/view/view_type");
+    vrEnabledDataRef = XPLMFindDataRef("sim/graphics/VR/enabled");
     hasJoystickDataRef = XPLMFindDataRef("sim/joystick/has_joystick");
     joystickPitchNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_pitch_nullzone");
     joystickRollNullzoneDataRef = XPLMFindDataRef("sim/joystick/joystick_roll_nullzone");
@@ -1028,6 +1029,9 @@ PLUGIN_API int XPluginEnable(void)
 
 PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, void *inParam)
 {
+    if (inFromWho != XPLM_PLUGIN_XPLANE)
+        return;
+
     switch (inMessage)
     {
     case XPLM_MSG_PLANE_LOADED:
@@ -1044,6 +1048,27 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
         switchTo3DCommandLook = 0;
         if (!Has2DPanel())
             switchTo3DCommandLook = 1;
+        break;
+
+    case XPLM_MSG_ENTERED_VR:
+    case XPLM_MSG_EXITING_VR:
+        const int vrEnabled = inMessage == XPLM_MSG_ENTERED_VR;
+        
+        UpdateIndicatorsWindow(vrEnabled);
+
+        if (mode == KEYBOARD && !keyPressActive)
+        {
+            // hide the window
+            ToggleKeyboardControl();
+            // destroy it
+            if (keyboardWindow)
+            {
+                XPLMDestroyWindow(keyboardWindow);
+                keyboardWindow = NULL;
+            }
+            // create a fresh one and show it again
+            ToggleKeyboardControl(vrEnabled);
+        }
         break;
     }
 }
@@ -2251,6 +2276,9 @@ static void HandleKeyboardSelectorCommand(XPLMCommandPhase inPhase, KeyboardKey 
 
 static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStatus inMouse, void *inRefcon)
 {
+    if (XPLMGetDatai(vrEnabledDataRef))
+        return 0;
+
     static int lastX = -1, lastY = -1;
 
     switch (inMouse)
@@ -3374,7 +3402,7 @@ static int ToggleBrakesCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhas
     return 0;
 }
 
-static void ToggleKeyboardControl(void)
+static void ToggleKeyboardControl(int vrEnabled)
 {
     // if we are in mouse mode we actually want to toggle it off instead of toggling keyboard mode
     if (mode == MOUSE)
@@ -3403,6 +3431,9 @@ static void ToggleKeyboardControl(void)
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
+        if (vrEnabled == -1)
+            vrEnabled = XPLMGetDatai(vrEnabledDataRef);
+
         if (keyboardWindow == NULL)
         {
             XPLMCreateWindow_t keyboardWindowParameters;
@@ -3418,13 +3449,15 @@ static void ToggleKeyboardControl(void)
             keyboardWindowParameters.handleMouseClickFunc = HandleMouseClick;
             keyboardWindowParameters.handleCursorFunc = HandleCursor;
             keyboardWindowParameters.handleMouseWheelFunc = HandleMouseWheel;
-            keyboardWindowParameters.decorateAsFloatingWindow = xplm_WindowDecorationSelfDecorated;
+            keyboardWindowParameters.decorateAsFloatingWindow = vrEnabled ? xplm_WindowDecorationRoundRectangle : xplm_WindowDecorationSelfDecorated;
             keyboardWindowParameters.layer = xplm_WindowLayerFloatingWindows;
             keyboardWindowParameters.handleRightClickFunc = HandleMouseClick;
             keyboardWindow = XPLMCreateWindowEx(&keyboardWindowParameters);
         }
         else
             XPLMSetWindowIsVisible(keyboardWindow, 1);
+
+        XPLMSetWindowPositioningMode(keyboardWindow, vrEnabled ? xplm_WindowVR : xplm_WindowPositionFree, 0);
     }
     else if (mode == KEYBOARD && !keyPressActive)
     {
@@ -3719,7 +3752,7 @@ static int TrimResetCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, 
     return 0;
 }
 
-static void UpdateIndicatorsWindow(void)
+static void UpdateIndicatorsWindow(int vrEnabled)
 {
     if (indicatorsWindow)
     {
@@ -3759,6 +3792,9 @@ static void UpdateIndicatorsWindow(void)
     if (numMixtureLevers > 0)
         width += INDICATOR_LEVER_WIDTH;
 
+    if (vrEnabled == -1)
+        vrEnabled = XPLMGetDatai(vrEnabledDataRef);
+
     XPLMCreateWindow_t indicatorsWindowParameters;
     indicatorsWindowParameters.structSize = sizeof indicatorsWindowParameters;
     indicatorsWindowParameters.top = indicatorsBottom + INDICATOR_LEVER_HEIGHT;
@@ -3772,10 +3808,12 @@ static void UpdateIndicatorsWindow(void)
     indicatorsWindowParameters.handleMouseClickFunc = HandleMouseClick;
     indicatorsWindowParameters.handleCursorFunc = HandleCursor;
     indicatorsWindowParameters.handleMouseWheelFunc = HandleMouseWheel;
-    indicatorsWindowParameters.decorateAsFloatingWindow = xplm_WindowDecorationSelfDecorated;
+    indicatorsWindowParameters.decorateAsFloatingWindow = vrEnabled ? xplm_WindowDecorationRoundRectangle : xplm_WindowDecorationSelfDecorated;
     indicatorsWindowParameters.layer = xplm_WindowLayerFlightOverlay;
     indicatorsWindowParameters.handleRightClickFunc = HandleMouseClick;
     indicatorsWindow = XPLMCreateWindowEx(&indicatorsWindowParameters);
+
+    XPLMSetWindowPositioningMode(indicatorsWindow, vrEnabled ? xplm_WindowVR : xplm_WindowPositionFree, 0);
 }
 
 static void UpdateSettingsWidgets(void)
