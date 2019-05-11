@@ -285,7 +285,7 @@
 #define COWL_FLAP_MODIFIER_COMMAND NAME_LOWERCASE "/cowl_flap_modifier"
 #define TRIM_MODIFIER_COMMAND NAME_LOWERCASE "/trim_modifier"
 #define TRIM_RESET_COMMAND NAME_LOWERCASE "/trim_reset"
-#define TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND NAME_LOWERCASE "/toggle_beta_or_toggle_reverse"
+#define TOGGLE_REVERSE_COMMAND NAME_LOWERCASE "/toggle_reverse"
 #define TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_or_keyboard_control"
 #define PUSH_TO_TALK_COMMAND NAME_LOWERCASE "/push_to_talk"
 #define TOGGLE_BRAKES_COMMAND NAME_LOWERCASE "/toggle_brakes"
@@ -318,6 +318,8 @@
 #define KEY_BASE_SIZE 48
 #define KEY_BORDER_WIDTH 1
 #define KEY_REPEAT_INTERVAL 0.1f
+
+#define THRUST_REVERSER_SETTING_ON_ENGAGEMENT -0.05f
 
 #define TOUCHPAD_MAX_DELTA 150
 #define TOUCHPAD_CURSOR_SENSITIVITY 1.0f
@@ -374,11 +376,11 @@
                                    "        if (gl_TexCoord[0].x < segmentWidth)"                                                                                                                                                                                                                                                                                      \
                                    "        {"                                                                                                                                                                                                                                                                                                                         \
                                    "            if (reverser)"                                                                                                                                                                                                                                                                                                         \
-                                   "                gl_FragColor = gl_TexCoord[0].y > throttleNormalized ? vec4(1.0, 0.5, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                              \
+                                   "                gl_FragColor = gl_TexCoord[0].y > throttleNormalized ? vec4(1.0, 0.5, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                               \
                                    "            else if (beta)"                                                                                                                                                                                                                                                                                                        \
-                                   "                gl_FragColor = gl_TexCoord[0].y > throttleNormalized ? vec4(1.0, 1.0, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                              \
+                                   "                gl_FragColor = gl_TexCoord[0].y > throttleNormalized ? vec4(1.0, 1.0, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                               \
                                    "            else"                                                                                                                                                                                                                                                                                                                  \
-                                   "                gl_FragColor = gl_TexCoord[0].y < throttleNormalized ? vec4(0.0, 0.0, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                              \
+                                   "                gl_FragColor = gl_TexCoord[0].y < throttleNormalized ? vec4(0.0, 0.0, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                               \
                                    "        }"                                                                                                                                                                                                                                                                                                                         \
                                    "        else if (hasProp && gl_TexCoord[0].x > segmentWidth + borderWidthX && gl_TexCoord[0].x < segmentWidth * 2)"                                                                                                                                                                                                                \
                                    "            gl_FragColor = gl_TexCoord[0].y < prop ? vec4(0.0, 0.0, 1.0, 0.75) : backgroundColor;"                                                                                                                                                                                                                                 \
@@ -620,6 +622,7 @@ static void FitGeometryWithinScreenBounds(int *left, int *top, int *right, int *
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon);
 inline static int FloatsEqual(float a, float b);
 static int inline GetKeyboardWidth(void);
+static XPLMDataRef GetThrottleRatioDataRef(void);
 static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon);
 static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus);
 static void HandleKeyboardSelectorCommand(XPLMCommandPhase inPhase, KeyboardKey *newSelectedKey);
@@ -667,7 +670,6 @@ static void StopConfiguration(void);
 inline static void SyncLockKeyState(KeyboardKey *key);
 static int ToggleArmSpeedBrakeOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ToggleAutopilotOrDisableFlightDirectorCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
-static int ToggleBetaOrToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ToggleBrakesCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void ToggleKeyboardControl(int vrEnabled = -1);
 static void ToggleMode(Mode m, XPLMCommandPhase phase);
@@ -675,6 +677,7 @@ static void ToggleMouseButton(MouseButton button, int down, void *display = NULL
 static void ToggleMouseControl(void);
 static int ToggleMouseOrKeyboardControlCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ToggleLeftMouseButtonCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
+static int ToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ToggleRightMouseButtonCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int TrimModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int TrimResetCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
@@ -791,7 +794,7 @@ static KeyboardKey numpadEnterKey = InitKeyboardKey("Enter", KEY_CODE_NUMPADENTE
 static KeyboardKey *keyboardKeys[] = {&escapeKey, &f1Key, &f2Key, &f3Key, &f4Key, &f5Key, &f6Key, &f7Key, &f8Key, &f9Key, &f10Key, &f11Key, &f12Key, &sysRqKey, &scrollKey, &pauseKey, &insertKey, &deleteKey, &homeKey, &endKey, &graveKey, &d1Key, &d2Key, &d3Key, &d4Key, &d5Key, &d6Key, &d7Key, &d8Key, &d9Key, &d0Key, &minusKey, &equalsKey, &backKey, &numLockKey, &divideKey, &multiplyKey, &subtractKey, &tabKey, &qKey, &wKey, &eKey, &rKey, &tKey, &yKey, &uKey, &iKey, &oKey, &pKey, &leftBracketKey, &rightBracketKey, &backslashKey, &numpad7Key, &numpad8Key, &numpad9Key, &addKey, &captialKey, &aKey, &sKey, &dKey, &fKey, &gKey, &hKey, &jKey, &kKey, &lKey, &semicolonKey, &apostropheKey, &returnKey, &numpad4Key, &numpad5Key, &numpad6Key, &pageUpKey, &leftShiftKey, &zKey, &xKey, &cKey, &vKey, &bKey, &nKey, &mKey, &commaKey, &periodKey, &slashKey, &rightShiftKey, &numpad1Key, &numpad2Key, &numpad3Key, &pageDownKey, &leftControlKey, &leftWindowsKey, &leftAltKey, &spaceKey, &rightAltKey, &rightWindowsKey, &appsKey, &rightControlKey, &upKey, &downKey, &leftKey, &rightKey, &numpad0Key, &numpadCommaKey, &numpadEnterKey};
 static KeyboardKey *selectedKey = &kKey;
 
-static int axisOffset = 0, buttonOffset = 0, switchTo3DCommandLook = 0, overrideHeadShakePluginFailed = 0, lastCinemaVerite = 0, showIndicators = 1, indicatorsRight = 0, indicatorsBottom = 0, numPropLevers = 0, numMixtureLevers = 0, keyboardRight = 0, keyboardBottom = 0, keyPressActive = 0;
+static int axisOffset = 0, buttonOffset = 0, indicatorsBottom = 0, indicatorsRight = 0, numMixtureLevers = 0, numPropLevers = 0, keyboardBottom = 0, keyboardRight = 0, keyPressActive = 0, lastCinemaVerite = 0, overrideHeadShakePluginFailed = 0, thrustReverserMode = 0, showIndicators = 1, switchTo3DCommandLook = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
@@ -816,8 +819,8 @@ static int hidInitialized = 0;
 static volatile int hidDeviceThreadRun = 1;
 #endif
 
-static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleReverseCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfThrotmaxREVDataRef = NULL, acfFeatheredPitchDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, throttleJetRevRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
 static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, configurationStatusCaption = NULL, startConfigurationtButton = NULL, showIndicatorsCheckbox = NULL;
 
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
@@ -847,7 +850,6 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 #endif
 
     // prepare fragment-shaders
-    //  InitShader2(INDICATORS_VERTEX_SHADER, INDICATORS_FRAGMENT_SHADER, &indicatorsProgram, &indicatorsVertexShader, &indicatorsFragmentShader);
     InitShader(INDICATORS_FRAGMENT_SHADER, &indicatorsProgram, &indicatorsFragmentShader);
     InitShader(KEYBOARD_KEY_FRAGMENT_SHADER, &keyboardKeyProgram, &keyboardKeyFragmentShader);
 
@@ -856,9 +858,10 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     acfPeXDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peX");
     acfPeYDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peY");
     acfPeZDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peZ");
-    acfRSCMingovPrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_mingov_prp");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
+    acfThrotmaxREVDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_throtmax_REV");
+    acfFeatheredPitchDataRef = XPLMFindDataRef("sim/aircraft/overflow/acf_feathered_pitch");
     acfHasBetaDataRef = XPLMFindDataRef("sim/aircraft/overflow/acf_has_beta");
     acfSbrkEQDataRef = XPLMFindDataRef("sim/aircraft/parts/acf_sbrkEQ");
     acfEnTypeDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_en_type");
@@ -891,13 +894,13 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     elevatorTrimDataRef = XPLMFindDataRef("sim/cockpit2/controls/elevator_trim");
     rudderTrimDataRef = XPLMFindDataRef("sim/cockpit2/controls/rudder_trim");
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
+    throttleJetRevRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_jet_rev_ratio_all");
     throttleBetaRevRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_beta_rev_ratio_all");
     propPitchDegDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_pitch_deg");
     propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
     carbHeatRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/carb_heat_ratio");
     cowlFlapRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/cowl_flap_ratio");
-    thrustReverserDeployRatioDataRef = XPLMFindDataRef("sim/flightmodel2/engines/thrust_reverser_deploy_ratio");
     overrideToeBrakesDataRef = XPLMFindDataRef("sim/operation/override/override_toe_brakes");
 
     // create custom commands
@@ -910,7 +913,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     cowlFlapModifierCommand = XPLMCreateCommand(COWL_FLAP_MODIFIER_COMMAND, "Cowl Flap Modifier");
     trimModifierCommand = XPLMCreateCommand(TRIM_MODIFIER_COMMAND, "Trim Modifier");
     trimResetCommand = XPLMCreateCommand(TRIM_RESET_COMMAND, "Trim Reset");
-    toggleBetaOrToggleReverseCommand = XPLMCreateCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND, "Toggle Beta / Toggle Reverse");
+    toggleReverseCommand = XPLMCreateCommand(TOGGLE_REVERSE_COMMAND, "Toggle Reverse");
     toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND, "Toggle Mouse or Keyboard Control");
     pushToTalkCommand = XPLMCreateCommand(PUSH_TO_TALK_COMMAND, "Push-To-Talk");
     toggleBrakesCommand = XPLMCreateCommand(TOGGLE_BRAKES_COMMAND, "Toggle Brakes");
@@ -935,7 +938,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommand, 1, NULL);
     XPLMRegisterCommandHandler(trimModifierCommand, TrimModifierCommand, 1, NULL);
     XPLMRegisterCommandHandler(trimResetCommand, TrimResetCommand, 1, NULL);
-    XPLMRegisterCommandHandler(toggleBetaOrToggleReverseCommand, ToggleBetaOrToggleReverseCommand, 1, NULL);
+    XPLMRegisterCommandHandler(toggleReverseCommand, ToggleReverseCommand, 1, NULL);
     XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMouseOrKeyboardControlCommand, 1, NULL);
     XPLMRegisterCommandHandler(pushToTalkCommand, PushToTalkCommand, 1, NULL);
     XPLMRegisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommand, 1, NULL);
@@ -1011,7 +1014,7 @@ PLUGIN_API void XPluginStop(void)
     XPLMUnregisterCommandHandler(cowlFlapModifierCommand, CowlFlapModifierCommand, 1, NULL);
     XPLMUnregisterCommandHandler(trimModifierCommand, TrimModifierCommand, 1, NULL);
     XPLMUnregisterCommandHandler(trimResetCommand, TrimResetCommand, 1, NULL);
-    XPLMUnregisterCommandHandler(toggleBetaOrToggleReverseCommand, ToggleBetaOrToggleReverseCommand, 1, NULL);
+    XPLMUnregisterCommandHandler(toggleReverseCommand, ToggleReverseCommand, 1, NULL);
     XPLMUnregisterCommandHandler(toggleMousePointerControlCommand, ToggleMouseOrKeyboardControlCommand, 1, NULL);
     XPLMUnregisterCommandHandler(pushToTalkCommand, PushToTalkCommand, 1, NULL);
     XPLMUnregisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommand, 1, NULL);
@@ -1073,6 +1076,8 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
         defaultHeadPositionX = FLT_MAX;
         defaultHeadPositionY = FLT_MAX;
         defaultHeadPositionZ = FLT_MAX;
+
+        thrustReverserMode = 0;
 
         // reinitialize indicators window if necessary
         UpdateIndicatorsWindow();
@@ -1390,12 +1395,12 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
         propRatio = Normalize(propPitchDeg, acfMinPitch, acfMaxPitch, 0.0f, 1.0f);
     }
     else
-        propRatio = Normalize(XPLMGetDataf(propRotationSpeedRadSecAllDataRef), XPLMGetDataf(acfRSCMingovPrpDataRef), XPLMGetDataf(acfRSCRedlinePrpDataRef), 0.0f, 1.0f);
+        propRatio = Normalize(XPLMGetDataf(propRotationSpeedRadSecAllDataRef), XPLMGetDataf(acfFeatheredPitchDataRef), XPLMGetDataf(acfRSCRedlinePrpDataRef), 0.0f, 1.0f);
 
-    glUniform1f(propLocation, numPropLevers < 1 ? -2.0 : propRatio);
+    glUniform1f(propLocation, numPropLevers < 1 ? -3.0f : propRatio);
 
     const int mixtureLocation = glGetUniformLocation(indicatorsProgram, "mixture");
-    glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -2.0 : XPLMGetDataf(mixtureRatioAllDataRef));
+    glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -3.0f : XPLMGetDataf(mixtureRatioAllDataRef));
 
     int left, top, right, bottom;
     XPLMGetWindowGeometry(indicatorsWindow, &left, &top, &right, &bottom);
@@ -1639,6 +1644,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         XPLMCommandOnce(XPLMFindCommand("sim/view/3d_cockpit_cmnd_look"));
         switchTo3DCommandLook = 0;
     }
+
+    // disable thrust reverser mode if throttle was moved into positive range
+    if (thrustReverserMode && XPLMGetDataf(throttleBetaRevRatioAllDataRef) > 0.0f)
+        thrustReverserMode = false;
 
     if (XPLMGetDatai(hasJoystickDataRef))
     {
@@ -1898,18 +1907,18 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             {
                 XPLMCommandEnd(XPLMFindCommand("sim/autopilot/servos_off_any"));
 
-                int viewType = XPLMGetDatai(viewTypeDataRef);
+                const int viewType = XPLMGetDatai(viewTypeDataRef);
 
                 if (viewType == VIEW_TYPE_3D_COCKPIT_COMMAND_LOOK)
                 {
                     float deltaPsi = 0.0f, deltaThe = 0.0f;
-                    float viewSensitivityMultiplier = JOYSTICK_LOOK_SENSITIVITY * inElapsedSinceLastCall;
+                    const float viewSensitivityMultiplier = JOYSTICK_LOOK_SENSITIVITY * inElapsedSinceLastCall;
 
                     // turn head to the left
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] < 0.5f - joystickPitchNullzone)
                     {
                         // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 0.0f, 0.0f, 1.0f);
+                        const float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         deltaPsi -= d * viewSensitivityMultiplier;
                     }
@@ -1917,7 +1926,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] > 0.5f + joystickPitchNullzone)
                     {
                         // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 1.0f, 0.0f, 1.0f);
+                        const float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         deltaPsi += d * viewSensitivityMultiplier;
                     }
@@ -1926,7 +1935,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                     {
                         // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
+                        const float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         deltaThe += d * viewSensitivityMultiplier;
                     }
@@ -1934,13 +1943,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                     {
                         // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
+                        const float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         deltaThe -= d * viewSensitivityMultiplier;
                     }
 
-                    float pilotsHeadPsi = XPLMGetDataf(pilotsHeadPsiDataRef);
-                    float pilotsHeadThe = XPLMGetDataf(pilotsHeadTheDataRef);
+                    const float pilotsHeadPsi = XPLMGetDataf(pilotsHeadPsiDataRef);
+                    const float pilotsHeadThe = XPLMGetDataf(pilotsHeadTheDataRef);
 
                     float newPilotsHeadPsi = pilotsHeadPsi + deltaPsi;
                     float newPilotsHeadThe = pilotsHeadThe + deltaThe;
@@ -1959,10 +1968,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] < 0.5f - joystickPitchNullzone)
                     {
                         // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 0.0f, 0.0f, 1.0f);
+                        const float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2) and round to integer
-                        int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
+                        const int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
 
                         // apply the command
                         for (int i = 0; i < n; i++)
@@ -1972,10 +1981,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] > 0.5f + joystickPitchNullzone)
                     {
                         // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 1.0f, 0.0f, 1.0f);
+                        const float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2) and round to integer
-                        int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
+                        const int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
 
                         // apply the command
                         for (int i = 0; i < n; i++)
@@ -1986,10 +1995,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                     {
                         // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
+                        const float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2) and round to integer
-                        int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
+                        const int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
 
                         // apply the command
                         for (int i = 0; i < n; i++)
@@ -1999,10 +2008,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                     {
                         // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
+                        const float d = Normalize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2) and round to integer
-                        int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
+                        const int n = (int)(powf(2.0f * d, 2.0f) + 0.5f);
 
                         // apply the command
                         for (int i = 0; i < n; i++)
@@ -2016,44 +2025,44 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
                 if (!helicopter && mode == PROP)
                 {
-                    float acfRSCMingovPrp = XPLMGetDataf(acfRSCMingovPrpDataRef);
-                    float acfRSCRedlinePrp = XPLMGetDataf(acfRSCRedlinePrpDataRef);
-                    float propRotationSpeedRadSecAll = XPLMGetDataf(propRotationSpeedRadSecAllDataRef);
+                    const float acfFeatheredPitch = XPLMGetDataf(acfFeatheredPitchDataRef);
+                    const float acfRSCRedlinePrp = XPLMGetDataf(acfRSCRedlinePrpDataRef);
+                    const float propRotationSpeedRadSecAll = XPLMGetDataf(propRotationSpeedRadSecAllDataRef);
 
                     // increase prop pitch
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                     {
-                        // normalize range [0.5, 0.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
-                        float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
+                        // normalize range [0.5, 0.0] to [acfFeatheredPitch, acfRSCRedlinePrp]
+                        const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, acfFeatheredPitch, acfRSCRedlinePrp);
 
-                        float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll + d;
+                        const float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll + d;
 
-                        // ensure we don't set values larger than 1.0
+                        // ensure we don't set values larger than redline
                         XPLMSetDataf(propRotationSpeedRadSecAllDataRef, newPropRotationSpeedRadSecAll < acfRSCRedlinePrp ? newPropRotationSpeedRadSecAll : acfRSCRedlinePrp);
                     }
                     // decrease prop pitch
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                     {
-                        // normalize range [0.5, 1.0] to [acfRSCMingovPrp, acfRSCRedlinePrp]
-                        float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, acfRSCMingovPrp, acfRSCRedlinePrp);
+                        // normalize range [0.5, 1.0] to [acfFeatheredPitch, acfRSCRedlinePrp]
+                        const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, acfFeatheredPitch, acfRSCRedlinePrp);
 
-                        float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll - d;
+                        const float newPropRotationSpeedRadSecAll = propRotationSpeedRadSecAll - d;
 
-                        // ensure we don't set values smaller than 0.0
-                        XPLMSetDataf(propRotationSpeedRadSecAllDataRef, newPropRotationSpeedRadSecAll > acfRSCMingovPrp ? newPropRotationSpeedRadSecAll : acfRSCMingovPrp);
+                        // ensure we don't set values smaller than feathered pitch
+                        XPLMSetDataf(propRotationSpeedRadSecAllDataRef, newPropRotationSpeedRadSecAll > acfFeatheredPitch ? newPropRotationSpeedRadSecAll : acfFeatheredPitch);
                     }
                 }
                 else if (mode == MIXTURE)
                 {
-                    float mixtureRatioAll = XPLMGetDataf(mixtureRatioAllDataRef);
+                    const float mixtureRatioAll = XPLMGetDataf(mixtureRatioAllDataRef);
 
                     // increase mixture setting
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                     {
                         // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
+                        const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
-                        float newMixtureRatioAll = mixtureRatioAll + d;
+                        const float newMixtureRatioAll = mixtureRatioAll + d;
 
                         // ensure we don't set values larger than 1.0
                         XPLMSetDataf(mixtureRatioAllDataRef, newMixtureRatioAll < 1.0f ? newMixtureRatioAll : 1.0f);
@@ -2062,9 +2071,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                     {
                         // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
+                        const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
-                        float newMixtureRatioAll = mixtureRatioAll - d;
+                        const float newMixtureRatioAll = mixtureRatioAll - d;
 
                         // ensure we don't set values smaller than 0.0
                         XPLMSetDataf(mixtureRatioAllDataRef, newMixtureRatioAll > 0.0f ? newMixtureRatioAll : 0.0f);
@@ -2079,12 +2088,12 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                     {
                         // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
+                        const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // ensure we don't set values smaller than 0.0
                         for (int i = 0; i < acfNumEngines; i++)
                         {
-                            float newCowlFlapRatio = cowlFlapRatio[i] - d;
+                            const float newCowlFlapRatio = cowlFlapRatio[i] - d;
                             cowlFlapRatio[i] = newCowlFlapRatio > 0.0f ? newCowlFlapRatio : 0.0f;
                         }
                     }
@@ -2092,12 +2101,12 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                     {
                         // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
+                        const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // ensure we don't set values larger than 1.0
                         for (int i = 0; i < acfNumEngines; i++)
                         {
-                            float newCowlFlapRatio = cowlFlapRatio[i] + d;
+                            const float newCowlFlapRatio = cowlFlapRatio[i] + d;
                             cowlFlapRatio[i] = newCowlFlapRatio < 1.0f ? newCowlFlapRatio : 1.0f;
                         }
                     }
@@ -2112,7 +2121,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] < 0.5f - joystickPitchNullzone)
                     {
                         // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 0.0f, 0.0f, 1.0f);
+                        const float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2)
                         distX -= (int)(powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
@@ -2121,7 +2130,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] > 0.5f + joystickPitchNullzone)
                     {
                         // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 1.0f, 0.0f, 1.0f);
+                        const float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2)
                         distX += (int)(powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
@@ -2131,7 +2140,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                     {
                         // normalize range [0.5, 0.0] to [0.0, 1.0]
-                        float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
+                        const float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2)
                         distY -= (int)(powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
@@ -2140,7 +2149,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                     {
                         // normalize range [0.5, 1.0] to [0.0, 1.0]
-                        float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
+                        const float d = Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                         // apply acceleration function (y = x^2)
                         distY += (int)(powf(d * JOYSTICK_MOUSE_POINTER_SENSITIVITY, 2.0f) * inElapsedSinceLastCall);
@@ -2170,9 +2179,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                             if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                             {
                                 // normalize range [0.5, 0.0] to [acfMinPitch, acfMaxPitch]
-                                float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, acfMinPitch[i], acfMaxPitch[i]);
+                                const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, acfMinPitch[i], acfMaxPitch[i]);
 
-                                float newPropPitchDeg = propPitchDeg[i] + d;
+                                const float newPropPitchDeg = propPitchDeg[i] + d;
 
                                 // ensure we don't set values larger than acfMaxPitch
                                 propPitchDeg[i] = newPropPitchDeg < acfMaxPitch[i] ? newPropPitchDeg : acfMaxPitch[i];
@@ -2181,9 +2190,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                             else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                             {
                                 // normalize range [0.5, 1.0] to [acfMinPitch, acfMaxPitch]
-                                float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, acfMinPitch[i], acfMaxPitch[i]);
+                                const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, acfMinPitch[i], acfMaxPitch[i]);
 
-                                float newPropPitchDeg = propPitchDeg[i] - d;
+                                const float newPropPitchDeg = propPitchDeg[i] - d;
 
                                 // ensure we don't set values smaller than acfMinPitch
                                 propPitchDeg[i] = newPropPitchDeg > acfMinPitch[i] ? newPropPitchDeg : acfMinPitch[i];
@@ -2206,9 +2215,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                                     speedbrakeRatio = 0.0f;
 
                                 // normalize range [0.5, 0.0] to [0.0, 1.0]
-                                float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
+                                const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
-                                float newSpeedbrakeRatio = speedbrakeRatio - d;
+                                const float newSpeedbrakeRatio = speedbrakeRatio - d;
 
                                 // ensure we don't set values smaller than 0.0
                                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio > 0.0f ? newSpeedbrakeRatio : 0.0f);
@@ -2221,9 +2230,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                                     speedbrakeRatio = 0.0f;
 
                                 // normalize range [0.5, 1.0] to [0.0, 1.0]
-                                float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
+                                const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
-                                float newSpeedbrakeRatio = speedbrakeRatio + d;
+                                const float newSpeedbrakeRatio = speedbrakeRatio + d;
 
                                 // ensure we don't set values larger than 1.0
                                 XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio < 1.0f ? newSpeedbrakeRatio : 1.0f);
@@ -2231,61 +2240,42 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                         }
                         else
                         {
-                            float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
-
-                            float thrustReverserDeployRatio[8];
-                            XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
-
-                            float averageThrustReverserDeployRatio = 0.0f;
-                            for (int i = 0; i < acfNumEngines; i++)
-                                averageThrustReverserDeployRatio += thrustReverserDeployRatio[i];
-                            averageThrustReverserDeployRatio /= acfNumEngines;
-
-                            const int thrustReverserDeployed = averageThrustReverserDeployRatio > 0.5f;
-
                             // increase throttle setting
                             if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
                             {
                                 // normalize range [0.5, 0.0] to [0.0, 1.0]
-                                float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
+                                const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
-                                // invert d if thrust reversers are engaged
-                                if (thrustReverserDeployed)
-                                {
-                                    float newThrottleRatioAll = throttleRatioAll - d;
+                                const XPLMDataRef throttleRatioDataRef = GetThrottleRatioDataRef();
 
-                                    // ensure we don't set values smaller than 0.0
-                                    XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
-                                }
-                                else
-                                {
-                                    float newThrottleRatioAll = throttleRatioAll + d;
+                                const float newThrottleRatioAll = XPLMGetDataf(throttleRatioDataRef) + d;
 
-                                    // ensure we don't set values larger than 1.0
-                                    XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
-                                }
+                                // ensure we don't set values larger than 1.0
+                                XPLMSetDataf(throttleRatioDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
                             }
                             // decrease throttle setting
                             else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
                             {
                                 // normalize range [0.5, 1.0] to [0.0, 1.0]
-                                float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
+                                const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
-                                // invert d if thrust reversers are engaged
-                                if (thrustReverserDeployed)
+                                const XPLMDataRef throttleRatioDataRef = GetThrottleRatioDataRef();
+
+                                const float newThrottleRatioAll = XPLMGetDataf(throttleRatioDataRef) - d;
+
+                                float lowerThrottleBound;
+                                if (thrustReverserMode)
                                 {
-                                    float newThrottleRatioAll = throttleRatioAll + d;
-
-                                    // ensure we don't set values larger than 1.0
-                                    XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                                    if (throttleRatioDataRef == throttleBetaRevRatioAllDataRef)
+                                        lowerThrottleBound = -2.0f;
+                                    else
+                                        lowerThrottleBound = -1.0f;
                                 }
                                 else
-                                {
-                                    float newThrottleRatioAll = throttleRatioAll - d;
+                                    lowerThrottleBound = 0.0f;
 
-                                    // ensure we don't set values smaller than 0.0
-                                    XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
-                                }
+                                // ensure we don't set values smaller than the lower throttle bound
+                                XPLMSetDataf(throttleRatioDataRef, newThrottleRatioAll > lowerThrottleBound ? newThrottleRatioAll : lowerThrottleBound);
                             }
                         }
                     }
@@ -2300,6 +2290,16 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 inline static int FloatsEqual(float a, float b)
 {
     return fabs(a - b) < FLT_EPSILON;
+}
+
+static XPLMDataRef GetThrottleRatioDataRef(void)
+{
+    if (XPLMGetDatai(acfHasBetaDataRef))
+        return throttleBetaRevRatioAllDataRef;
+    else if (XPLMGetDataf(acfThrotmaxREVDataRef) > 0.0f)
+        return throttleJetRevRatioAllDataRef;
+    else
+        return throttleRatioAllDataRef;
 }
 
 static int inline GetKeyboardWidth(void)
@@ -3180,7 +3180,7 @@ static void SetDefaultAssignments(void)
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TOGGLE_BETA_OR_TOGGLE_REVERSE_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TOGGLE_REVERSE_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t)XPLMFindCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_MODIFIER_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t)XPLMFindCommand(LOOK_MODIFIER_COMMAND);
@@ -3407,35 +3407,6 @@ static int ToggleAutopilotOrDisableFlightDirectorCommand(XPLMCommandRef inComman
             else
                 XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_toggle"));
         }
-
-        beginTime = 0.0f;
-    }
-
-    return 0;
-}
-
-static int ToggleBetaOrToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
-{
-    static float beginTime = 0.0f;
-
-    if (inPhase == xplm_CommandBegin)
-        beginTime = XPLMGetElapsedTime();
-    else if (inPhase == xplm_CommandContinue)
-    {
-        // toggle beta
-        if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
-        {
-            if (XPLMGetDatai(acfHasBetaDataRef))
-                XPLMCommandOnce(XPLMFindCommand("sim/engines/beta_toggle"));
-
-            beginTime = FLT_MAX;
-        }
-    }
-    else if (inPhase == xplm_CommandEnd)
-    {
-        // toggle reverse
-        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
-            XPLMCommandOnce(XPLMFindCommand("sim/engines/thrust_reverse_toggle"));
 
         beginTime = 0.0f;
     }
@@ -3688,6 +3659,30 @@ static int ToggleMouseOrKeyboardControlCommand(XPLMCommandRef inCommand, XPLMCom
 static int ToggleLeftMouseButtonCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     HandleToggleMouseButtonCommand(inPhase, LEFT);
+    return 0;
+}
+
+static int ToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase == xplm_CommandBegin)
+    {
+        if (thrustReverserMode)
+            XPLMSetDataf(throttleBetaRevRatioAllDataRef, 0.0f);
+        else
+        {
+            if (XPLMGetDatai(acfHasBetaDataRef))
+                // has beta
+                XPLMSetDataf(throttleBetaRevRatioAllDataRef, THRUST_REVERSER_SETTING_ON_ENGAGEMENT);
+            else if (XPLMGetDataf(acfThrotmaxREVDataRef) > 0.0f)
+                // has thrust reverser
+                XPLMSetDataf(throttleJetRevRatioAllDataRef, THRUST_REVERSER_SETTING_ON_ENGAGEMENT);
+            else
+                return 0;
+        }
+
+        thrustReverserMode = !thrustReverserMode;
+    }
+
     return 0;
 }
 
