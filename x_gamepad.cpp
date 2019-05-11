@@ -323,37 +323,68 @@
 #define TOUCHPAD_CURSOR_SENSITIVITY 1.0f
 #define TOUCHPAD_SCROLL_SENSITIVITY 0.1f
 
-#define INDICATORS_FRAGMENT_SHADER "#version 130\n"                                                                                                                                                                                                                       \
-                                   ""                                                                                                                                                                                                                                     \
-                                   "uniform float throttle;"                                                                                                                                                                                                              \
-                                   "uniform float prop;"                                                                                                                                                                                                                  \
-                                   "uniform float mixture;"                                                                                                                                                                                                               \
-                                   "uniform ivec4 bounds;"                                                                                                                                                                                                                \
-                                   ""                                                                                                                                                                                                                                     \
-                                   "void main()"                                                                                                                                                                                                                          \
-                                   "{"                                                                                                                                                                                                                                    \
-                                   "    vec2 size = vec2(bounds.z - bounds.x, bounds.y - bounds.w);"                                                                                                                                                                      \
-                                   "    gl_FragColor = vec4(0.5, 0.5, 0.5, 0.75);"                                                                                                                                                                                        \
-                                   ""                                                                                                                                                                                                                                     \
-                                   "    if (abs(gl_FragCoord.x - bounds.x) < 1.0 || abs(gl_FragCoord.x - bounds.z) < 1.0 || abs(gl_FragCoord.y - bounds.y) < 1.0 || abs(gl_FragCoord.y - bounds.w) < 1.0 || round(mod(gl_FragCoord.y - bounds.w, (size.y / 4.0))) < 1.0)" \
-                                   "        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);"                                                                                                                                                                                     \
-                                   "    else"                                                                                                                                                                                                                             \
-                                   "    {"                                                                                                                                                                                                                                \
-                                   "        int segments = 3;"                                                                                                                                                                                                            \
-                                   "        if (prop < -0.5)"                                                                                                                                                                                                             \
-                                   "            segments--;"                                                                                                                                                                                                              \
-                                   "        if (mixture < -0.5)"                                                                                                                                                                                                          \
-                                   "            segments--;"                                                                                                                                                                                                              \
-                                   ""                                                                                                                                                                                                                                     \
-                                   "        float segmentWidth = size.x / segments;"                                                                                                                                                                                      \
-                                   ""                                                                                                                                                                                                                                     \
-                                   "        if (gl_FragCoord.x < bounds.z - (segments - 1) * segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * throttle) + bounds.w + 1.0)"                                                                                              \
-                                   "            gl_FragColor = vec4(0.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                \
-                                   "        else if (gl_FragCoord.x >= bounds.z - (segments - 1) * segmentWidth && (segments < 3 || gl_FragCoord.x < bounds.z - segmentWidth) && gl_FragCoord.y < ((size.y - 2.0) * prop) + bounds.w + 1.0)"                              \
-                                   "            gl_FragColor = vec4(0.0, 0.0, 1.0, 0.75);"                                                                                                                                                                                \
-                                   "        else if (gl_FragCoord.x >= bounds.z - segmentWidth && gl_FragCoord.y < ((size.y - 2.0) * mixture) + bounds.w + 1.0)"                                                                                                          \
-                                   "            gl_FragColor = vec4(1.0, 0.0, 0.0, 0.75);"                                                                                                                                                                                \
-                                   "    }"                                                                                                                                                                                                                                \
+#define INDICATORS_FRAGMENT_SHADER "#version 130\n"                                                                                                                                                                                                                                                                                                                    \
+                                   ""                                                                                                                                                                                                                                                                                                                                  \
+                                   "uniform ivec2 size;"                                                                                                                                                                                                                                                                                                               \
+                                   "uniform float throttle;"                                                                                                                                                                                                                                                                                                           \
+                                   "uniform float prop;"                                                                                                                                                                                                                                                                                                               \
+                                   "uniform float mixture;"                                                                                                                                                                                                                                                                                                            \
+                                   ""                                                                                                                                                                                                                                                                                                                                  \
+                                   "void main()"                                                                                                                                                                                                                                                                                                                       \
+                                   "{"                                                                                                                                                                                                                                                                                                                                 \
+                                   "    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);"                                                                                                                                                                                                                                                                                      \
+                                   ""                                                                                                                                                                                                                                                                                                                                  \
+                                   "    float borderWidthX = 1.0 / size.x;"                                                                                                                                                                                                                                                                                            \
+                                   "    float borderWidthY = 1.0 / size.y;"                                                                                                                                                                                                                                                                                            \
+                                   "    float halfBorderWidthY = borderWidthY / 2.0;"                                                                                                                                                                                                                                                                                  \
+                                   ""                                                                                                                                                                                                                                                                                                                                  \
+                                   "    if (gl_TexCoord[0].x > borderWidthX && gl_TexCoord[0].x < 1.0 - borderWidthX && gl_TexCoord[0].y > borderWidthY && gl_TexCoord[0].y < 1.0 - borderWidthY && distance(gl_TexCoord[0].y, 0.25) > halfBorderWidthY && distance(gl_TexCoord[0].y, 0.5) > halfBorderWidthY && distance(gl_TexCoord[0].y, 0.75) > halfBorderWidthY)" \
+                                   "    {"                                                                                                                                                                                                                                                                                                                             \
+                                   "        bool reverser = false;"                                                                                                                                                                                                                                                                                                    \
+                                   "        bool beta = false;"                                                                                                                                                                                                                                                                                                        \
+                                   "        float throttleNormalized = throttle;"                                                                                                                                                                                                                                                                                      \
+                                   "        bool hasProp = true;"                                                                                                                                                                                                                                                                                                      \
+                                   "        bool hasMixture = true;"                                                                                                                                                                                                                                                                                                   \
+                                   "        int segments = 3;"                                                                                                                                                                                                                                                                                                         \
+                                   ""                                                                                                                                                                                                                                                                                                                                  \
+                                   "        if (throttleNormalized < -1.0)"                                                                                                                                                                                                                                                                                            \
+                                   "        {"                                                                                                                                                                                                                                                                                                                         \
+                                   "            reverser = true;"                                                                                                                                                                                                                                                                                                      \
+                                   "            throttleNormalized += 2.0;"                                                                                                                                                                                                                                                                                            \
+                                   "        }"                                                                                                                                                                                                                                                                                                                         \
+                                   "        else if (throttleNormalized < 0.0)"                                                                                                                                                                                                                                                                                        \
+                                   "        {"                                                                                                                                                                                                                                                                                                                         \
+                                   "            beta = true;"                                                                                                                                                                                                                                                                                                          \
+                                   "            throttleNormalized += 1.0;"                                                                                                                                                                                                                                                                                            \
+                                   "        }"                                                                                                                                                                                                                                                                                                                         \
+                                   "        if (prop < -2.5)"                                                                                                                                                                                                                                                                                                          \
+                                   "        {"                                                                                                                                                                                                                                                                                                                         \
+                                   "            hasProp = false;"                                                                                                                                                                                                                                                                                                      \
+                                   "            segments--;"                                                                                                                                                                                                                                                                                                           \
+                                   "        }"                                                                                                                                                                                                                                                                                                                         \
+                                   "        if (mixture < -2.5)"                                                                                                                                                                                                                                                                                                       \
+                                   "        {"                                                                                                                                                                                                                                                                                                                         \
+                                   "            hasMixture = false;"                                                                                                                                                                                                                                                                                                   \
+                                   "            segments--;"                                                                                                                                                                                                                                                                                                           \
+                                   "        }"                                                                                                                                                                                                                                                                                                                         \
+                                   ""                                                                                                                                                                                                                                                                                                                                  \
+                                   "        float segmentWidth = 1.0 / segments;"                                                                                                                                                                                                                                                                                      \
+                                   "        vec4 backgroundColor = vec4(0.5, 0.5, 0.5, 0.75);"                                                                                                                                                                                                                                                                         \
+                                   ""                                                                                                                                                                                                                                                                                                                                  \
+                                   "        if (gl_TexCoord[0].x < segmentWidth)"                                                                                                                                                                                                                                                                                      \
+                                   "        {"                                                                                                                                                                                                                                                                                                                         \
+                                   "            if (reverser)"                                                                                                                                                                                                                                                                                                         \
+                                   "                gl_FragColor = gl_TexCoord[0].y > throttleNormalized ? vec4(1.0, 0.5, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                              \
+                                   "            else if (beta)"                                                                                                                                                                                                                                                                                                        \
+                                   "                gl_FragColor = gl_TexCoord[0].y > throttleNormalized ? vec4(1.0, 1.0, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                              \
+                                   "            else"                                                                                                                                                                                                                                                                                                                  \
+                                   "                gl_FragColor = gl_TexCoord[0].y < throttleNormalized ? vec4(0.0, 0.0, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                              \
+                                   "        }"                                                                                                                                                                                                                                                                                                                         \
+                                   "        else if (hasProp && gl_TexCoord[0].x > segmentWidth + borderWidthX && gl_TexCoord[0].x < segmentWidth * 2)"                                                                                                                                                                                                                \
+                                   "            gl_FragColor = gl_TexCoord[0].y < prop ? vec4(0.0, 0.0, 1.0, 0.75) : backgroundColor;"                                                                                                                                                                                                                                 \
+                                   "        else if (hasMixture && gl_TexCoord[0].x > borderWidthX + segmentWidth * (hasProp ? 2 : 1))"                                                                                                                                                                                                                                \
+                                   "            gl_FragColor = gl_TexCoord[0].y < mixture ? vec4(1.0, 0.0, 0.0, 0.75) : backgroundColor;"                                                                                                                                                                                                                              \
+                                   "    }"                                                                                                                                                                                                                                                                                                                             \
                                    "}"
 
 #define KEYBOARD_KEY_FRAGMENT_SHADER "#version 130\n"                                                                                                    \
@@ -365,7 +396,7 @@
                                      ""                                                                                                                  \
                                      "void main()"                                                                                                       \
                                      "{"                                                                                                                 \
-                                     "    float borderWidth = 1.0f /keyBaseSize;"                                                                        \
+                                     "    float borderWidth = 1.0 / keyBaseSize;"                                                                        \
                                      "    float maxX = 1.0 - borderWidth / aspect;"                                                                      \
                                      "    float minX = borderWidth / aspect;"                                                                            \
                                      "    float maxY = 1.0 - borderWidth;"                                                                               \
@@ -583,6 +614,7 @@ static void *DeviceThread(void *argument);
 #endif
 static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon);
 static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon);
+static void EndKeyboardMode(void);
 static float Exponentialize(float value, float inMin, float inMax, float outMin, float outMax);
 static void FitGeometryWithinScreenBounds(int *left, int *top, int *right, int *bottom);
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon);
@@ -764,7 +796,7 @@ static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, def
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
 static ConfigurationStep configurationStep = START;
-static GLuint indicatorsProgram = 0, indicatorsFragmentShader = 0, keyboardKeyProgram = 0, keyboardKeyVertexShader = 0, keyboardKeyFragmentShader = 0;
+static GLuint indicatorsProgram = 0, indicatorsVertexShader = 0, indicatorsFragmentShader = 0, keyboardKeyProgram = 0, keyboardKeyFragmentShader = 0;
 static int *pushedJoystickButtonAssignments = NULL;
 static XPLMWindowID indicatorsWindow = NULL, keyboardWindow = NULL;
 
@@ -785,7 +817,7 @@ static volatile int hidDeviceThreadRun = 1;
 #endif
 
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleBetaOrToggleReverseCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
+static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCMingovPrpDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, thrustReverserDeployRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
 static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, configurationStatusCaption = NULL, startConfigurationtButton = NULL, showIndicatorsCheckbox = NULL;
 
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
@@ -806,7 +838,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
 #if IBM
     // init glew
-    GLenum err = glewInit();
+    const GLenum err = glewInit();
     if (err != GLEW_OK)
     {
         XPLMDebugString(NAME ": The following error occured while initializing GLEW:\n");
@@ -815,6 +847,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 #endif
 
     // prepare fragment-shaders
+    //  InitShader2(INDICATORS_VERTEX_SHADER, INDICATORS_FRAGMENT_SHADER, &indicatorsProgram, &indicatorsVertexShader, &indicatorsFragmentShader);
     InitShader(INDICATORS_FRAGMENT_SHADER, &indicatorsProgram, &indicatorsFragmentShader);
     InitShader(KEYBOARD_KEY_FRAGMENT_SHADER, &keyboardKeyProgram, &keyboardKeyFragmentShader);
 
@@ -858,6 +891,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     elevatorTrimDataRef = XPLMFindDataRef("sim/cockpit2/controls/elevator_trim");
     rudderTrimDataRef = XPLMFindDataRef("sim/cockpit2/controls/rudder_trim");
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
+    throttleBetaRevRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_beta_rev_ratio_all");
     propPitchDegDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_pitch_deg");
     propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
@@ -1053,20 +1087,21 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
     case XPLM_MSG_ENTERED_VR:
     case XPLM_MSG_EXITING_VR:
         const int vrEnabled = inMessage == XPLM_MSG_ENTERED_VR;
-        
+
         UpdateIndicatorsWindow(vrEnabled);
+
+        // always destroy the keyboard window
+        if (keyboardWindow != NULL)
+        {
+            XPLMDestroyWindow(keyboardWindow);
+            keyboardWindow = NULL;
+        }
 
         if (mode == KEYBOARD && !keyPressActive)
         {
-            // hide the window
-            ToggleKeyboardControl();
-            // destroy it
-            if (keyboardWindow)
-            {
-                XPLMDestroyWindow(keyboardWindow);
-                keyboardWindow = NULL;
-            }
-            // create a fresh one and show it again
+            EndKeyboardMode();
+
+            // create a fresh keyboard window immediately and show it again
             ToggleKeyboardControl(vrEnabled);
         }
         break;
@@ -1325,8 +1360,8 @@ static void *DeviceThread(void *argument)
 
 static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
 {
-    int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
-    int helicopter = IsHelicopter();
+    const int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
+    const int helicopter = IsHelicopter();
 
     XPLMSetGraphicsState(0, 0, 0, 0, 1, 0, 0);
 
@@ -1336,12 +1371,12 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
     if (gliderWithSpeedbrakes)
         throttle = 1.0f - XPLMGetDataf(speedbrakeRatioDataRef);
     else
-        throttle = XPLMGetDataf(throttleRatioAllDataRef);
+        throttle = XPLMGetDataf(throttleBetaRevRatioAllDataRef);
 
-    int throttleLocation = glGetUniformLocation(indicatorsProgram, "throttle");
+    const int throttleLocation = glGetUniformLocation(indicatorsProgram, "throttle");
     glUniform1f(throttleLocation, throttle);
 
-    int propLocation = glGetUniformLocation(indicatorsProgram, "prop");
+    const int propLocation = glGetUniformLocation(indicatorsProgram, "prop");
     float propRatio = 0.0f;
     if (helicopter)
     {
@@ -1357,17 +1392,19 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
     else
         propRatio = Normalize(XPLMGetDataf(propRotationSpeedRadSecAllDataRef), XPLMGetDataf(acfRSCMingovPrpDataRef), XPLMGetDataf(acfRSCRedlinePrpDataRef), 0.0f, 1.0f);
 
-    glUniform1f(propLocation, numPropLevers < 1 ? -1.0f : propRatio);
+    glUniform1f(propLocation, numPropLevers < 1 ? -2.0 : propRatio);
 
-    int mixtureLocation = glGetUniformLocation(indicatorsProgram, "mixture");
-    glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -1.0f : XPLMGetDataf(mixtureRatioAllDataRef));
+    const int mixtureLocation = glGetUniformLocation(indicatorsProgram, "mixture");
+    glUniform1f(mixtureLocation, numMixtureLevers < 1 ? -2.0 : XPLMGetDataf(mixtureRatioAllDataRef));
 
-    int left = 0, top = 0, right = 0, bottom = 0;
+    int left, top, right, bottom;
     XPLMGetWindowGeometry(indicatorsWindow, &left, &top, &right, &bottom);
-    int boundsLocation = glGetUniformLocation(indicatorsProgram, "bounds");
-    glUniform4i(boundsLocation, left, top, right, bottom);
+
+    const int sizeLocation = glGetUniformLocation(indicatorsProgram, "size");
+    glUniform2i(sizeLocation, right - left, top - bottom);
 
     glBegin(GL_QUADS);
+    glColor3f(0.0f, 0.0f, 1.0f);
     glTexCoord2f(0.0f, 0.0f);
     glVertex2f((GLfloat)left, (GLfloat)bottom);
     glTexCoord2f(0.0f, 1.0f);
@@ -1477,6 +1514,19 @@ static void DrawKeyboardWindow(XPLMWindowID inWindowID, void *inRefcon)
     glUseProgram(0);
 }
 
+static void EndKeyboardMode(void)
+{
+    ReleaseAllKeys();
+
+    // restore the default button assignments
+    PopButtonAssignments();
+
+    if (keyboardWindow != NULL)
+        XPLMSetWindowIsVisible(keyboardWindow, 0);
+
+    mode = DEFAULT;
+}
+
 static float Exponentialize(float value, float inMin, float inMax, float outMin, float outMax)
 {
     float n = Normalize(value, inMin, inMax, 0.0f, 1.0f);
@@ -1553,12 +1603,22 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         ptr++;
     }
 
+    if (showIndicators && !XPLMGetWindowIsVisible(indicatorsWindow))
+    {
+        // showIndicators is enabled but the indicators window is not visible (this can happen in VR if the user presses the close button)
+        showIndicators = 0;
+        XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, showIndicators);
+    }
+
     if (XPLMGetWindowIsVisible(keyboardWindow))
     {
         SyncLockKeyState(&captialKey);
         SyncLockKeyState(&numLockKey);
         SyncLockKeyState(&scrollKey);
     }
+    else if (mode == KEYBOARD)
+        // we are in keyboard mode but the keyboard window is not visible (this can happen in VR if the user presses the close button)
+        EndKeyboardMode();
 
     // update the default head position when required
     if (FloatsEqual(defaultHeadPositionX, FLT_MAX) || FloatsEqual(defaultHeadPositionY, FLT_MAX) || FloatsEqual(defaultHeadPositionZ, FLT_MAX))
@@ -1568,7 +1628,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         defaultHeadPositionZ = XPLMGetDataf(acfPeZDataRef);
     }
 
-    int helicopter = IsHelicopter();
+    const int helicopter = IsHelicopter();
 
     int currentMouseX, currentMouseY;
     XPLMGetMouseLocation(&currentMouseX, &currentMouseY);
@@ -1708,9 +1768,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             break;
         }
 
-        float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
+        const float sensitivityMultiplier = JOYSTICK_RELATIVE_CONTROL_MULTIPLIER * inElapsedSinceLastCall;
 
-        float joystickPitchNullzone = XPLMGetDataf(joystickPitchNullzoneDataRef);
+        const float joystickPitchNullzone = XPLMGetDataf(joystickPitchNullzoneDataRef);
 
         static int joystickAxisLeftXCalibrated = 0;
         if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] > 0.0f)
@@ -1730,7 +1790,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 
         if (joystickAxisLeftXCalibrated)
         {
-            int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
+            const int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
 
             static int brakeMode = 0;
 
@@ -2012,7 +2072,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                 }
                 else if (mode == COWL)
                 {
-                    float *cowlFlapRatio = (float *)malloc(acfNumEngines * sizeof(float));
+                    float cowlFlapRatio[8];
                     XPLMGetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
 
                     // decrease cowl flap setting
@@ -2043,7 +2103,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     }
 
                     XPLMSetDatavf(cowlFlapRatioDataRef, cowlFlapRatio, 0, acfNumEngines);
-                    free(cowlFlapRatio);
                 }
                 else if (mode == MOUSE)
                 {
@@ -2102,7 +2161,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                         XPLMGetDatavf(acfMinPitchDataRef, acfMinPitch, 0, 8);
                         float acfMaxPitch[8];
                         XPLMGetDatavf(acfMaxPitchDataRef, acfMaxPitch, 0, 8);
-                        float *propPitchDeg = (float *)malloc(acfNumEngines * sizeof(float));
+                        float propPitchDeg[8];
                         XPLMGetDatavf(propPitchDegDataRef, propPitchDeg, 0, acfNumEngines);
 
                         for (int i = 0; i < acfNumEngines; i++)
@@ -2132,7 +2191,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                         }
 
                         XPLMSetDatavf(propPitchDegDataRef, propPitchDeg, 0, acfNumEngines);
-                        free(propPitchDeg);
                     }
                     else
                     {
@@ -2175,14 +2233,15 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                         {
                             float throttleRatioAll = XPLMGetDataf(throttleRatioAllDataRef);
 
-                            float *thrustReverserDeployRatio = (float *)malloc(acfNumEngines * sizeof(float));
-
+                            float thrustReverserDeployRatio[8];
                             XPLMGetDatavf(thrustReverserDeployRatioDataRef, thrustReverserDeployRatio, 0, acfNumEngines);
 
                             float averageThrustReverserDeployRatio = 0.0f;
                             for (int i = 0; i < acfNumEngines; i++)
                                 averageThrustReverserDeployRatio += thrustReverserDeployRatio[i];
                             averageThrustReverserDeployRatio /= acfNumEngines;
+
+                            const int thrustReverserDeployed = averageThrustReverserDeployRatio > 0.5f;
 
                             // increase throttle setting
                             if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] < 0.5f - joystickPitchNullzone)
@@ -2191,7 +2250,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                                 float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                                 // invert d if thrust reversers are engaged
-                                if (averageThrustReverserDeployRatio > 0.5f)
+                                if (thrustReverserDeployed)
                                 {
                                     float newThrottleRatioAll = throttleRatioAll - d;
 
@@ -2213,7 +2272,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                                 float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                                 // invert d if thrust reversers are engaged
-                                if (averageThrustReverserDeployRatio > 0.5f)
+                                if (thrustReverserDeployed)
                                 {
                                     float newThrottleRatioAll = throttleRatioAll + d;
 
@@ -2228,8 +2287,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                                     XPLMSetDataf(throttleRatioAllDataRef, newThrottleRatioAll > 0.0f ? newThrottleRatioAll : 0.0f);
                                 }
                             }
-
-                            free(thrustReverserDeployRatio);
                         }
                     }
                 }
@@ -3268,11 +3325,11 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommand(XPLMCommandRef inCommand, 
     {
         if (inPhase == xplm_CommandBegin)
         {
-            int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
+            const int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
 
             if (acfNumEngines > 0)
             {
-                float *carbHeatRatio = (float *)malloc(acfNumEngines * sizeof(float));
+                float carbHeatRatio[8];
                 XPLMGetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
 
                 float newCarbHeatRatio = carbHeatRatio[0] <= 0.5f ? 1.0f : 0.0f;
@@ -3281,7 +3338,6 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommand(XPLMCommandRef inCommand, 
                     carbHeatRatio[i] = newCarbHeatRatio;
 
                 XPLMSetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
-                free(carbHeatRatio);
             }
         }
     }
@@ -3453,23 +3509,14 @@ static void ToggleKeyboardControl(int vrEnabled)
             keyboardWindowParameters.layer = xplm_WindowLayerFloatingWindows;
             keyboardWindowParameters.handleRightClickFunc = HandleMouseClick;
             keyboardWindow = XPLMCreateWindowEx(&keyboardWindowParameters);
+
+            XPLMSetWindowPositioningMode(keyboardWindow, vrEnabled ? xplm_WindowVR : xplm_WindowPositionFree, 0);
         }
         else
             XPLMSetWindowIsVisible(keyboardWindow, 1);
-
-        XPLMSetWindowPositioningMode(keyboardWindow, vrEnabled ? xplm_WindowVR : xplm_WindowPositionFree, 0);
     }
     else if (mode == KEYBOARD && !keyPressActive)
-    {
-        ReleaseAllKeys();
-
-        // restore the default button assignments
-        PopButtonAssignments();
-
-        XPLMSetWindowIsVisible(keyboardWindow, 0);
-
-        mode = DEFAULT;
-    }
+        EndKeyboardMode();
 }
 
 static void ToggleMode(Mode m, XPLMCommandPhase phase)
@@ -3760,8 +3807,8 @@ static void UpdateIndicatorsWindow(int vrEnabled)
         indicatorsWindow = NULL;
     }
 
-    int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
-    int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
+    const int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
+    const int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
 
     if (!showIndicators || (acfNumEngines < 1 && !gliderWithSpeedbrakes))
         return;
@@ -3770,7 +3817,7 @@ static void UpdateIndicatorsWindow(int vrEnabled)
     numMixtureLevers = 0;
     if (!gliderWithSpeedbrakes)
     {
-        int helicopter = IsHelicopter();
+        const int helicopter = IsHelicopter();
 
         int acfPropType[8];
         XPLMGetDatavi(acfPropTypeDataRef, acfPropType, 0, 8);
