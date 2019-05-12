@@ -266,19 +266,16 @@
 
 #define ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS "P acf/_new_plot_XP3D_cock/0 1"
 
-#define DEFAULT_B738_ACF_FILENAME "b738.acf"
-
 #define DREAMFOIL_AS350_PLUGIN_SIGNATURE "DreamFoil.AS350"
 #define DREAMFOIL_B407_PLUGIN_SIGNATURE "DreamFoil.B407"
 #define HEAD_SHAKE_PLUGIN_SIGNATURE "com.simcoders.headshake"
-#define QPAC_A320_PLUGIN_SIGNATURE "QPAC.airbus.fbw"
 #define ROTORSIM_EC135_PLUGIN_SIGNATURE "rotorsim.ec135.management"
 #define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
 #define X_XSQUAWKBOX_PLUGIN_SIGNATURE "vatsim.protodev.clients.xsquawkbox"
 
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
 #define TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND NAME_LOWERCASE "/toggle_arm_speed_brake_or_toggle_carb_heat"
-#define TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND NAME_LOWERCASE "/toggle_autopilot_or_disable_flight_director"
+#define CWS_OR_DISCONNECT_AUTOPILOT NAME_LOWERCASE "/cws_or_disconnect_autopilot"
 #define LOOK_MODIFIER_COMMAND NAME_LOWERCASE "/look_modifier"
 #define PROP_PITCH_THROTTLE_MODIFIER_COMMAND NAME_LOWERCASE "/prop_pitch_throttle_modifier"
 #define MIXTURE_CONTROL_MODIFIER_COMMAND NAME_LOWERCASE "/mixture_control_modifier"
@@ -288,7 +285,6 @@
 #define TOGGLE_REVERSE_COMMAND NAME_LOWERCASE "/toggle_reverse"
 #define TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND NAME_LOWERCASE "/toggle_mouse_or_keyboard_control"
 #define PUSH_TO_TALK_COMMAND NAME_LOWERCASE "/push_to_talk"
-#define TOGGLE_BRAKES_COMMAND NAME_LOWERCASE "/toggle_brakes"
 #define TOGGLE_LEFT_MOUSE_BUTTON_COMMAND NAME_LOWERCASE "/toggle_left_mouse_button"
 #define TOGGLE_RIGHT_MOUSE_BUTTON_COMMAND NAME_LOWERCASE "/toggle_right_mouse_button"
 #define SCROLL_UP_COMMAND NAME_LOWERCASE "/scroll_up"
@@ -609,6 +605,7 @@ static void CleanupDeviceThread(hid_device *handle, hid_device_info *dev);
 #endif
 static void CleanupShader(GLuint program, GLuint fragmentShader, int deleteProgram);
 static int CowlFlapModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
+static int CwsOrDisconnectAutopilotCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 #if IBM
 static void DeviceThread(void *argument);
 #elif APL
@@ -633,7 +630,6 @@ static void HandleToggleMouseButtonCommand(XPLMCommandPhase phase, MouseButton b
 static int Has2DPanel(void);
 static KeyboardKey InitKeyboardKey(const char *label, int keyCode, float aspect = 1.0f, KeyPosition position = BETWEEN);
 static void InitShader(const char *fragmentShaderString, GLuint *program, GLuint *fragmentShader);
-static int IsDefaultB738(void);
 inline static int IsGliderWithSpeedbrakes(void);
 static int IsHelicopter(void);
 inline static int IsLockKey(KeyboardKey key);
@@ -669,8 +665,6 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
 static void StopConfiguration(void);
 inline static void SyncLockKeyState(KeyboardKey *key);
 static int ToggleArmSpeedBrakeOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
-static int ToggleAutopilotOrDisableFlightDirectorCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
-static int ToggleBrakesCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void ToggleKeyboardControl(int vrEnabled = -1);
 static void ToggleMode(Mode m, XPLMCommandPhase phase);
 static void ToggleMouseButton(MouseButton button, int down, void *display = NULL);
@@ -819,8 +813,8 @@ static int hidInitialized = 0;
 static volatile int hidDeviceThreadRun = 1;
 #endif
 
-static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, toggleAutopilotOrDisableFlightDirectorCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleBrakesCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleReverseCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
-static XPLMDataRef acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfThrotmaxREVDataRef = NULL, acfFeatheredPitchDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, throttleJetRevRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
+static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, cwsOrDisconnectAutopilotCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleReverseCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
+static XPLMDataRef preconfiguredApTypeDataRef = NULL, acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfThrotmaxREVDataRef = NULL, acfFeatheredPitchDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, throttleJetRevRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
 static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, configurationStatusCaption = NULL, startConfigurationtButton = NULL, showIndicatorsCheckbox = NULL;
 
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
@@ -854,6 +848,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     InitShader(KEYBOARD_KEY_FRAGMENT_SHADER, &keyboardKeyProgram, &keyboardKeyFragmentShader);
 
     // obtain datarefs
+    preconfiguredApTypeDataRef = XPLMFindDataRef("sim/aircraft/autopilot/preconfigured_ap_type");
     acfCockpitTypeDataRef = XPLMFindDataRef("sim/aircraft/view/acf_cockpit_type");
     acfPeXDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peX");
     acfPeYDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peY");
@@ -906,7 +901,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // create custom commands
     cycleResetViewCommand = XPLMCreateCommand(CYCLE_RESET_VIEW_COMMAND, "Cycle / Reset View");
     toggleArmSpeedBrakeOrToggleCarbHeatCommand = XPLMCreateCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND, "Toggle / Arm Speedbrake / Toggle Carb Heat");
-    toggleAutopilotOrDisableFlightDirectorCommand = XPLMCreateCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND, "Toggle Autopilot / Disable Flight Director");
+    cwsOrDisconnectAutopilotCommand = XPLMCreateCommand(CWS_OR_DISCONNECT_AUTOPILOT, "CWS / Disconnect Autopilot");
     lookModifierCommand = XPLMCreateCommand(LOOK_MODIFIER_COMMAND, "Look Modifier");
     propPitchOrThrottleModifierCommand = XPLMCreateCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND, "Prop Pitch / Throttle Modifier");
     mixtureControlModifierCommand = XPLMCreateCommand(MIXTURE_CONTROL_MODIFIER_COMMAND, "Mixture Control Modifier");
@@ -916,7 +911,6 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     toggleReverseCommand = XPLMCreateCommand(TOGGLE_REVERSE_COMMAND, "Toggle Reverse");
     toggleMousePointerControlCommand = XPLMCreateCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND, "Toggle Mouse or Keyboard Control");
     pushToTalkCommand = XPLMCreateCommand(PUSH_TO_TALK_COMMAND, "Push-To-Talk");
-    toggleBrakesCommand = XPLMCreateCommand(TOGGLE_BRAKES_COMMAND, "Toggle Brakes");
     toggleLeftMouseButtonCommand = XPLMCreateCommand(TOGGLE_LEFT_MOUSE_BUTTON_COMMAND, "Toggle Left Mouse Button");
     toggleRightMouseButtonCommand = XPLMCreateCommand(TOGGLE_RIGHT_MOUSE_BUTTON_COMMAND, "Toggle Right Mouse Button");
     scrollUpCommand = XPLMCreateCommand(SCROLL_UP_COMMAND, "Scroll Up");
@@ -931,7 +925,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // register custom commands
     XPLMRegisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommand, 1, NULL);
     XPLMRegisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommand, 1, NULL);
-    XPLMRegisterCommandHandler(toggleAutopilotOrDisableFlightDirectorCommand, ToggleAutopilotOrDisableFlightDirectorCommand, 1, NULL);
+    XPLMRegisterCommandHandler(cwsOrDisconnectAutopilotCommand, CwsOrDisconnectAutopilotCommand, 1, NULL);
     XPLMRegisterCommandHandler(lookModifierCommand, LookModifierCommand, 1, NULL);
     XPLMRegisterCommandHandler(propPitchOrThrottleModifierCommand, PropPitchOrThrottleModifierCommand, 1, NULL);
     XPLMRegisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommand, 1, NULL);
@@ -941,7 +935,6 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     XPLMRegisterCommandHandler(toggleReverseCommand, ToggleReverseCommand, 1, NULL);
     XPLMRegisterCommandHandler(toggleMousePointerControlCommand, ToggleMouseOrKeyboardControlCommand, 1, NULL);
     XPLMRegisterCommandHandler(pushToTalkCommand, PushToTalkCommand, 1, NULL);
-    XPLMRegisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommand, 1, NULL);
     XPLMRegisterCommandHandler(toggleLeftMouseButtonCommand, ToggleLeftMouseButtonCommand, 1, NULL);
     XPLMRegisterCommandHandler(toggleRightMouseButtonCommand, ToggleRightMouseButtonCommand, 1, NULL);
     XPLMRegisterCommandHandler(scrollUpCommand, ScrollUpCommand, 1, NULL);
@@ -1007,7 +1000,7 @@ PLUGIN_API void XPluginStop(void)
     // unregister custom commands
     XPLMUnregisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommand, 1, NULL);
     XPLMUnregisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommand, 1, NULL);
-    XPLMUnregisterCommandHandler(toggleAutopilotOrDisableFlightDirectorCommand, ToggleAutopilotOrDisableFlightDirectorCommand, 1, NULL);
+    XPLMUnregisterCommandHandler(cwsOrDisconnectAutopilotCommand, CwsOrDisconnectAutopilotCommand, 1, NULL);
     XPLMUnregisterCommandHandler(lookModifierCommand, LookModifierCommand, 1, NULL);
     XPLMUnregisterCommandHandler(propPitchOrThrottleModifierCommand, PropPitchOrThrottleModifierCommand, 1, NULL);
     XPLMUnregisterCommandHandler(mixtureControlModifierCommand, MixtureControlModifierCommand, 1, NULL);
@@ -1017,7 +1010,6 @@ PLUGIN_API void XPluginStop(void)
     XPLMUnregisterCommandHandler(toggleReverseCommand, ToggleReverseCommand, 1, NULL);
     XPLMUnregisterCommandHandler(toggleMousePointerControlCommand, ToggleMouseOrKeyboardControlCommand, 1, NULL);
     XPLMUnregisterCommandHandler(pushToTalkCommand, PushToTalkCommand, 1, NULL);
-    XPLMUnregisterCommandHandler(toggleBrakesCommand, ToggleBrakesCommand, 1, NULL);
     XPLMUnregisterCommandHandler(toggleLeftMouseButtonCommand, ToggleLeftMouseButtonCommand, 1, NULL);
     XPLMUnregisterCommandHandler(toggleRightMouseButtonCommand, ToggleRightMouseButtonCommand, 1, NULL);
     XPLMUnregisterCommandHandler(scrollUpCommand, ScrollUpCommand, 1, NULL);
@@ -1265,6 +1257,30 @@ static void CleanupShader(GLuint program, GLuint fragmentShader, int deleteProgr
 static int CowlFlapModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     ToggleMode(COWL, inPhase);
+
+    return 0;
+}
+
+static int CwsOrDisconnectAutopilotCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    if (inPhase == xplm_CommandContinue)
+        return 0;
+
+    switch (XPLMGetDatai(preconfiguredApTypeDataRef))
+    {
+    case 0:
+    case 1:
+        if (inPhase == xplm_CommandBegin)
+            XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_off_any"));
+        break;
+    default:
+        if (inPhase == xplm_CommandBegin)
+            XPLMCommandBegin(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
+        else
+            XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
+
+        break;
+    }
 
     return 0;
 }
@@ -1801,8 +1817,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         {
             const int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
 
-            static int brakeMode = 0;
-
             // handle brakes
             float leftBrakeRatio = 0.0f, rightBrakeRatio = 0.0f;
 
@@ -1814,20 +1828,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 #endif
                 (controllerType == DS4 && joystickAxisValues[JOYSTICK_AXIS_DS4_R2 + axisOffset] >= 0.5f))
             {
-                if (!brakeMode && mode == DEFAULT)
-                {
-                    PushButtonAssignments();
-
-                    int joystickButtonAssignments[1600];
-                    XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-                    joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(TOGGLE_BRAKES_COMMAND);
-
-                    XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
-
-                    brakeMode = 1;
-                }
-
                 switch (controllerType)
                 {
                 case XBOX360:
@@ -1852,11 +1852,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                         leftBrakeRatio = 0.0f;
                 }
             }
-            else if (brakeMode)
-            {
-                PopButtonAssignments();
-                brakeMode = 0;
-            }
             XPLMSetDataf(leftBrakeRatioDataRef, leftBrakeRatio);
             XPLMSetDataf(rightBrakeRatioDataRef, rightBrakeRatio);
 
@@ -1871,7 +1866,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (mode == LOOK)
                         XPLMCommandBegin(pushToTalkCommand);
                     else
-                        XPLMCommandBegin(XPLMFindCommand("sim/autopilot/servos_off_any"));
+                        XPLMCommandBegin(cwsOrDisconnectAutopilotCommand);
                 }
                 else if (!leftTriggerDown && !rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= 0.15f)
                     rightTriggerDown = 1;
@@ -1881,7 +1876,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (mode == LOOK)
                         XPLMCommandEnd(pushToTalkCommand);
                     else
-                        XPLMCommandEnd(XPLMFindCommand("sim/autopilot/servos_off_any"));
+                        XPLMCommandEnd(cwsOrDisconnectAutopilotCommand);
                 }
                 else if (!leftTriggerDown && rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] > 0.15f)
                     rightTriggerDown = 0;
@@ -1891,14 +1886,14 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     if (mode == LOOK)
                         XPLMCommandBegin(pushToTalkCommand);
                     else
-                        XPLMCommandBegin(XPLMFindCommand("sim/autopilot/servos_off_any"));
+                        XPLMCommandBegin(cwsOrDisconnectAutopilotCommand);
                 }
                 else
                 {
                     if (mode == LOOK)
                         XPLMCommandEnd(pushToTalkCommand);
                     else
-                        XPLMCommandEnd(XPLMFindCommand("sim/autopilot/servos_off_any"));
+                        XPLMCommandEnd(cwsOrDisconnectAutopilotCommand);
                 }
 #endif
             }
@@ -2495,14 +2490,6 @@ static void InitShader(const char *fragmentShaderString, GLuint *program, GLuint
     }
 
     CleanupShader(*program, *fragmentShader, 0);
-}
-
-static int IsDefaultB738(void)
-{
-    char fileName[256], path[512];
-    XPLMGetNthAircraftModel(0, fileName, path);
-
-    return strcmp(fileName, DEFAULT_B738_ACF_FILENAME) == 0 ? 1 : 0;
 }
 
 inline static int IsGliderWithSpeedbrakes(void)
@@ -3181,7 +3168,7 @@ static void SetDefaultAssignments(void)
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TOGGLE_REVERSE_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t)XPLMFindCommand(TOGGLE_AUTOPILOT_OR_DISABLE_FLIGHT_DIRECTOR_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/brakes_toggle_max");
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_MODIFIER_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t)XPLMFindCommand(LOOK_MODIFIER_COMMAND);
         joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/zoom_out");
@@ -3195,7 +3182,7 @@ static void SetDefaultAssignments(void)
 #endif
         case DS4:
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t)XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand("sim/autopilot/servos_off_any");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand(CWS_OR_DISCONNECT_AUTOPILOT);
             break;
         }
 
@@ -3340,90 +3327,6 @@ static int ToggleArmSpeedBrakeOrToggleCarbHeatCommand(XPLMCommandRef inCommand, 
                 XPLMSetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
             }
         }
-    }
-
-    return 0;
-}
-
-static int ToggleAutopilotOrDisableFlightDirectorCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
-{
-    static float beginTime = 0.0f;
-
-    if (inPhase == xplm_CommandBegin)
-        beginTime = XPLMGetElapsedTime();
-    else if (inPhase == xplm_CommandContinue)
-    {
-        // disable flight director
-        if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
-        {
-            // custom handling for default B738
-            XPLMCommandRef B738CMDAutopilotFlightDirToggle = XPLMFindCommand("laminar/B738/autopilot/flight_director_toggle");
-            XPLMCommandRef B738CMDAutopilotFlightDirFoToggle = XPLMFindCommand("laminar/B738/autopilot/flight_director_fo_toggle");
-            if (IsDefaultB738() && B738CMDAutopilotFlightDirToggle != NULL && B738CMDAutopilotFlightDirFoToggle != NULL)
-            {
-                XPLMCommandOnce(B738CMDAutopilotFlightDirToggle);
-                XPLMCommandOnce(B738CMDAutopilotFlightDirFoToggle);
-            }
-            // custom handling for QPAC A320
-            else if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE))
-                XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
-            // custom handling for RotorSim EC135
-            else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE))
-                XPLMCommandOnce(XPLMFindCommand("ec135/autopilot/apmd_dcpl"));
-            // default handling
-            else
-                XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_fdir_off"));
-
-            beginTime = FLT_MAX;
-        }
-    }
-    else if (inPhase == xplm_CommandEnd)
-    {
-        // toggle autopilot
-        if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
-        {
-            // custom handling for default B738
-            XPLMCommandRef B738CMDAutopilotDisconectButton = XPLMFindCommand("laminar/B738/autopilot/disconnect_button");
-            if (IsDefaultB738() && B738CMDAutopilotDisconectButton != NULL)
-                XPLMCommandOnce(B738CMDAutopilotDisconectButton);
-            // custom handling for QPAC A320
-            else if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE))
-            {
-                XPLMDataRef ap1EngageDataRef = XPLMFindDataRef("AirbusFBW/AP1Engage");
-                XPLMDataRef ap2EngageDataRef = XPLMFindDataRef("AirbusFBW/AP2Engage");
-
-                if (ap1EngageDataRef != NULL && ap2EngageDataRef != NULL)
-                {
-                    if (!XPLMGetDatai(ap1EngageDataRef) && !XPLMGetDatai(ap2EngageDataRef))
-                        XPLMCommandOnce(XPLMFindCommand("airbus_qpac/ap1_push"));
-                    else
-                        XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_and_flight_dir_off"));
-                }
-            }
-            // custom handling for RotorSim EC135
-            else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE))
-                XPLMCommandOnce(XPLMFindCommand("ec135/autopilot/ap_on"));
-            // default handling
-            else
-                XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_toggle"));
-        }
-
-        beginTime = 0.0f;
-    }
-
-    return 0;
-}
-
-static int ToggleBrakesCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
-{
-    if (inPhase == xplm_CommandBegin)
-    {
-        // custom handling for QPAC A320
-        if (IsPluginEnabled(QPAC_A320_PLUGIN_SIGNATURE))
-            XPLMCommandOnce(XPLMFindCommand("airbus_qpac/park_brake_toggle"));
-        // default handling
-        else
-            XPLMCommandOnce(XPLMFindCommand("sim/flight_controls/brakes_toggle_max"));
     }
 
     return 0;
