@@ -272,6 +272,7 @@
 #define ROTORSIM_EC135_PLUGIN_SIGNATURE "rotorsim.ec135.management"
 #define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
 #define X_XSQUAWKBOX_PLUGIN_SIGNATURE "vatsim.protodev.clients.xsquawkbox"
+#define ZIBO_PLUGIN_SIGNATURE "zibomod.by.Zibo"
 
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
 #define TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND NAME_LOWERCASE "/toggle_arm_speed_brake_or_toggle_carb_heat"
@@ -532,6 +533,7 @@ typedef enum
     MIXTURE,
     COWL,
     TRIM,
+    SPEEDBRAKE,
     MOUSE,
     KEYBOARD
 } Mode;
@@ -662,9 +664,9 @@ static int ScrollUpCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, v
 static void SetDefaultAssignments(void);
 static int SetOverrideHeadShakePlugin(int overrideEnabled);
 static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget, long inParam1, long inParam2);
+static int SpeedbrakeModifierOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void StopConfiguration(void);
 inline static void SyncLockKeyState(KeyboardKey *key);
-static int ToggleArmSpeedBrakeOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void ToggleKeyboardControl(int vrEnabled = -1);
 static void ToggleMode(Mode m, XPLMCommandPhase phase);
 static void ToggleMouseButton(MouseButton button, int down, void *display = NULL);
@@ -814,7 +816,7 @@ static volatile int hidDeviceThreadRun = 1;
 #endif
 
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, cwsOrDisconnectAutopilotCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleReverseCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
-static XPLMDataRef preconfiguredApTypeDataRef = NULL, acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfThrotmaxREVDataRef = NULL, acfFeatheredPitchDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, ongroundAnyDataRef = NULL, groundspeedDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, speedbrakeRatioDataRef = NULL, aileronTrimDataRef = NULL, elevatorTrimDataRef = NULL, rudderTrimDataRef = NULL, throttleRatioAllDataRef = NULL, throttleJetRevRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, carbHeatRatioDataRef = NULL, cowlFlapRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
+static XPLMDataRef preconfiguredApTypeDataRef = NULL, acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfThrotmaxREVDataRef = NULL, acfFeatheredPitchDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, sbrkrqstDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, throttleJetRevRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
 static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, configurationStatusCaption = NULL, startConfigurationtButton = NULL, showIndicatorsCheckbox = NULL;
 
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
@@ -863,8 +865,6 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     acfPropTypeDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_prop_type");
     acfMinPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_min_pitch");
     acfMaxPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_max_pitch");
-    ongroundAnyDataRef = XPLMFindDataRef("sim/flightmodel/failures/onground_any");
-    groundspeedDataRef = XPLMFindDataRef("sim/flightmodel/position/groundspeed");
     cinemaVeriteDataRef = XPLMFindDataRef("sim/graphics/view/cinema_verite");
     pilotsHeadPsiDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_psi");
     pilotsHeadTheDataRef = XPLMFindDataRef("sim/graphics/view/pilots_head_the");
@@ -885,16 +885,13 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     leftBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/left_brake_ratio");
     rightBrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/right_brake_ratio");
     speedbrakeRatioDataRef = XPLMFindDataRef("sim/cockpit2/controls/speedbrake_ratio");
-    aileronTrimDataRef = XPLMFindDataRef("sim/cockpit2/controls/aileron_trim");
-    elevatorTrimDataRef = XPLMFindDataRef("sim/cockpit2/controls/elevator_trim");
-    rudderTrimDataRef = XPLMFindDataRef("sim/cockpit2/controls/rudder_trim");
+    sbrkrqstDataRef = XPLMFindDataRef("sim/flightmodel/controls/sbrkrqst");
     throttleRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
     throttleJetRevRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_jet_rev_ratio_all");
     throttleBetaRevRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_beta_rev_ratio_all");
     propPitchDegDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_pitch_deg");
     propRotationSpeedRadSecAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_rotation_speed_rad_sec_all");
     mixtureRatioAllDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/mixture_ratio_all");
-    carbHeatRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/carb_heat_ratio");
     cowlFlapRatioDataRef = XPLMFindDataRef("sim/cockpit2/engine/actuators/cowl_flap_ratio");
     overrideToeBrakesDataRef = XPLMFindDataRef("sim/operation/override/override_toe_brakes");
 
@@ -924,7 +921,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
     // register custom commands
     XPLMRegisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommand, 1, NULL);
-    XPLMRegisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommand, 1, NULL);
+    XPLMRegisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, SpeedbrakeModifierOrToggleCarbHeatCommand, 1, NULL);
     XPLMRegisterCommandHandler(cwsOrDisconnectAutopilotCommand, CwsOrDisconnectAutopilotCommand, 1, NULL);
     XPLMRegisterCommandHandler(lookModifierCommand, LookModifierCommand, 1, NULL);
     XPLMRegisterCommandHandler(propPitchOrThrottleModifierCommand, PropPitchOrThrottleModifierCommand, 1, NULL);
@@ -999,7 +996,7 @@ PLUGIN_API void XPluginStop(void)
 
     // unregister custom commands
     XPLMUnregisterCommandHandler(cycleResetViewCommand, ResetSwitchViewCommand, 1, NULL);
-    XPLMUnregisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, ToggleArmSpeedBrakeOrToggleCarbHeatCommand, 1, NULL);
+    XPLMUnregisterCommandHandler(toggleArmSpeedBrakeOrToggleCarbHeatCommand, SpeedbrakeModifierOrToggleCarbHeatCommand, 1, NULL);
     XPLMUnregisterCommandHandler(cwsOrDisconnectAutopilotCommand, CwsOrDisconnectAutopilotCommand, 1, NULL);
     XPLMUnregisterCommandHandler(lookModifierCommand, LookModifierCommand, 1, NULL);
     XPLMUnregisterCommandHandler(propPitchOrThrottleModifierCommand, PropPitchOrThrottleModifierCommand, 1, NULL);
@@ -1266,21 +1263,29 @@ static int CwsOrDisconnectAutopilotCommand(XPLMCommandRef inCommand, XPLMCommand
     if (inPhase == xplm_CommandContinue)
         return 0;
 
+    XPLMCommandRef command = NULL;
     switch (XPLMGetDatai(preconfiguredApTypeDataRef))
     {
     case 0:
+        // check if the autopilot disconnect command of the default B738 exists
+        if (IsPluginEnabled(ZIBO_PLUGIN_SIGNATURE))
+        {
+            command = XPLMFindCommand("laminar/B738/autopilot/capt_disco_press");
+            break;
+        }
     case 1:
-        if (inPhase == xplm_CommandBegin)
-            XPLMCommandOnce(XPLMFindCommand("sim/autopilot/servos_off_any"));
+        // otherwise fallback to the default command
+        command = XPLMFindCommand("sim/autopilot/servos_off_any");
         break;
     default:
-        if (inPhase == xplm_CommandBegin)
-            XPLMCommandBegin(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
-        else
-            XPLMCommandEnd(XPLMFindCommand("sim/autopilot/control_wheel_steer"));
-
+        command = XPLMFindCommand("sim/autopilot/control_wheel_steer");
         break;
     }
+
+    if (inPhase == xplm_CommandBegin)
+        XPLMCommandBegin(command);
+    else
+        XPLMCommandEnd(command);
 
     return 0;
 }
@@ -3265,6 +3270,45 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
     return 0;
 }
 
+static int SpeedbrakeModifierOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
+{
+    // if a speedbrake exists this command switches to speedbrake mode
+    if (XPLMGetDatai(acfSbrkEQDataRef))
+    {
+        if (inPhase == xplm_CommandEnd)
+        {
+            if (mode == SPEEDBRAKE)
+            {
+                // restore the default button assignments
+                PopButtonAssignments();
+
+                mode = DEFAULT;
+            }
+        }
+        else if (mode == DEFAULT)
+        {
+            mode = SPEEDBRAKE;
+
+            // store the default button assignments
+            PushButtonAssignments();
+
+            // assign trim controls to the buttons and dpad
+            int joystickButtonAssignments[1600];
+            XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand("sim/flight_controls/speed_brakes_up_one");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand("sim/flight_controls/speed_brakes_down_one");
+
+            XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
+        }
+    }
+    // if the aircraft is not equipped with a speedbrake this command toggles the carb heat
+    else if (inPhase == xplm_CommandBegin)
+        XPLMCommandOnce(XPLMFindCommand("sim/engines/carb_heat_toggle"));
+
+    return 0;
+}
+
 static void StopConfiguration(void)
 {
     // if the user closes the widget while he is configuring a controller we need to set the aborted state to perform the cleanup
@@ -3272,64 +3316,6 @@ static void StopConfiguration(void)
         configurationStep = ABORT;
     else
         configurationStep = START;
-}
-
-inline static void SyncLockKeyState(KeyboardKey *key);
-static int ToggleArmSpeedBrakeOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
-{
-    // if a speedbrake exists this command controls it
-    if (XPLMGetDatai(acfSbrkEQDataRef))
-    {
-        static float beginTime = 0.0f;
-
-        float oldSpeedbrakeRatio = XPLMGetDataf(speedbrakeRatioDataRef);
-
-        if (inPhase == xplm_CommandBegin)
-            beginTime = XPLMGetElapsedTime();
-        else if (inPhase == xplm_CommandContinue)
-        {
-            // arm / unarm speedbrake
-            if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
-            {
-                float newSpeedbrakeRatio = FloatsEqual(oldSpeedbrakeRatio, -0.5f) ? 0.0f : -0.5f;
-                XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
-                beginTime = FLT_MAX;
-            }
-        }
-        else if (inPhase == xplm_CommandEnd)
-        {
-            // toggle speedbrake
-            if (XPLMGetElapsedTime() - beginTime < BUTTON_LONG_PRESS_TIME && !FloatsEqual(beginTime, FLT_MAX))
-            {
-                float newSpeedbrakeRatio = oldSpeedbrakeRatio <= 0.5f ? 1.0f : 0.0f;
-                XPLMSetDataf(speedbrakeRatioDataRef, newSpeedbrakeRatio);
-            }
-            beginTime = 0.0f;
-        }
-    }
-    // if the aircraft is not equipped with a speedbrake this command toggles the carb heat
-    else
-    {
-        if (inPhase == xplm_CommandBegin)
-        {
-            const int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
-
-            if (acfNumEngines > 0)
-            {
-                float carbHeatRatio[8];
-                XPLMGetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
-
-                float newCarbHeatRatio = carbHeatRatio[0] <= 0.5f ? 1.0f : 0.0f;
-
-                for (int i = 0; i < acfNumEngines; i++)
-                    carbHeatRatio[i] = newCarbHeatRatio;
-
-                XPLMSetDatavf(carbHeatRatioDataRef, carbHeatRatio, 0, acfNumEngines);
-            }
-        }
-    }
-
-    return 0;
 }
 
 static void ToggleKeyboardControl(int vrEnabled)
@@ -3537,13 +3523,10 @@ static int ToggleMouseOrKeyboardControlCommand(XPLMCommandRef inCommand, XPLMCom
 
         if (inPhase == xplm_CommandBegin)
             beginTime = XPLMGetElapsedTime();
-        else if (inPhase == xplm_CommandContinue)
+        else if (inPhase == xplm_CommandContinue && XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
         {
-            if (XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
-            {
-                ToggleKeyboardControl();
-                beginTime = FLT_MAX;
-            }
+            ToggleKeyboardControl();
+            beginTime = FLT_MAX;
         }
         else if (inPhase == xplm_CommandEnd)
         {
@@ -3687,11 +3670,11 @@ static int TrimResetCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, 
         }
         else
         {
-            XPLMSetDataf(aileronTrimDataRef, 0.0f);
-            XPLMSetDataf(elevatorTrimDataRef, 0.0f);
+            XPLMCommandOnce(XPLMFindCommand("sim/flight_controls/aileron_trim_center"));
+            XPLMCommandOnce(XPLMFindCommand("sim/flight_controls/rudder_trim_center"));
         }
 
-        XPLMSetDataf(rudderTrimDataRef, 0.0f);
+        XPLMCommandOnce(XPLMFindCommand("sim/flight_controls/rudder_trim_center"));
     }
 
     return 0;
