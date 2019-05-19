@@ -258,7 +258,7 @@
 #define AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT 41
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
-#define DEFAULT_NULLZONE 0.10f
+#define DEFAULT_NULLZONE 0.1f
 
 #define DEFAULT_PITCH_SENSITIVITY 1.0f
 #define DEFAULT_ROLL_SENSITIVITY 1.0f
@@ -272,6 +272,7 @@
 #define ROTORSIM_EC135_PLUGIN_SIGNATURE "rotorsim.ec135.management"
 #define X_IVAP_PLUGIN_SIGNATURE "ivao.xivap"
 #define X_XSQUAWKBOX_PLUGIN_SIGNATURE "vatsim.protodev.clients.xsquawkbox"
+#define TOLISS_PLUGIN_SIGNATURE "XP11.ToLiss.A319.systems"
 #define ZIBO_PLUGIN_SIGNATURE "zibomod.by.Zibo"
 
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
@@ -316,7 +317,8 @@
 #define KEY_BORDER_WIDTH 1
 #define KEY_REPEAT_INTERVAL 0.1f
 
-#define THRUST_REVERSER_SETTING_ON_ENGAGEMENT -0.05f
+// must be lower than -0.1 for the ToLiss A319
+#define THRUST_REVERSER_SETTING_ON_ENGAGEMENT -0.15f
 
 #define TOUCHPAD_MAX_DELTA 150
 #define TOUCHPAD_CURSOR_SENSITIVITY 1.0f
@@ -621,6 +623,7 @@ static void FitGeometryWithinScreenBounds(int *left, int *top, int *right, int *
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon);
 inline static int FloatsEqual(float a, float b);
 static int inline GetKeyboardWidth(void);
+static float GetThrottleRatio(XPLMDataRef fallbackThrottleRatioDataRef);
 static XPLMDataRef GetThrottleRatioDataRef(void);
 static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon);
 static void HandleKey(XPLMWindowID inWindowID, char inKey, XPLMKeyFlags inFlags, char inVirtualKey, void *inRefcon, int losingFocus);
@@ -663,6 +666,7 @@ static int ScrollDownCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase,
 static int ScrollUpCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void SetDefaultAssignments(void);
 static int SetOverrideHeadShakePlugin(int overrideEnabled);
+static void SetToLissThrottle(float throttleRatio);
 static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget, long inParam1, long inParam2);
 static int SpeedbrakeModifierOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void StopConfiguration(void);
@@ -1267,8 +1271,13 @@ static int CwsOrDisconnectAutopilotCommand(XPLMCommandRef inCommand, XPLMCommand
     switch (XPLMGetDatai(preconfiguredApTypeDataRef))
     {
     case 0:
-        // check if the autopilot disconnect command of the default B738 exists
-        if (IsPluginEnabled(ZIBO_PLUGIN_SIGNATURE))
+        // custom handling for autopilot disconnect command
+        if (IsPluginEnabled(TOLISS_PLUGIN_SIGNATURE))
+        {
+            command = XPLMFindCommand("sim/autopilot/Flight-Dir Down");
+            break;
+        }
+        else if (IsPluginEnabled(ZIBO_PLUGIN_SIGNATURE))
         {
             command = XPLMFindCommand("laminar/B738/autopilot/capt_disco_press");
             break;
@@ -1397,7 +1406,7 @@ static void DrawIndicatorsWindow(XPLMWindowID inWindowID, void *inRefcon)
     if (gliderWithSpeedbrakes)
         throttle = 1.0f - XPLMGetDataf(speedbrakeRatioDataRef);
     else
-        throttle = XPLMGetDataf(throttleBetaRevRatioAllDataRef);
+        throttle = GetThrottleRatio(throttleBetaRevRatioAllDataRef);
 
     const int throttleLocation = glGetUniformLocation(indicatorsProgram, "throttle");
     glUniform1f(throttleLocation, throttle);
@@ -1667,8 +1676,8 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
     }
 
     // disable thrust reverser mode if throttle was moved into positive range
-    if (thrustReverserMode && XPLMGetDataf(throttleBetaRevRatioAllDataRef) > 0.0f)
-        thrustReverserMode = false;
+    if (thrustReverserMode && GetThrottleRatio(throttleBetaRevRatioAllDataRef) > 0.0f)
+        thrustReverserMode = 0;
 
     if (XPLMGetDatai(hasJoystickDataRef))
     {
@@ -2247,11 +2256,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                                 const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 0.0f, 0.0f, 1.0f);
 
                                 const XPLMDataRef throttleRatioDataRef = GetThrottleRatioDataRef();
-
-                                const float newThrottleRatioAll = XPLMGetDataf(throttleRatioDataRef) + d;
+                                float newThrottleRatioAll = GetThrottleRatio(throttleRatioDataRef) + d;
 
                                 // ensure we don't set values larger than 1.0
-                                XPLMSetDataf(throttleRatioDataRef, newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f);
+                                newThrottleRatioAll = newThrottleRatioAll < 1.0f ? newThrottleRatioAll : 1.0f;
+
+                                XPLMSetDataf(throttleRatioDataRef, newThrottleRatioAll);
+                                SetToLissThrottle(newThrottleRatioAll);
                             }
                             // decrease throttle setting
                             else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] > 0.5f + joystickPitchNullzone)
@@ -2260,8 +2271,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                                 const float d = sensitivityMultiplier * Exponentialize(joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)], 0.5f, 1.0f, 0.0f, 1.0f);
 
                                 const XPLMDataRef throttleRatioDataRef = GetThrottleRatioDataRef();
-
-                                const float newThrottleRatioAll = XPLMGetDataf(throttleRatioDataRef) - d;
+                                float newThrottleRatioAll = GetThrottleRatio(throttleRatioDataRef) - d;
 
                                 float lowerThrottleBound;
                                 if (thrustReverserMode)
@@ -2275,7 +2285,10 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                                     lowerThrottleBound = 0.0f;
 
                                 // ensure we don't set values smaller than the lower throttle bound
-                                XPLMSetDataf(throttleRatioDataRef, newThrottleRatioAll > lowerThrottleBound ? newThrottleRatioAll : lowerThrottleBound);
+                                newThrottleRatioAll = newThrottleRatioAll > lowerThrottleBound ? newThrottleRatioAll : lowerThrottleBound;
+
+                                XPLMSetDataf(throttleRatioDataRef, newThrottleRatioAll);
+                                SetToLissThrottle(newThrottleRatioAll);
                             }
                         }
                     }
@@ -2290,6 +2303,19 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 inline static int FloatsEqual(float a, float b)
 {
     return fabs(a - b) < FLT_EPSILON;
+}
+
+static float GetThrottleRatio(XPLMDataRef fallbackThrottleRatioDataRef)
+{
+    float throttRatio;
+
+    const XPLMDataRef airbusThrottleInputDataRef = XPLMFindDataRef("AirbusFBW/throttle_input");
+    if (airbusThrottleInputDataRef != NULL)
+        XPLMGetDatavf(airbusThrottleInputDataRef, &throttRatio, 4, 1);
+    else
+        throttRatio = XPLMGetDataf(fallbackThrottleRatioDataRef);
+
+    return throttRatio;
 }
 
 static XPLMDataRef GetThrottleRatioDataRef(void)
@@ -3217,6 +3243,20 @@ static int SetOverrideHeadShakePlugin(int overrideEnabled)
     return 1;
 }
 
+static void SetToLissThrottle(float throttleRatio)
+{
+    // the ToLiss A319 uses a custom dataref for throttle control, modifying the default throttle-ratio datarefs has no effect
+    const XPLMDataRef airbusThrottleInputDataRef = XPLMFindDataRef("AirbusFBW/throttle_input");
+    if (airbusThrottleInputDataRef != NULL)
+    {
+        float throttleInput[] = {throttleRatio, throttleRatio};
+        // indices 0 and 1 are the left and right lever, index 4 seems to be an average between the two, in order to allow going from a value that is different than 0.0 into the thrust reverse mode we need to set all three of them accordingly
+        XPLMSetDatavf(airbusThrottleInputDataRef, throttleInput, 0, 2);
+        // we do not touch index 3 since its purpose is unknown
+        XPLMSetDatavf(airbusThrottleInputDataRef, &throttleRatio, 4, 1);
+    }
+}
+
 static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget, long inParam1, long inParam2)
 {
     if (inMessage == xpMessage_CloseButtonPushed)
@@ -3553,15 +3593,21 @@ static int ToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPha
     if (inPhase == xplm_CommandBegin)
     {
         if (thrustReverserMode)
+        {
             XPLMSetDataf(throttleBetaRevRatioAllDataRef, 0.0f);
+            SetToLissThrottle(0.0f);
+        }
         else
         {
             if (XPLMGetDatai(acfHasBetaDataRef))
                 // has beta
                 XPLMSetDataf(throttleBetaRevRatioAllDataRef, THRUST_REVERSER_SETTING_ON_ENGAGEMENT);
             else if (XPLMGetDataf(acfThrotmaxREVDataRef) > 0.0f)
+            {
                 // has thrust reverser
                 XPLMSetDataf(throttleJetRevRatioAllDataRef, THRUST_REVERSER_SETTING_ON_ENGAGEMENT);
+                SetToLissThrottle(THRUST_REVERSER_SETTING_ON_ENGAGEMENT);
+            }
             else
                 return 0;
         }
