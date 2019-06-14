@@ -275,6 +275,8 @@
 #define TOLISS_PLUGIN_SIGNATURE "XP11.ToLiss.A319.systems"
 #define ZIBO_PLUGIN_SIGNATURE "zibomod.by.Zibo"
 
+#define DA_62_ICAO_CODE "DA62"
+
 #define CYCLE_RESET_VIEW_COMMAND NAME_LOWERCASE "/cycle_reset_view"
 #define TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND NAME_LOWERCASE "/toggle_arm_speed_brake_or_toggle_carb_heat"
 #define CWS_OR_DISCONNECT_AUTOPILOT NAME_LOWERCASE "/cws_or_disconnect_autopilot"
@@ -820,7 +822,7 @@ static volatile int hidDeviceThreadRun = 1;
 #endif
 
 static XPLMCommandRef cycleResetViewCommand = NULL, toggleArmSpeedBrakeOrToggleCarbHeatCommand = NULL, cwsOrDisconnectAutopilotCommand = NULL, lookModifierCommand = NULL, propPitchOrThrottleModifierCommand = NULL, mixtureControlModifierCommand = NULL, cowlFlapModifierCommand = NULL, trimModifierCommand = NULL, trimResetCommand = NULL, toggleMousePointerControlCommand = NULL, pushToTalkCommand = NULL, toggleLeftMouseButtonCommand = NULL, toggleReverseCommand = NULL, toggleRightMouseButtonCommand = NULL, scrollUpCommand = NULL, scrollDownCommand = NULL, keyboardSelectorUpCommand = NULL, keyboardSelectorDownCommand = NULL, keyboardSelectorLeftCommand = NULL, keyboardSelectorRightCommand = NULL, pressKeyboardKeyCommand = NULL, lockKeyboardKeyCommand = NULL;
-static XPLMDataRef preconfiguredApTypeDataRef = NULL, acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfThrotmaxREVDataRef = NULL, acfFeatheredPitchDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, sbrkrqstDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, throttleJetRevRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
+static XPLMDataRef preconfiguredApTypeDataRef = NULL, acfCockpitTypeDataRef = NULL, acfPeXDataRef = NULL, acfPeYDataRef = NULL, acfPeZDataRef = NULL, acfICAODataRef = NULL, acfRSCRedlinePrpDataRef = NULL, acfNumEnginesDataRef = NULL, acfFeatheredPitchDataRef = NULL, acfHasBetaDataRef = NULL, acfSbrkEQDataRef = NULL, acfRevthrustEqDataRef = NULL, acfEnTypeDataRef = NULL, acfPropTypeDataRef = NULL, acfMinPitchDataRef = NULL, acfMaxPitchDataRef = NULL, cinemaVeriteDataRef = NULL, pilotsHeadPsiDataRef = NULL, pilotsHeadTheDataRef = NULL, viewTypeDataRef = NULL, vrEnabledDataRef = NULL, hasJoystickDataRef = NULL, joystickPitchNullzoneDataRef = NULL, joystickRollNullzoneDataRef = NULL, joystickHeadingNullzoneDataRef = NULL, joystickPitchSensitivityDataRef = NULL, joystickRollSensitivityDataRef = NULL, joystickHeadingSensitivityDataRef = NULL, joystickAxisAssignmentsDataRef = NULL, joystickAxisReverseDataRef = NULL, joystickAxisValuesDataRef = NULL, joystickButtonAssignmentsDataRef = NULL, joystickButtonValuesDataRef = NULL, leftBrakeRatioDataRef = NULL, rightBrakeRatioDataRef = NULL, sbrkrqstDataRef = NULL, speedbrakeRatioDataRef = NULL, throttleRatioAllDataRef = NULL, throttleJetRevRatioAllDataRef = NULL, throttleBetaRevRatioAllDataRef = NULL, propPitchDegDataRef = NULL, propRotationSpeedRadSecAllDataRef = NULL, mixtureRatioAllDataRef = NULL, cowlFlapRatioDataRef = NULL, overrideToeBrakesDataRef = NULL;
 static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL, xbox360ControllerRadioButton = NULL, configurationStatusCaption = NULL, startConfigurationtButton = NULL, showIndicatorsCheckbox = NULL;
 
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
@@ -859,13 +861,14 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     acfPeXDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peX");
     acfPeYDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peY");
     acfPeZDataRef = XPLMFindDataRef("sim/aircraft/view/acf_peZ");
+    acfICAODataRef = XPLMFindDataRef("sim/aircraft/view/acf_ICAO");
     acfRSCRedlinePrpDataRef = XPLMFindDataRef("sim/aircraft/controls/acf_RSC_redline_prp");
     acfNumEnginesDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");
-    acfThrotmaxREVDataRef = XPLMFindDataRef("sim/aircraft/engine/acf_throtmax_REV");
     acfFeatheredPitchDataRef = XPLMFindDataRef("sim/aircraft/overflow/acf_feathered_pitch");
     acfHasBetaDataRef = XPLMFindDataRef("sim/aircraft/overflow/acf_has_beta");
     acfSbrkEQDataRef = XPLMFindDataRef("sim/aircraft/parts/acf_sbrkEQ");
     acfEnTypeDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_en_type");
+    acfRevthrustEqDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_revthrust_eq");
     acfPropTypeDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_prop_type");
     acfMinPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_min_pitch");
     acfMaxPitchDataRef = XPLMFindDataRef("sim/aircraft/prop/acf_max_pitch");
@@ -2322,7 +2325,7 @@ static XPLMDataRef GetThrottleRatioDataRef(void)
 {
     if (XPLMGetDatai(acfHasBetaDataRef))
         return throttleBetaRevRatioAllDataRef;
-    else if (XPLMGetDataf(acfThrotmaxREVDataRef) > 0.0f)
+    else if (XPLMGetDatai(acfRevthrustEqDataRef))
         return throttleJetRevRatioAllDataRef;
     else
         return throttleRatioAllDataRef;
@@ -3602,7 +3605,7 @@ static int ToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPha
             if (XPLMGetDatai(acfHasBetaDataRef))
                 // has beta
                 XPLMSetDataf(throttleBetaRevRatioAllDataRef, THRUST_REVERSER_SETTING_ON_ENGAGEMENT);
-            else if (XPLMGetDataf(acfThrotmaxREVDataRef) > 0.0f)
+            else if (XPLMGetDatai(acfRevthrustEqDataRef))
             {
                 // has thrust reverser
                 XPLMSetDataf(throttleJetRevRatioAllDataRef, THRUST_REVERSER_SETTING_ON_ENGAGEMENT);
@@ -3740,9 +3743,12 @@ static void UpdateIndicatorsWindow(int vrEnabled)
     if (!showIndicators || (acfNumEngines < 1 && !gliderWithSpeedbrakes))
         return;
 
+    char acfICAO[40];
+    XPLMGetDatab(acfICAODataRef, acfICAO, 0, 40);
+
     numPropLevers = 0;
     numMixtureLevers = 0;
-    if (!gliderWithSpeedbrakes)
+    if (!gliderWithSpeedbrakes && strcmp(acfICAO, DA_62_ICAO_CODE) != 0)
     {
         const int helicopter = IsHelicopter();
 
