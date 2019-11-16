@@ -667,7 +667,6 @@ static void Scroll(int clicks, void *display = NULL);
 static int ScrollDownCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ScrollUpCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void SetDefaultAssignments(void);
-static int SetOverrideHeadShakePlugin(int overrideEnabled);
 static void SetToLissThrottle(float throttleRatio);
 static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget, long inParam1, long inParam2);
 static int SpeedbrakeModifierOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
@@ -796,7 +795,7 @@ static KeyboardKey numpadEnterKey = InitKeyboardKey("Enter", KEY_CODE_NUMPADENTE
 static KeyboardKey *keyboardKeys[] = {&escapeKey, &f1Key, &f2Key, &f3Key, &f4Key, &f5Key, &f6Key, &f7Key, &f8Key, &f9Key, &f10Key, &f11Key, &f12Key, &sysRqKey, &scrollKey, &pauseKey, &insertKey, &deleteKey, &homeKey, &endKey, &graveKey, &d1Key, &d2Key, &d3Key, &d4Key, &d5Key, &d6Key, &d7Key, &d8Key, &d9Key, &d0Key, &minusKey, &equalsKey, &backKey, &numLockKey, &divideKey, &multiplyKey, &subtractKey, &tabKey, &qKey, &wKey, &eKey, &rKey, &tKey, &yKey, &uKey, &iKey, &oKey, &pKey, &leftBracketKey, &rightBracketKey, &backslashKey, &numpad7Key, &numpad8Key, &numpad9Key, &addKey, &captialKey, &aKey, &sKey, &dKey, &fKey, &gKey, &hKey, &jKey, &kKey, &lKey, &semicolonKey, &apostropheKey, &returnKey, &numpad4Key, &numpad5Key, &numpad6Key, &pageUpKey, &leftShiftKey, &zKey, &xKey, &cKey, &vKey, &bKey, &nKey, &mKey, &commaKey, &periodKey, &slashKey, &rightShiftKey, &numpad1Key, &numpad2Key, &numpad3Key, &pageDownKey, &leftControlKey, &leftWindowsKey, &leftAltKey, &spaceKey, &rightAltKey, &rightWindowsKey, &appsKey, &rightControlKey, &upKey, &downKey, &leftKey, &rightKey, &numpad0Key, &numpadCommaKey, &numpadEnterKey};
 static KeyboardKey *selectedKey = &kKey;
 
-static int axisOffset = 0, buttonOffset = 0, indicatorsBottom = 0, indicatorsRight = 0, numMixtureLevers = 0, numPropLevers = 0, keyboardBottom = 0, keyboardRight = 0, keyPressActive = 0, lastCinemaVerite = 0, overrideHeadShakePluginFailed = 0, thrustReverserMode = 0, showIndicators = 1, switchTo3DCommandLook = 0;
+static int axisOffset = 0, buttonOffset = 0, indicatorsBottom = 0, indicatorsRight = 0, numMixtureLevers = 0, numPropLevers = 0, keyboardBottom = 0, keyboardRight = 0, keyPressActive = 0, lastCinemaVerite = 0, thrustReverserMode = 0, showIndicators = 1, switchTo3DCommandLook = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
 static ControllerType controllerType = XBOX360;
 static Mode mode = DEFAULT;
@@ -2928,8 +2927,9 @@ static void OverrideCameraControls(void)
     if (lastCinemaVerite)
         XPLMSetDatai(cinemaVeriteDataRef, 0);
 
-    // enalbe the camera override of HeadShake
-    overrideHeadShakePluginFailed = SetOverrideHeadShakePlugin(1);
+    // temporarily disable HeadShake
+    if (IsPluginEnabled(HEAD_SHAKE_PLUGIN_SIGNATURE))
+        XPLMCommandOnce(XPLMFindCommand("simcoders/headshake/stop"));
 }
 
 static void PopButtonAssignments(void)
@@ -3085,10 +3085,6 @@ static void RestoreCameraControls(void)
     // restore cinema verite to its old status
     if (lastCinemaVerite)
         XPLMSetDatai(cinemaVeriteDataRef, 1);
-
-    // disable the camera override of HeadhShake if we enabled it before
-    if (!overrideHeadShakePluginFailed)
-        SetOverrideHeadShakePlugin(0);
 }
 
 static void SaveSettings(void)
@@ -3232,18 +3228,6 @@ static void SetDefaultAssignments(void)
         XPLMSetDataf(joystickRollSensitivityDataRef, DEFAULT_ROLL_SENSITIVITY);
         XPLMSetDataf(joystickHeadingSensitivityDataRef, DEFAULT_HEADING_SENSITIVITY);
     }
-}
-
-static int SetOverrideHeadShakePlugin(int overrideEnabled)
-{
-    if (IsPluginEnabled(HEAD_SHAKE_PLUGIN_SIGNATURE))
-    {
-        XPLMSetDatai(XPLMFindDataRef("simcoders/headshake/override"), overrideEnabled);
-
-        return 0;
-    }
-
-    return 1;
 }
 
 static void SetToLissThrottle(float throttleRatio)
