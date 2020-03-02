@@ -1,8 +1,8 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.7)
 
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -16,11 +16,10 @@ if(Git_FOUND)
     execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --long --always
                     OUTPUT_VARIABLE VERSION
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
-    add_compile_definitions(VERSION=\"${VERSION}\")
+    add_definitions(-DVERSION=\"${VERSION}\")
 else()
     message(WARNING "Git executable was not found, the version string will be left undefined.")
 endif()
-
 
 set(LIB_DIR "${PROJECT_SOURCE_DIR}/lib")
 
@@ -32,7 +31,8 @@ if(CMAKE_HOST_WIN32)
     set(PLATFORM_COMPILE_OPTIONS /wd4100 /wd4267 /wd4996)
     set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_LINK_FLAGS} /MANIFEST:NO")
 else()
-    set(PLATFORM_COMPILE_OPTIONS -Wall -Wunreachable-code -Wextra -Wshadow -Wfloat-equal -Wno-unused-parameter -pedantic -pthread)
+    set(PLATFORM_COMPILE_OPTIONS -Wall -Wunreachable-code -Wextra -Wshadow -Wfloat-equal -Wno-unused-parameter -pedantic -Ofast)
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_LINK_FLAGS} -v -s")
 endif()
 
 if(APPLE)
@@ -101,7 +101,7 @@ target_compile_options(x_gamepad PUBLIC "$<$<CONFIG:RELEASE>:${PLATFORM_RELEASE_
 target_compile_definitions(x_gamepad PRIVATE ${DEFINITIONS})
 
 if(APPLE)
-    target_link_libraries(x_gamepad "-framework ApplicationServices" )
+    target_link_libraries(x_gamepad "-framework ApplicationServices")
     target_link_libraries(x_gamepad "-framework Carbon")
     target_link_libraries(x_gamepad "-framework CoreFoundation")
     target_link_libraries(x_gamepad "-framework OpenGL")
@@ -123,6 +123,9 @@ else()
         target_compile_options(x_gamepad PRIVATE "-fvisibility=hidden" -static-libgcc -static-libstdc++)
         set_target_properties(x_gamepad PROPERTIES OUTPUT_NAME "lin")
     else()
+        if(NOT CMAKE_HOST_WIN32)
+            target_link_libraries(x_gamepad -static-libgcc -static-libstdc++)
+        endif()
         target_link_libraries(x_gamepad "${LIB_DIR}/SDK/Libraries/Win/XPWidgets_64.lib")
         target_link_libraries(x_gamepad "${LIB_DIR}/SDK/Libraries/Win/XPLM_64.lib")
         target_link_libraries(x_gamepad "${LIB_DIR}/glew-2.1.0/lib/Release/x64/glew32s.lib")

@@ -2971,7 +2971,7 @@ static void MoveMousePointer(int distX, int distY, void *display)
         return;
 
 #if IBM
-    INPUT input = {0};
+    INPUT input = {0, 0, 0, 0, 0, 0, 0};
     input.type = INPUT_MOUSE;
     input.mi.dx = (long)distX;
     input.mi.dy = (long)distY;

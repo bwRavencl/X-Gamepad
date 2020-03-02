@@ -12,8 +12,6 @@ DEPLOY_XPL_DIR=$DEPLOY_DIR/$XPL_DIR
 
 mkdir -p $DEPLOY_XPL_DIR || exit $?
 
-STRIP_SYMBOLS=true
-
 if [ $CROSS_TRIPLE = "x86_64-w64-mingw32" ]; then
   export CMAKE_SYSTEM_NAME="Windows"
   cp $PROJECT_DIR/lib/hidapi/hidapi.dll $DEPLOY_XPL_DIR || exit $?
@@ -35,10 +33,6 @@ cd $BUILD_DIR &&
 rm -rf * &&
 cmake -DCMAKE_SYSTEM_NAME=$CMAKE_SYSTEM_NAME .. &&
 make || exit $?
-
-if [ "$STRIP_SYMBOLS" = true ]; then
-  strip $BIN_XPL_FILES || exit $?
-fi
 
 cp -R $BIN_XPL_FILES $DEPLOY_XPL_DIR &&
 
