@@ -2,9 +2,7 @@ cmake_minimum_required(VERSION 3.7)
 
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 project(x_gamepad)
@@ -32,7 +30,7 @@ if(CMAKE_HOST_WIN32)
     set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_LINK_FLAGS} /MANIFEST:NO")
 else()
     set(PLATFORM_COMPILE_OPTIONS -Wall -Wunreachable-code -Wextra -Wshadow -Wfloat-equal -Wno-unused-parameter -pedantic -Ofast)
-    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_LINK_FLAGS} -v -s")
+    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_LINK_FLAGS} -s")
 endif()
 
 if(APPLE)
@@ -91,7 +89,7 @@ include_directories(${PROJECT_BINARY_DIR}
                     ${PLATFORM_INCLUDE_DIRECTORIES})
 
 set(SOURCES
-    x_gamepad.cpp)
+    x_gamepad.c)
 
 add_library(x_gamepad MODULE ${SOURCES})
 
@@ -130,6 +128,7 @@ else()
         target_link_libraries(x_gamepad "${LIB_DIR}/SDK/Libraries/Win/XPLM_64.lib")
         target_link_libraries(x_gamepad "${LIB_DIR}/glew-2.1.0/lib/Release/x64/glew32s.lib")
         target_link_libraries(x_gamepad "opengl32")
+        target_link_libraries(x_gamepad "xinput")
         target_link_libraries(x_gamepad "${LIB_DIR}/hidapi/hidapi.lib")
         set_target_properties(x_gamepad PROPERTIES OUTPUT_NAME "win")
     endif()

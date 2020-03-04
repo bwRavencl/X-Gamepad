@@ -1,4 +1,4 @@
-/* Copyright (C) 2019  Matteo Hausner
+/* Copyright (C) 2020  Matteo Hausner
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,30 +26,29 @@
 #include "XPStandardWidgets.h"
 #include "XPWidgets.h"
 
-#include <fstream>
-#include <sstream>
-
 #ifndef VERSION
 #define VERSION "UNDEFINED"
 #endif
 
-#if IBM
-#include <math.h>
-#include <float.h>
-#include "glew.h"
-#include <process.h>
-#include <windows.h>
-#elif APL
+#if APL
 #include <pthread.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
 #include <OpenGL/gl.h>
-#endif
-
-#if LIN
+#else
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
+#endif
+
+#if IBM
+#include "glew.h"
+#include <process.h>
+#include <windows.h>
+#include <xinput.h>
+#endif
+
+#if LIN
 #include <stdlib.h>
 #include <string.h>
 #include <GL/gl.h>
@@ -63,9 +62,9 @@
 #define NAME_LOWERCASE "x_gamepad"
 
 #if IBM
-#define CONFIG_PATH ".\\Resources\\plugins\\" NAME_LOWERCASE "\\" NAME_LOWERCASE ".ini"
+#define CONFIG_PATH ".\\Resources\\plugins\\" NAME_LOWERCASE "\\" NAME_LOWERCASE ".prf"
 #else
-#define CONFIG_PATH "./Resources/plugins/" NAME_LOWERCASE "/" NAME_LOWERCASE ".ini"
+#define CONFIG_PATH "./Resources/plugins/" NAME_LOWERCASE "/" NAME_LOWERCASE ".prf"
 #endif
 
 #define JOYSTICK_AXIS_ABSTRACT_LEFT_X 0
@@ -257,6 +256,8 @@
 #define AXIS_ASSIGNMENT_PITCH 1
 #define AXIS_ASSIGNMENT_ROLL 2
 #define AXIS_ASSIGNMENT_YAW 3
+#define AXIS_ASSIGNMENT_LEFT_TOE_BRAKE 6
+#define AXIS_ASSIGNMENT_RIGHT_TOE_BRAKE 7
 #define AXIS_ASSIGNMENT_VIEW_LEFT_RIGHT 41
 #define AXIS_ASSIGNMENT_VIEW_UP_DOWN 42
 
@@ -679,7 +680,19 @@ typedef enum
     BETWEEN
 } KeyPosition;
 
-struct KeyboardKey
+typedef struct
+{
+    ControllerType controllerType;
+    int axisOffset;
+    int buttonOffset;
+    int showIndicators;
+    int indicatorsRight;
+    int indicatorsBottom;
+    int keyboardRight;
+    int keyboardBottom;
+} Settings;
+
+typedef struct KeyboardKey
 {
     char *label;
     int keyCode;
@@ -689,30 +702,16 @@ struct KeyboardKey
     KeyPosition position;
     KeyState state;
     float lastInputTime;
-    KeyboardKey *above;
-    KeyboardKey *below;
-    KeyboardKey *left;
-    KeyboardKey *right;
-};
-
-#if IBM
-struct XInputState
-{
-    unsigned long dwPacketNumber;
-    unsigned short up : 1, down : 1, left : 1, right : 1, start : 1, back : 1, l3 : 1, r3 : 1, lButton : 1, rButton : 1, guideButton : 1, unknown : 1, aButton : 1, bButton : 1, xButton : 1, yButton : 1;
-    unsigned char lTrigger;
-    unsigned char rTrigger;
-    short lJoyY;
-    short lJoyX;
-    short rJoyY;
-    short rJoyX;
-};
-#endif
+    struct KeyboardKey *above;
+    struct KeyboardKey *below;
+    struct KeyboardKey *left;
+    struct KeyboardKey *right;
+} KeyboardKey;
 
 static int AxisIndex(int abstractAxisIndex);
 static int ButtonIndex(int abstractButtonIndex);
 #if !LIN
-static void CleanupDeviceThread(hid_device *handle, hid_device_info *dev);
+static void CleanupDeviceThread(hid_device *handle, struct hid_device_info *dev);
 #endif
 static void CleanupShader(GLuint program, GLuint fragmentShader, int deleteProgram);
 static int CowlFlapModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
@@ -729,7 +728,7 @@ static float Exponentialize(float value, float inMin, float inMax, float outMin,
 static void FitGeometryWithinScreenBounds(int *left, int *top, int *right, int *bottom);
 static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void *inRefcon);
 inline static int FloatsEqual(float a, float b);
-static int inline GetKeyboardWidth(void);
+inline static int GetKeyboardWidth(void);
 static float GetThrottleRatio(XPLMDataRef fallbackThrottleRatioDataRef);
 static XPLMDataRef GetThrottleRatioDataRef(void);
 static XPLMCursorStatus HandleCursor(XPLMWindowID inWindowID, int x, int y, void *inRefcon);
@@ -740,7 +739,7 @@ static int HandleMouseWheel(XPLMWindowID inWindowID, int x, int y, int wheel, in
 static void HandleScrollCommand(XPLMCommandPhase phase, int clicks);
 static void HandleToggleMouseButtonCommand(XPLMCommandPhase phase, MouseButton button);
 static int Has2DPanel(void);
-static KeyboardKey InitKeyboardKey(const char *label, int keyCode, float aspect = 1.0f, KeyPosition position = BETWEEN);
+static KeyboardKey InitKeyboardKey(const char *label, int keyCode, float aspect, KeyPosition position);
 static void InitShader(const char *fragmentShaderString, GLuint *program, GLuint *fragmentShader);
 inline static int IsGliderWithSpeedbrakes(void);
 static int IsHelicopter(void);
@@ -750,13 +749,12 @@ static int KeyboardSelectorDownCommand(XPLMCommandRef inCommand, XPLMCommandPhas
 static int KeyboardSelectorLeftCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int KeyboardSelectorRightCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int KeyboardSelectorUpCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
-static void LoadSettings(void);
 static int LockKeyboardKeyCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int LookModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void MakeInput(int keyCode, KeyState state);
 static void MenuHandlerCallback(void *inMenuRef, void *inItemRef);
 static int MixtureControlModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
-static void MoveMousePointer(int distX, int distY, void *display = NULL);
+static void MoveMousePointer(int distX, int distY, void *display);
 static float Normalize(float value, float inMin, float inMax, float outMin, float outMax);
 static void OverrideCameraControls(void);
 static void PopButtonAssignments(void);
@@ -768,7 +766,7 @@ static void ReleaseAllKeys(void);
 static int ResetSwitchViewCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void RestoreCameraControls(void);
 static void SaveSettings(void);
-static void Scroll(int clicks, void *display = NULL);
+static void Scroll(int clicks, void *display);
 static int ScrollDownCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ScrollUpCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void SetDefaultAssignments(void);
@@ -777,9 +775,9 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
 static int SpeedbrakeModifierOrToggleCarbHeatCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static void StopConfiguration(void);
 inline static void SyncLockKeyState(KeyboardKey *keyboardKey);
-static void ToggleKeyboardControl(int vrEnabled = -1);
+static void ToggleKeyboardControl(int vrEnabled);
 static void ToggleMode(Mode m, XPLMCommandPhase phase);
-static void ToggleMouseButton(MouseButton button, int down, void *display = NULL);
+static void ToggleMouseButton(MouseButton button, int down, void *display);
 static void ToggleMouseControl(void);
 static int ToggleMouseOrKeyboardControlCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int ToggleLeftMouseButtonCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
@@ -787,144 +785,19 @@ static int ToggleReverseCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPha
 static int ToggleRightMouseButtonCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int TrimModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
 static int TrimResetCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon);
-static void UpdateIndicatorsWindow(int vrEnabled = -1);
+static void UpdateIndicatorsWindow(int vrEnabled);
 static void UpdateSettingsWidgets(void);
+inline static void UpdateToeBrakeControl(void);
 inline static void WireKey(KeyboardKey *keyboardKey, KeyboardKey *left, KeyboardKey *right, KeyboardKey *above, KeyboardKey *below);
 static void WireKeys(void);
 
-static KeyboardKey escapeKeyboardKey = InitKeyboardKey("Esc", KEY_CODE_ESCAPE, 1.0f, LEFT_END);
-static KeyboardKey f1KeyboardKey = InitKeyboardKey("F1", KEY_CODE_F1);
-static KeyboardKey f2KeyboardKey = InitKeyboardKey("F2", KEY_CODE_F2);
-static KeyboardKey f3KeyboardKey = InitKeyboardKey("F3", KEY_CODE_F3);
-static KeyboardKey f4KeyboardKey = InitKeyboardKey("F4", KEY_CODE_F4);
-static KeyboardKey f5KeyboardKey = InitKeyboardKey("F5", KEY_CODE_F5);
-static KeyboardKey f6KeyboardKey = InitKeyboardKey("F6", KEY_CODE_F6);
-static KeyboardKey f7KeyboardKey = InitKeyboardKey("F7", KEY_CODE_F7);
-static KeyboardKey f8KeyboardKey = InitKeyboardKey("F8", KEY_CODE_F8);
-static KeyboardKey f9KeyboardKey = InitKeyboardKey("F9", KEY_CODE_F9);
-static KeyboardKey f10KeyboardKey = InitKeyboardKey("F10", KEY_CODE_F10);
-static KeyboardKey f11KeyboardKey = InitKeyboardKey("F11", KEY_CODE_F11);
-static KeyboardKey f12KeyboardKey = InitKeyboardKey("F12", KEY_CODE_F12);
-#if APL
-static KeyboardKey sysRqKeyboardKey = InitKeyboardKey("F13", KEY_CODE_SYSRQ);
-static KeyboardKey scrollKeyboardKey = InitKeyboardKey("F14", KEY_CODE_SCROLL);
-static KeyboardKey pauseKeyboardKey = InitKeyboardKey("F15", KEY_CODE_PAUSE);
-static KeyboardKey insertKeyboardKey = InitKeyboardKey("fn", KEY_CODE_INSERT, 0.88f);
-#else
-static KeyboardKey sysRqKeyboardKey = InitKeyboardKey("SysRq", KEY_CODE_SYSRQ);
-static KeyboardKey scrollKeyboardKey = InitKeyboardKey("Scroll", KEY_CODE_SCROLL);
-static KeyboardKey pauseKeyboardKey = InitKeyboardKey("Pause", KEY_CODE_PAUSE);
-static KeyboardKey insertKeyboardKey = InitKeyboardKey("Ins", KEY_CODE_INSERT, 0.88f);
-#endif
-static KeyboardKey deleteKeyboardKey = InitKeyboardKey("Del", KEY_CODE_DELETE, 0.88f);
-static KeyboardKey homeKeyboardKey = InitKeyboardKey("Home", KEY_CODE_HOME, 0.88f);
-static KeyboardKey endKeyboardKey = InitKeyboardKey("End", KEY_CODE_END, 0.88f, RIGHT_END);
-static KeyboardKey graveKeyboardKey = InitKeyboardKey("`", KEY_CODE_GRAVE, 1.0f, LEFT_END);
-static KeyboardKey d1KeyboardKey = InitKeyboardKey("1", KEY_CODE_1);
-static KeyboardKey d2KeyboardKey = InitKeyboardKey("2", KEY_CODE_2);
-static KeyboardKey d3KeyboardKey = InitKeyboardKey("3", KEY_CODE_3);
-static KeyboardKey d4KeyboardKey = InitKeyboardKey("4", KEY_CODE_4);
-static KeyboardKey d5KeyboardKey = InitKeyboardKey("5", KEY_CODE_5);
-static KeyboardKey d6KeyboardKey = InitKeyboardKey("6", KEY_CODE_6);
-static KeyboardKey d7KeyboardKey = InitKeyboardKey("7", KEY_CODE_7);
-static KeyboardKey d8KeyboardKey = InitKeyboardKey("8", KEY_CODE_8);
-static KeyboardKey d9KeyboardKey = InitKeyboardKey("9", KEY_CODE_9);
-static KeyboardKey d0KeyboardKey = InitKeyboardKey("0", KEY_CODE_0);
-static KeyboardKey minusKeyboardKey = InitKeyboardKey("-", KEY_CODE_MINUS);
-static KeyboardKey equalsKeyboardKey = InitKeyboardKey("=", KEY_CODE_EQUALS);
-static KeyboardKey backKeyboardKey = InitKeyboardKey("Back", KEY_CODE_BACK, 2.5f);
-#if APL
-static KeyboardKey numLockKeyboardKey = InitKeyboardKey("Clear", KEY_CODE_NUMLOCK);
-#else
-static KeyboardKey numLockKeyboardKey = InitKeyboardKey("NumLk", KEY_CODE_NUMLOCK);
-#endif
-static KeyboardKey divideKeyboardKey = InitKeyboardKey("/", KEY_CODE_DIVIDE);
-static KeyboardKey multiplyKeyboardKey = InitKeyboardKey("*", KEY_CODE_MULTIPLY);
-static KeyboardKey subtractKeyboardKey = InitKeyboardKey("-", KEY_CODE_SUBTRACT, 1.0f, RIGHT_END);
-static KeyboardKey tabKeyboardKey = InitKeyboardKey("Tab", KEY_CODE_TAB, 1.5f, LEFT_END);
-static KeyboardKey qKeyboardKey = InitKeyboardKey("Q", KEY_CODE_Q);
-static KeyboardKey wKeyboardKey = InitKeyboardKey("W", KEY_CODE_W);
-static KeyboardKey eKeyboardKey = InitKeyboardKey("E", KEY_CODE_E);
-static KeyboardKey rKeyboardKey = InitKeyboardKey("R", KEY_CODE_R);
-static KeyboardKey tKeyboardKey = InitKeyboardKey("T", KEY_CODE_T);
-static KeyboardKey yKeyboardKey = InitKeyboardKey("Y", KEY_CODE_Y);
-static KeyboardKey uKeyboardKey = InitKeyboardKey("U", KEY_CODE_U);
-static KeyboardKey iKeyboardKey = InitKeyboardKey("I", KEY_CODE_I);
-static KeyboardKey oKeyboardKey = InitKeyboardKey("O", KEY_CODE_O);
-static KeyboardKey pKeyboardKey = InitKeyboardKey("P", KEY_CODE_P);
-static KeyboardKey leftBracketKeyboardKey = InitKeyboardKey("[", KEY_CODE_LBRACKET);
-static KeyboardKey rightBracketKeyboardKey = InitKeyboardKey("]", KEY_CODE_RBRACKET);
-static KeyboardKey backslashKeyboardKey = InitKeyboardKey("\\", KEY_CODE_BACKSLASH, 2.0f);
-static KeyboardKey numpad7KeyboardKey = InitKeyboardKey("7", KEY_CODE_NUMPAD7);
-static KeyboardKey numpad8KeyboardKey = InitKeyboardKey("8", KEY_CODE_NUMPAD8);
-static KeyboardKey numpad9KeyboardKey = InitKeyboardKey("9", KEY_CODE_NUMPAD9);
-static KeyboardKey addKeyboardKey = InitKeyboardKey("+", KEY_CODE_ADD, 1.0f, RIGHT_END);
-static KeyboardKey captialKeyboardKey = InitKeyboardKey("Caps Lock", KEY_CODE_CAPITAL, 2.0f, LEFT_END);
-static KeyboardKey aKeyboardKey = InitKeyboardKey("A", KEY_CODE_A);
-static KeyboardKey sKeyboardKey = InitKeyboardKey("S", KEY_CODE_S);
-static KeyboardKey dKeyboardKey = InitKeyboardKey("D", KEY_CODE_D);
-static KeyboardKey fKeyboardKey = InitKeyboardKey("F", KEY_CODE_F);
-static KeyboardKey gKeyboardKey = InitKeyboardKey("G", KEY_CODE_G);
-static KeyboardKey hKeyboardKey = InitKeyboardKey("H", KEY_CODE_H);
-static KeyboardKey jKeyboardKey = InitKeyboardKey("J", KEY_CODE_J);
-static KeyboardKey kKeyboardKey = InitKeyboardKey("K", KEY_CODE_K);
-static KeyboardKey lKeyboardKey = InitKeyboardKey("L", KEY_CODE_L);
-static KeyboardKey semicolonKeyboardKey = InitKeyboardKey(";", KEY_CODE_SEMICOLON);
-static KeyboardKey apostropheKeyboardKey = InitKeyboardKey("'", KEY_CODE_APOSTROPHE);
-static KeyboardKey returnKeyboardKey = InitKeyboardKey("Return", KEY_CODE_RETURN, 2.5f);
-static KeyboardKey numpad4KeyboardKey = InitKeyboardKey("4", KEY_CODE_NUMPAD4);
-static KeyboardKey numpad5KeyboardKey = InitKeyboardKey("5", KEY_CODE_NUMPAD5);
-static KeyboardKey numpad6KeyboardKey = InitKeyboardKey("6", KEY_CODE_NUMPAD6);
-static KeyboardKey pageUpKeyboardKey = InitKeyboardKey("PgUp", KEY_CODE_PRIOR, 1.0f, RIGHT_END);
-static KeyboardKey leftShiftKeyboardKey = InitKeyboardKey("Shift", KEY_CODE_LSHIFT, 2.5f, LEFT_END);
-static KeyboardKey zKeyboardKey = InitKeyboardKey("Z", KEY_CODE_Z);
-static KeyboardKey xKeyboardKey = InitKeyboardKey("X", KEY_CODE_X);
-static KeyboardKey cKeyboardKey = InitKeyboardKey("C", KEY_CODE_C);
-static KeyboardKey vKeyboardKey = InitKeyboardKey("V", KEY_CODE_V);
-static KeyboardKey bKeyboardKey = InitKeyboardKey("B", KEY_CODE_B);
-static KeyboardKey nKeyboardKey = InitKeyboardKey("N", KEY_CODE_N);
-static KeyboardKey mKeyboardKey = InitKeyboardKey("M", KEY_CODE_M);
-static KeyboardKey commaKeyboardKey = InitKeyboardKey(",", KEY_CODE_COMMA);
-static KeyboardKey periodKeyboardKey = InitKeyboardKey(".", KEY_CODE_PERIOD);
-static KeyboardKey slashKeyboardKey = InitKeyboardKey("/", KEY_CODE_SLASH);
-static KeyboardKey rightShiftKeyboardKey = InitKeyboardKey("Shift", KEY_CODE_RSHIFT, 3.0f);
-static KeyboardKey numpad1KeyboardKey = InitKeyboardKey("1", KEY_CODE_NUMPAD1);
-static KeyboardKey numpad2KeyboardKey = InitKeyboardKey("2", KEY_CODE_NUMPAD2);
-static KeyboardKey numpad3KeyboardKey = InitKeyboardKey("3", KEY_CODE_NUMPAD3);
-static KeyboardKey pageDownKeyboardKey = InitKeyboardKey("PgDn", KEY_CODE_NEXT, 1.0f, RIGHT_END);
-static KeyboardKey leftControlKeyboardKey = InitKeyboardKey("Ctrl", KEY_CODE_LCONTROl, 1.0f, LEFT_END);
-#if APL
-static KeyboardKey leftWindowsKeyboardKey = InitKeyboardKey("CMD", KEY_CODE_LWIN);
-static KeyboardKey leftAltKeyboardKey = InitKeyboardKey("Opt", KEY_CODE_LMENU);
-#else
-static KeyboardKey leftWindowsKeyboardKey = InitKeyboardKey("Win", KEY_CODE_LWIN);
-static KeyboardKey leftAltKeyboardKey = InitKeyboardKey("Alt", KEY_CODE_LMENU);
-#endif
-static KeyboardKey spaceKeyboardKey = InitKeyboardKey("Space", KEY_CODE_SPACE, 4.5f);
-#if APL
-static KeyboardKey rightAltKeyboardKey = InitKeyboardKey("Opt", KEY_CODE_RMENU);
-static KeyboardKey rightWindowsKeyboardKey = InitKeyboardKey("CMD", KEY_CODE_RWIN);
-static KeyboardKey appsKeyboardKey = InitKeyboardKey("Num =", KEY_CODE_APPS);
-#else
-static KeyboardKey rightAltKeyboardKey = InitKeyboardKey("Alt", KEY_CODE_RMENU);
-static KeyboardKey rightWindowsKeyboardKey = InitKeyboardKey("Win", KEY_CODE_RWIN);
-static KeyboardKey appsKeyboardKey = InitKeyboardKey("Menu", KEY_CODE_APPS);
-#endif
-static KeyboardKey rightControlKeyboardKey = InitKeyboardKey("Ctrl", KEY_CODE_RCONTROL);
-static KeyboardKey upKeyboardKey = InitKeyboardKey("Up", KEY_CODE_UP);
-static KeyboardKey downKeyboardKey = InitKeyboardKey("Down", KEY_CODE_DOWN);
-static KeyboardKey leftKeyboardKey = InitKeyboardKey("Left", KEY_CODE_LEFT);
-static KeyboardKey rightKeyboardKey = InitKeyboardKey("Right", KEY_CODE_RIGHT);
-static KeyboardKey numpad0KeyboardKey = InitKeyboardKey("0", KEY_CODE_NUMPAD0, 2.0f);
-static KeyboardKey numpadCommaKeyboardKey = InitKeyboardKey(",", KEY_CODE_NUMPADCOMMA);
-static KeyboardKey numpadEnterKeyboardKey = InitKeyboardKey("Enter", KEY_CODE_NUMPADENTER, 1.0f, RIGHT_END);
-
+static KeyboardKey escapeKeyboardKey, f1KeyboardKey, f2KeyboardKey, f3KeyboardKey, f4KeyboardKey, f5KeyboardKey, f6KeyboardKey, f7KeyboardKey, f8KeyboardKey, f9KeyboardKey, f10KeyboardKey, f11KeyboardKey, f12KeyboardKey, sysRqKeyboardKey, scrollKeyboardKey, pauseKeyboardKey, insertKeyboardKey, deleteKeyboardKey, homeKeyboardKey, endKeyboardKey, graveKeyboardKey, d1KeyboardKey, d2KeyboardKey, d3KeyboardKey, d4KeyboardKey, d5KeyboardKey, d6KeyboardKey, d7KeyboardKey, d8KeyboardKey, d9KeyboardKey, d0KeyboardKey, minusKeyboardKey, equalsKeyboardKey, backKeyboardKey, numLockKeyboardKey, divideKeyboardKey, multiplyKeyboardKey, subtractKeyboardKey, tabKeyboardKey, qKeyboardKey, wKeyboardKey, eKeyboardKey, rKeyboardKey, tKeyboardKey, yKeyboardKey, uKeyboardKey, iKeyboardKey, oKeyboardKey, pKeyboardKey, leftBracketKeyboardKey, rightBracketKeyboardKey, backslashKeyboardKey, numpad7KeyboardKey, numpad8KeyboardKey, numpad9KeyboardKey, addKeyboardKey, captialKeyboardKey, aKeyboardKey, sKeyboardKey, dKeyboardKey, fKeyboardKey, gKeyboardKey, hKeyboardKey, jKeyboardKey, kKeyboardKey, lKeyboardKey, semicolonKeyboardKey, apostropheKeyboardKey, returnKeyboardKey, numpad4KeyboardKey, numpad5KeyboardKey, numpad6KeyboardKey, pageUpKeyboardKey, leftShiftKeyboardKey, zKeyboardKey, xKeyboardKey, cKeyboardKey, vKeyboardKey, bKeyboardKey, nKeyboardKey, mKeyboardKey, commaKeyboardKey, periodKeyboardKey, slashKeyboardKey, rightShiftKeyboardKey, numpad1KeyboardKey, numpad2KeyboardKey, numpad3KeyboardKey, pageDownKeyboardKey, leftControlKeyboardKey, leftWindowsKeyboardKey, leftAltKeyboardKey, spaceKeyboardKey, rightAltKeyboardKey, rightWindowsKeyboardKey, appsKeyboardKey, rightControlKeyboardKey, upKeyboardKey, downKeyboardKey, leftKeyboardKey, rightKeyboardKey, numpad0KeyboardKey, numpadCommaKeyboardKey, numpadEnterKeyboardKey;
 static KeyboardKey *keyboardKeys[] = {&escapeKeyboardKey, &f1KeyboardKey, &f2KeyboardKey, &f3KeyboardKey, &f4KeyboardKey, &f5KeyboardKey, &f6KeyboardKey, &f7KeyboardKey, &f8KeyboardKey, &f9KeyboardKey, &f10KeyboardKey, &f11KeyboardKey, &f12KeyboardKey, &sysRqKeyboardKey, &scrollKeyboardKey, &pauseKeyboardKey, &insertKeyboardKey, &deleteKeyboardKey, &homeKeyboardKey, &endKeyboardKey, &graveKeyboardKey, &d1KeyboardKey, &d2KeyboardKey, &d3KeyboardKey, &d4KeyboardKey, &d5KeyboardKey, &d6KeyboardKey, &d7KeyboardKey, &d8KeyboardKey, &d9KeyboardKey, &d0KeyboardKey, &minusKeyboardKey, &equalsKeyboardKey, &backKeyboardKey, &numLockKeyboardKey, &divideKeyboardKey, &multiplyKeyboardKey, &subtractKeyboardKey, &tabKeyboardKey, &qKeyboardKey, &wKeyboardKey, &eKeyboardKey, &rKeyboardKey, &tKeyboardKey, &yKeyboardKey, &uKeyboardKey, &iKeyboardKey, &oKeyboardKey, &pKeyboardKey, &leftBracketKeyboardKey, &rightBracketKeyboardKey, &backslashKeyboardKey, &numpad7KeyboardKey, &numpad8KeyboardKey, &numpad9KeyboardKey, &addKeyboardKey, &captialKeyboardKey, &aKeyboardKey, &sKeyboardKey, &dKeyboardKey, &fKeyboardKey, &gKeyboardKey, &hKeyboardKey, &jKeyboardKey, &kKeyboardKey, &lKeyboardKey, &semicolonKeyboardKey, &apostropheKeyboardKey, &returnKeyboardKey, &numpad4KeyboardKey, &numpad5KeyboardKey, &numpad6KeyboardKey, &pageUpKeyboardKey, &leftShiftKeyboardKey, &zKeyboardKey, &xKeyboardKey, &cKeyboardKey, &vKeyboardKey, &bKeyboardKey, &nKeyboardKey, &mKeyboardKey, &commaKeyboardKey, &periodKeyboardKey, &slashKeyboardKey, &rightShiftKeyboardKey, &numpad1KeyboardKey, &numpad2KeyboardKey, &numpad3KeyboardKey, &pageDownKeyboardKey, &leftControlKeyboardKey, &leftWindowsKeyboardKey, &leftAltKeyboardKey, &spaceKeyboardKey, &rightAltKeyboardKey, &rightWindowsKeyboardKey, &appsKeyboardKey, &rightControlKeyboardKey, &upKeyboardKey, &downKeyboardKey, &leftKeyboardKey, &rightKeyboardKey, &numpad0KeyboardKey, &numpadCommaKeyboardKey, &numpadEnterKeyboardKey};
 static KeyboardKey *selectedKey = &kKeyboardKey;
 
-static int axisOffset = 0, buttonOffset = 0, indicatorsBottom = 0, indicatorsRight = 0, numMixtureLevers = 0, numPropLevers = 0, keyboardBottom = 0, keyboardRight = 0, keyPressActive = 0, lastCinemaVerite = 0, thrustReverserMode = 0, showIndicators = 1, switchTo3DCommandLook = 0;
+static int numMixtureLevers = 0, numPropLevers = 0, keyPressActive = 0, lastCinemaVerite = 0, thrustReverserMode = 0, switchTo3DCommandLook = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
-static ControllerType controllerType = XBOX360;
+static Settings settings = {XBOX360, 0, 0, 1, 0, 0, 0, 0};
 static Mode mode = DEFAULT;
 static ConfigurationStep configurationStep = START;
 static GLuint indicatorsProgram = 0, indicatorsFragmentShader = 0, keyboardKeyProgram = 0, keyboardKeyFragmentShader = 0;
@@ -932,9 +805,6 @@ static int *pushedJoystickButtonAssignments = NULL;
 static XPLMWindowID indicatorsWindow = NULL, keyboardWindow = NULL;
 
 #if IBM
-static HINSTANCE hGetProcIDDLL = NULL;
-typedef int(__stdcall *pICFUNC)(int, XInputState &);
-pICFUNC XInputGetStateEx = NULL;
 static HANDLE hidDeviceThread = 0;
 #elif APL
 static pthread_t hidDeviceThread = 0;
@@ -953,11 +823,132 @@ static XPWidgetID settingsWidget = NULL, dualShock4ControllerRadioButton = NULL,
 
 PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 {
-#if IBM
-    hGetProcIDDLL = LoadLibrary("XInput1_3.dll");
-    FARPROC lpfnGetProcessID = GetProcAddress(HMODULE(hGetProcIDDLL), (LPCSTR)100);
-    XInputGetStateEx = pICFUNC(lpfnGetProcessID);
-#endif
+    escapeKeyboardKey = InitKeyboardKey("Esc", KEY_CODE_ESCAPE, 1.0f, LEFT_END);
+    f1KeyboardKey = InitKeyboardKey("F1", KEY_CODE_F1, 1.0f, BETWEEN);
+    f2KeyboardKey = InitKeyboardKey("F2", KEY_CODE_F2, 1.0f, BETWEEN);
+    f3KeyboardKey = InitKeyboardKey("F3", KEY_CODE_F3, 1.0f, BETWEEN);
+    f4KeyboardKey = InitKeyboardKey("F4", KEY_CODE_F4, 1.0f, BETWEEN);
+    f5KeyboardKey = InitKeyboardKey("F5", KEY_CODE_F5, 1.0f, BETWEEN);
+    f6KeyboardKey = InitKeyboardKey("F6", KEY_CODE_F6, 1.0f, BETWEEN);
+    f7KeyboardKey = InitKeyboardKey("F7", KEY_CODE_F7, 1.0f, BETWEEN);
+    f8KeyboardKey = InitKeyboardKey("F8", KEY_CODE_F8, 1.0f, BETWEEN);
+    f9KeyboardKey = InitKeyboardKey("F9", KEY_CODE_F9, 1.0f, BETWEEN);
+    f10KeyboardKey = InitKeyboardKey("F10", KEY_CODE_F10, 1.0f, BETWEEN);
+    f11KeyboardKey = InitKeyboardKey("F11", KEY_CODE_F11, 1.0f, BETWEEN);
+    f12KeyboardKey = InitKeyboardKey("F12", KEY_CODE_F12, 1.0f, BETWEEN);
+    #if APL
+    sysRqKeyboardKey = InitKeyboardKey("F13", KEY_CODE_SYSRQ, 1.0f, BETWEEN);
+    scrollKeyboardKey = InitKeyboardKey("F14", KEY_CODE_SCROLL, 1.0f, BETWEEN);
+    pauseKeyboardKey = InitKeyboardKey("F15", KEY_CODE_PAUSE, 1.0f, BETWEEN);
+    insertKeyboardKey = InitKeyboardKey("fn", KEY_CODE_INSERT, 0.88f, BETWEEN);
+    #else
+    sysRqKeyboardKey = InitKeyboardKey("SysRq", KEY_CODE_SYSRQ, 1.0f, BETWEEN);
+    scrollKeyboardKey = InitKeyboardKey("Scroll", KEY_CODE_SCROLL, 1.0f, BETWEEN);
+    pauseKeyboardKey = InitKeyboardKey("Pause", KEY_CODE_PAUSE, 1.0f, BETWEEN);
+    insertKeyboardKey = InitKeyboardKey("Ins", KEY_CODE_INSERT, 0.88f, BETWEEN);
+    #endif
+    deleteKeyboardKey = InitKeyboardKey("Del", KEY_CODE_DELETE, 0.88f, BETWEEN);
+    homeKeyboardKey = InitKeyboardKey("Home", KEY_CODE_HOME, 0.88f, BETWEEN);
+    endKeyboardKey = InitKeyboardKey("End", KEY_CODE_END, 0.88f, RIGHT_END);
+    graveKeyboardKey = InitKeyboardKey("`", KEY_CODE_GRAVE, 1.0f, LEFT_END);
+    d1KeyboardKey = InitKeyboardKey("1", KEY_CODE_1, 1.0f, BETWEEN);
+    d2KeyboardKey = InitKeyboardKey("2", KEY_CODE_2, 1.0f, BETWEEN);
+    d3KeyboardKey = InitKeyboardKey("3", KEY_CODE_3, 1.0f, BETWEEN);
+    d4KeyboardKey = InitKeyboardKey("4", KEY_CODE_4, 1.0f, BETWEEN);
+    d5KeyboardKey = InitKeyboardKey("5", KEY_CODE_5, 1.0f, BETWEEN);
+    d6KeyboardKey = InitKeyboardKey("6", KEY_CODE_6, 1.0f, BETWEEN);
+    d7KeyboardKey = InitKeyboardKey("7", KEY_CODE_7, 1.0f, BETWEEN);
+    d8KeyboardKey = InitKeyboardKey("8", KEY_CODE_8, 1.0f, BETWEEN);
+    d9KeyboardKey = InitKeyboardKey("9", KEY_CODE_9, 1.0f, BETWEEN);
+    d0KeyboardKey = InitKeyboardKey("0", KEY_CODE_0, 1.0f, BETWEEN);
+    minusKeyboardKey = InitKeyboardKey("-", KEY_CODE_MINUS, 1.0f, BETWEEN);
+    equalsKeyboardKey = InitKeyboardKey("=", KEY_CODE_EQUALS, 1.0f, BETWEEN);
+    backKeyboardKey = InitKeyboardKey("Back", KEY_CODE_BACK, 2.5f, BETWEEN);
+    #if APL
+    numLockKeyboardKey = InitKeyboardKey("Clear", KEY_CODE_NUMLOCK, 1.0f, BETWEEN);
+    #else
+    numLockKeyboardKey = InitKeyboardKey("NumLk", KEY_CODE_NUMLOCK, 1.0f, BETWEEN);
+    #endif
+    divideKeyboardKey = InitKeyboardKey("/", KEY_CODE_DIVIDE, 1.0f, BETWEEN);
+    multiplyKeyboardKey = InitKeyboardKey("*", KEY_CODE_MULTIPLY, 1.0f, BETWEEN);
+    subtractKeyboardKey = InitKeyboardKey("-", KEY_CODE_SUBTRACT, 1.0f, RIGHT_END);
+    tabKeyboardKey = InitKeyboardKey("Tab", KEY_CODE_TAB, 1.5f, LEFT_END);
+    qKeyboardKey = InitKeyboardKey("Q", KEY_CODE_Q, 1.0f, BETWEEN);
+    wKeyboardKey = InitKeyboardKey("W", KEY_CODE_W, 1.0f, BETWEEN);
+    eKeyboardKey = InitKeyboardKey("E", KEY_CODE_E, 1.0f, BETWEEN);
+    rKeyboardKey = InitKeyboardKey("R", KEY_CODE_R, 1.0f, BETWEEN);
+    tKeyboardKey = InitKeyboardKey("T", KEY_CODE_T, 1.0f, BETWEEN);
+    yKeyboardKey = InitKeyboardKey("Y", KEY_CODE_Y, 1.0f, BETWEEN);
+    uKeyboardKey = InitKeyboardKey("U", KEY_CODE_U, 1.0f, BETWEEN);
+    iKeyboardKey = InitKeyboardKey("I", KEY_CODE_I, 1.0f, BETWEEN);
+    oKeyboardKey = InitKeyboardKey("O", KEY_CODE_O, 1.0f, BETWEEN);
+    pKeyboardKey = InitKeyboardKey("P", KEY_CODE_P, 1.0f, BETWEEN);
+    leftBracketKeyboardKey = InitKeyboardKey("[", KEY_CODE_LBRACKET, 1.0f, BETWEEN);
+    rightBracketKeyboardKey = InitKeyboardKey("]", KEY_CODE_RBRACKET, 1.0f, BETWEEN);
+    backslashKeyboardKey = InitKeyboardKey("\\", KEY_CODE_BACKSLASH, 2.0f, BETWEEN);
+    numpad7KeyboardKey = InitKeyboardKey("7", KEY_CODE_NUMPAD7, 1.0f, BETWEEN);
+    numpad8KeyboardKey = InitKeyboardKey("8", KEY_CODE_NUMPAD8, 1.0f, BETWEEN);
+    numpad9KeyboardKey = InitKeyboardKey("9", KEY_CODE_NUMPAD9, 1.0f, BETWEEN);
+    addKeyboardKey = InitKeyboardKey("+", KEY_CODE_ADD, 1.0f, RIGHT_END);
+    captialKeyboardKey = InitKeyboardKey("Caps Lock", KEY_CODE_CAPITAL, 2.0f, LEFT_END);
+    aKeyboardKey = InitKeyboardKey("A", KEY_CODE_A, 1.0f, BETWEEN);
+    sKeyboardKey = InitKeyboardKey("S", KEY_CODE_S, 1.0f, BETWEEN);
+    dKeyboardKey = InitKeyboardKey("D", KEY_CODE_D, 1.0f, BETWEEN);
+    fKeyboardKey = InitKeyboardKey("F", KEY_CODE_F, 1.0f, BETWEEN);
+    gKeyboardKey = InitKeyboardKey("G", KEY_CODE_G, 1.0f, BETWEEN);
+    hKeyboardKey = InitKeyboardKey("H", KEY_CODE_H, 1.0f, BETWEEN);
+    jKeyboardKey = InitKeyboardKey("J", KEY_CODE_J, 1.0f, BETWEEN);
+    kKeyboardKey = InitKeyboardKey("K", KEY_CODE_K, 1.0f, BETWEEN);
+    lKeyboardKey = InitKeyboardKey("L", KEY_CODE_L, 1.0f, BETWEEN);
+    semicolonKeyboardKey = InitKeyboardKey(";", KEY_CODE_SEMICOLON, 1.0f, BETWEEN);
+    apostropheKeyboardKey = InitKeyboardKey("'", KEY_CODE_APOSTROPHE, 1.0f, BETWEEN);
+    returnKeyboardKey = InitKeyboardKey("Return", KEY_CODE_RETURN, 2.5f, BETWEEN);
+    numpad4KeyboardKey = InitKeyboardKey("4", KEY_CODE_NUMPAD4, 1.0f, BETWEEN);
+    numpad5KeyboardKey = InitKeyboardKey("5", KEY_CODE_NUMPAD5, 1.0f, BETWEEN);
+    numpad6KeyboardKey = InitKeyboardKey("6", KEY_CODE_NUMPAD6, 1.0f, BETWEEN);
+    pageUpKeyboardKey = InitKeyboardKey("PgUp", KEY_CODE_PRIOR, 1.0f, RIGHT_END);
+    leftShiftKeyboardKey = InitKeyboardKey("Shift", KEY_CODE_LSHIFT, 2.5f, LEFT_END);
+    zKeyboardKey = InitKeyboardKey("Z", KEY_CODE_Z, 1.0f, BETWEEN);
+    xKeyboardKey = InitKeyboardKey("X", KEY_CODE_X, 1.0f, BETWEEN);
+    cKeyboardKey = InitKeyboardKey("C", KEY_CODE_C, 1.0f, BETWEEN);
+    vKeyboardKey = InitKeyboardKey("V", KEY_CODE_V, 1.0f, BETWEEN);
+    bKeyboardKey = InitKeyboardKey("B", KEY_CODE_B, 1.0f, BETWEEN);
+    nKeyboardKey = InitKeyboardKey("N", KEY_CODE_N, 1.0f, BETWEEN);
+    mKeyboardKey = InitKeyboardKey("M", KEY_CODE_M, 1.0f, BETWEEN);
+    commaKeyboardKey = InitKeyboardKey(",", KEY_CODE_COMMA, 1.0f, BETWEEN);
+    periodKeyboardKey = InitKeyboardKey(".", KEY_CODE_PERIOD, 1.0f, BETWEEN);
+    slashKeyboardKey = InitKeyboardKey("/", KEY_CODE_SLASH, 1.0f, BETWEEN);
+    rightShiftKeyboardKey = InitKeyboardKey("Shift", KEY_CODE_RSHIFT, 3.0f, BETWEEN);
+    numpad1KeyboardKey = InitKeyboardKey("1", KEY_CODE_NUMPAD1, 1.0f, BETWEEN);
+    numpad2KeyboardKey = InitKeyboardKey("2", KEY_CODE_NUMPAD2, 1.0f, BETWEEN);
+    numpad3KeyboardKey = InitKeyboardKey("3", KEY_CODE_NUMPAD3, 1.0f, BETWEEN);
+    pageDownKeyboardKey = InitKeyboardKey("PgDn", KEY_CODE_NEXT, 1.0f, RIGHT_END);
+    leftControlKeyboardKey = InitKeyboardKey("Ctrl", KEY_CODE_LCONTROl, 1.0f, LEFT_END);
+    #if APL
+    leftWindowsKeyboardKey = InitKeyboardKey("CMD", KEY_CODE_LWIN, 1.0f, BETWEEN);
+    leftAltKeyboardKey = InitKeyboardKey("Opt", KEY_CODE_LMENU, 1.0f, BETWEEN);
+    #else
+    leftWindowsKeyboardKey = InitKeyboardKey("Win", KEY_CODE_LWIN, 1.0f, BETWEEN);
+    leftAltKeyboardKey = InitKeyboardKey("Alt", KEY_CODE_LMENU, 1.0f, BETWEEN);
+    #endif
+    spaceKeyboardKey = InitKeyboardKey("Space", KEY_CODE_SPACE, 4.5f, BETWEEN);
+    #if APL
+    rightAltKeyboardKey = InitKeyboardKey("Opt", KEY_CODE_RMENU, 1.0f, BETWEEN);
+    rightWindowsKeyboardKey = InitKeyboardKey("CMD", KEY_CODE_RWIN, 1.0f, BETWEEN);
+    appsKeyboardKey = InitKeyboardKey("Num =", KEY_CODE_APPS, 1.0f, BETWEEN);
+    #else
+    rightAltKeyboardKey = InitKeyboardKey("Alt", KEY_CODE_RMENU, 1.0f, BETWEEN);
+    rightWindowsKeyboardKey = InitKeyboardKey("Win", KEY_CODE_RWIN, 1.0f, BETWEEN);
+    appsKeyboardKey = InitKeyboardKey("Menu", KEY_CODE_APPS, 1.0f, BETWEEN);
+    #endif
+    rightControlKeyboardKey = InitKeyboardKey("Ctrl", KEY_CODE_RCONTROL, 1.0f, BETWEEN);
+    upKeyboardKey = InitKeyboardKey("Up", KEY_CODE_UP, 1.0f, BETWEEN);
+    downKeyboardKey = InitKeyboardKey("Down", KEY_CODE_DOWN, 1.0f, BETWEEN);
+    leftKeyboardKey = InitKeyboardKey("Left", KEY_CODE_LEFT, 1.0f, BETWEEN);
+    rightKeyboardKey = InitKeyboardKey("Right", KEY_CODE_RIGHT, 1.0f, BETWEEN);
+    numpad0KeyboardKey = InitKeyboardKey("0", KEY_CODE_NUMPAD0, 2.0f, BETWEEN);
+    numpadCommaKeyboardKey = InitKeyboardKey(",", KEY_CODE_NUMPADCOMMA, 1.0f, BETWEEN);
+    numpadEnterKeyboardKey = InitKeyboardKey("Enter", KEY_CODE_NUMPADENTER, 1.0f, RIGHT_END);
 
     // set plugin info
     strcpy(outName, NAME);
@@ -1079,26 +1070,31 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     // initialize indicator default position
     int right = 0, bottom = 0;
     XPLMGetScreenBoundsGlobal(NULL, NULL, &right, &bottom);
-    indicatorsRight = right;
-    indicatorsBottom = bottom;
+    settings.indicatorsRight = right;
+    settings.indicatorsBottom = bottom;
 
     // initialize keyboard default position
-    keyboardRight = right / 2 + GetKeyboardWidth() / 2;
-    keyboardBottom = bottom;
+    settings.keyboardRight = right / 2 + GetKeyboardWidth() / 2;
+    settings.keyboardBottom = bottom;
 
     WireKeys();
 
     // read and apply config file
-    LoadSettings();
+    FILE *file = fopen(CONFIG_PATH, "r");
+    if (file)
+    {
+        fread(&settings, sizeof(Settings), 1, file);
+        fclose(file);
+    }
 
-    // acquire toe brake control
-    XPLMSetDatai(overrideToeBrakesDataRef, 1);
+    // acquire toe brake control if required
+    UpdateToeBrakeControl();
 
     // register flight loop callbacks
     XPLMRegisterFlightLoopCallback(FlightLoopCallback, -1, NULL);
 
     // initialize indicators window if necessary
-    UpdateIndicatorsWindow();
+    UpdateIndicatorsWindow(-1);
 
     // create menu-entries
     int menuContainerIndex = XPLMAppendMenuItem(XPLMFindPluginsMenu(), NAME, 0, 0);
@@ -1107,7 +1103,7 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
 
 #if LIN
     display = XOpenDisplay(NULL);
-    if (display != NULL)
+    if (display)
     {
         XEvent event;
         XQueryPointer(display, RootWindow(display, DefaultScreen(display)), &event.xbutton.root, &event.xbutton.window, &event.xbutton.x_root, &event.xbutton.y_root, &event.xbutton.x, &event.xbutton.y, &event.xbutton.state);
@@ -1157,11 +1153,6 @@ PLUGIN_API void XPluginStop(void)
     // release toe brake control
     XPLMSetDatai(overrideToeBrakesDataRef, 0);
 
-#if IBM
-    if (hGetProcIDDLL != NULL)
-        FreeLibrary(hGetProcIDDLL);
-#endif
-
 #if !LIN
     hidDeviceThreadRun = 0;
     if (hidDeviceThread != 0)
@@ -1172,7 +1163,7 @@ PLUGIN_API void XPluginStop(void)
 #endif
     hid_exit();
 #else
-    if (display != NULL)
+    if (display)
         XCloseDisplay(display);
 #endif
 }
@@ -1202,7 +1193,7 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
         thrustReverserMode = 0;
 
         // reinitialize indicators window if necessary
-        UpdateIndicatorsWindow();
+        UpdateIndicatorsWindow(-1);
 
     case XPLM_MSG_AIRPORT_LOADED:
         // schedule a switch to the 3D cockpit view during the next flight loop
@@ -1213,12 +1204,13 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
 
     case XPLM_MSG_ENTERED_VR:
     case XPLM_MSG_EXITING_VR:
+    {
         const int vrEnabled = inMessage == XPLM_MSG_ENTERED_VR;
 
         UpdateIndicatorsWindow(vrEnabled);
 
         // always destroy the keyboard window
-        if (keyboardWindow != NULL)
+        if (keyboardWindow)
         {
             XPLMDestroyWindow(keyboardWindow);
             keyboardWindow = NULL;
@@ -1233,23 +1225,24 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, long inMessage, vo
         }
         break;
     }
+    }
 }
 
 static int AxisIndex(int abstractAxisIndex)
 {
-    switch (controllerType)
+    switch (settings.controllerType)
     {
     case XBOX360:
         switch (abstractAxisIndex)
         {
         case JOYSTICK_AXIS_ABSTRACT_LEFT_X:
-            return JOYSTICK_AXIS_XBOX360_LEFT_X + axisOffset;
+            return JOYSTICK_AXIS_XBOX360_LEFT_X + settings.axisOffset;
         case JOYSTICK_AXIS_ABSTRACT_LEFT_Y:
-            return JOYSTICK_AXIS_XBOX360_LEFT_Y + axisOffset;
+            return JOYSTICK_AXIS_XBOX360_LEFT_Y + settings.axisOffset;
         case JOYSTICK_AXIS_ABSTRACT_RIGHT_X:
-            return JOYSTICK_AXIS_XBOX360_RIGHT_X + axisOffset;
+            return JOYSTICK_AXIS_XBOX360_RIGHT_X + settings.axisOffset;
         case JOYSTICK_AXIS_ABSTRACT_RIGHT_Y:
-            return JOYSTICK_AXIS_XBOX360_RIGHT_Y + axisOffset;
+            return JOYSTICK_AXIS_XBOX360_RIGHT_Y + settings.axisOffset;
         default:
             return -1;
         }
@@ -1258,13 +1251,13 @@ static int AxisIndex(int abstractAxisIndex)
         switch (abstractAxisIndex)
         {
         case JOYSTICK_AXIS_ABSTRACT_LEFT_X:
-            return JOYSTICK_AXIS_DS4_LEFT_X + axisOffset;
+            return JOYSTICK_AXIS_DS4_LEFT_X + settings.axisOffset;
         case JOYSTICK_AXIS_ABSTRACT_LEFT_Y:
-            return JOYSTICK_AXIS_DS4_LEFT_Y + axisOffset;
+            return JOYSTICK_AXIS_DS4_LEFT_Y + settings.axisOffset;
         case JOYSTICK_AXIS_ABSTRACT_RIGHT_X:
-            return JOYSTICK_AXIS_DS4_RIGHT_X + axisOffset;
+            return JOYSTICK_AXIS_DS4_RIGHT_X + settings.axisOffset;
         case JOYSTICK_AXIS_ABSTRACT_RIGHT_Y:
-            return JOYSTICK_AXIS_DS4_RIGHT_Y + axisOffset;
+            return JOYSTICK_AXIS_DS4_RIGHT_Y + settings.axisOffset;
         default:
             return -1;
         }
@@ -1276,39 +1269,39 @@ static int AxisIndex(int abstractAxisIndex)
 
 static int ButtonIndex(int abstractButtonIndex)
 {
-    switch (controllerType)
+    switch (settings.controllerType)
     {
     case XBOX360:
         switch (abstractButtonIndex)
         {
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_DPAD_LEFT + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_DPAD_LEFT + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_DPAD_RIGHT + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_DPAD_RIGHT + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_UP:
-            return JOYSTICK_BUTTON_XBOX360_DPAD_UP + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_DPAD_UP + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN:
-            return JOYSTICK_BUTTON_XBOX360_DPAD_DOWN + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_DPAD_DOWN + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_X + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_X + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_B + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_B + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_FACE_UP:
-            return JOYSTICK_BUTTON_XBOX360_Y + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_Y + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN:
-            return JOYSTICK_BUTTON_XBOX360_A + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_A + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_BACK + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_BACK + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_START + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_START + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_LEFT_BUMPER + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_LEFT_BUMPER + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_RIGHT_BUMPER + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_RIGHT_BUMPER + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT:
-            return JOYSTICK_BUTTON_XBOX360_LEFT_STICK + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_LEFT_STICK + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT:
-            return JOYSTICK_BUTTON_XBOX360_RIGHT_STICK + buttonOffset;
+            return JOYSTICK_BUTTON_XBOX360_RIGHT_STICK + settings.buttonOffset;
         default:
             return -1;
         }
@@ -1317,41 +1310,41 @@ static int ButtonIndex(int abstractButtonIndex)
         switch (abstractButtonIndex)
         {
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT:
-            return JOYSTICK_BUTTON_DS4_DPAD_LEFT + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_DPAD_LEFT + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT:
-            return JOYSTICK_BUTTON_DS4_DPAD_RIGHT + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_DPAD_RIGHT + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_UP:
-            return JOYSTICK_BUTTON_DS4_DPAD_UP + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_DPAD_UP + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN:
-            return JOYSTICK_BUTTON_DS4_DPAD_DOWN + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_DPAD_DOWN + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_UP:
-            return JOYSTICK_BUTTON_DS4_DPAD_LEFT_UP + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_DPAD_LEFT_UP + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_DOWN:
-            return JOYSTICK_BUTTON_DS4_DPAD_LEFT_DOWN + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_DPAD_LEFT_DOWN + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_UP:
-            return JOYSTICK_BUTTON_DS4_DPAD_RIGHT_UP + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_DPAD_RIGHT_UP + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_DOWN:
-            return JOYSTICK_BUTTON_DS4_DPAD_RIGHT_DOWN + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_DPAD_RIGHT_DOWN + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT:
-            return JOYSTICK_BUTTON_DS4_SQUARE + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_SQUARE + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT:
-            return JOYSTICK_BUTTON_DS4_CIRCLE + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_CIRCLE + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_FACE_UP:
-            return JOYSTICK_BUTTON_DS4_TRIANGLE + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_TRIANGLE + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN:
-            return JOYSTICK_BUTTON_DS4_CROSS + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_CROSS + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT:
-            return JOYSTICK_BUTTON_DS4_SHARE + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_SHARE + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT:
-            return JOYSTICK_BUTTON_DS4_OPTIONS + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_OPTIONS + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT:
-            return JOYSTICK_BUTTON_DS4_L1 + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_L1 + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT:
-            return JOYSTICK_BUTTON_DS4_R1 + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_R1 + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT:
-            return JOYSTICK_BUTTON_DS4_L3 + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_L3 + settings.buttonOffset;
         case JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT:
-            return JOYSTICK_BUTTON_DS4_R3 + buttonOffset;
+            return JOYSTICK_BUTTON_DS4_R3 + settings.buttonOffset;
         default:
             return -1;
         }
@@ -1363,19 +1356,19 @@ static int ButtonIndex(int abstractButtonIndex)
 
 #if !LIN
 // hid device thread cleanup function
-static void CleanupDeviceThread(hid_device *handle, hid_device_info *dev)
+static void CleanupDeviceThread(hid_device *handle, struct hid_device_info *dev)
 {
-    if (handle != NULL)
+    if (handle)
         hid_close(handle);
 
-    if (dev != NULL)
+    if (dev)
         free(dev);
 
     hidDeviceThread = 0;
 }
 #endif
 
-static void CleanupShader(GLuint program, GLuint fragmentShader, int deleteProgram = 0)
+static void CleanupShader(GLuint program, GLuint fragmentShader, int deleteProgram)
 {
     glDetachShader(program, fragmentShader);
     glDeleteShader(fragmentShader);
@@ -1435,7 +1428,7 @@ static void DeviceThread(void *argument)
 static void *DeviceThread(void *argument)
 #endif
 {
-    struct hid_device_info *dev = (hid_device_info *)argument;
+    struct hid_device_info *dev = (struct hid_device_info *)argument;
     hid_device *handle = hid_open(dev->vendor_id, dev->product_id, dev->serial_number);
     if (handle == NULL)
     {
@@ -1474,12 +1467,12 @@ static void *DeviceThread(void *argument)
         if (touchpadButtonDown && !prevTouchpadButtonDown)
         {
             MouseButton button = down2 ? RIGHT : LEFT;
-            ToggleMouseButton(button, 1);
+            ToggleMouseButton(button, 1, NULL);
         }
         else if (!touchpadButtonDown && prevTouchpadButtonDown)
         {
-            ToggleMouseButton(LEFT, 0);
-            ToggleMouseButton(RIGHT, 0);
+            ToggleMouseButton(LEFT, 0, NULL);
+            ToggleMouseButton(RIGHT, 0, NULL);
         }
 
         if (down1 && !prevDown1)
@@ -1498,12 +1491,12 @@ static void *DeviceThread(void *argument)
             if (prevY1 > 0 && abs(dY1) < TOUCHPAD_MAX_DELTA)
                 distY = (int)(dY1 * TOUCHPAD_CURSOR_SENSITIVITY);
 
-            MoveMousePointer(distX, distY);
+            MoveMousePointer(distX, distY, NULL);
         }
         else if (prevY1 > 0 && abs(dY1) < TOUCHPAD_MAX_DELTA)
             scrollClicks = (int)(-dY1 * TOUCHPAD_SCROLL_SENSITIVITY);
 
-        Scroll(scrollClicks);
+        Scroll(scrollClicks, NULL);
 
         prevTouchpadButtonDown = touchpadButtonDown;
         prevDown1 = down1;
@@ -1685,7 +1678,7 @@ static void EndKeyboardMode(void)
     // restore the default button assignments
     PopButtonAssignments();
 
-    if (keyboardWindow != NULL)
+    if (keyboardWindow)
         XPLMSetWindowIsVisible(keyboardWindow, 0);
 
     mode = DEFAULT;
@@ -1767,11 +1760,11 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         ptr++;
     }
 
-    if (showIndicators && !XPLMGetWindowIsVisible(indicatorsWindow))
+    if (settings.showIndicators && !XPLMGetWindowIsVisible(indicatorsWindow))
     {
         // showIndicators is enabled but the indicators window is not visible (this can happen in VR if the user presses the close button)
-        showIndicators = 0;
-        XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, showIndicators);
+        settings.showIndicators = 0;
+        XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, settings.showIndicators);
     }
 
     if (XPLMGetWindowIsVisible(keyboardWindow))
@@ -1813,28 +1806,59 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
     if (XPLMGetDatai(hasJoystickDataRef))
     {
 #if IBM
-        static int guideButtonDown = 0;
-
-        if (controllerType == XBOX360 && XInputGetStateEx != NULL)
+        if (settings.controllerType == XBOX360)
         {
-            XInputState state;
-            XInputGetStateEx(0, state);
+            XINPUT_STATE xinputState;
+            XInputGetState(0, &xinputState);
 
-            if (!guideButtonDown && state.guideButton)
+            static int prevLeftTriggerDown = 0, prevRightTriggerDown = 0;
+            const int leftTriggerDown = xinputState.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
+            const int rightTriggerDown = xinputState.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
+
+            float leftBrakeRatio = 0.0f, rightBrakeRatio = 0.0f;
+
+            if (mode == LOOK)
             {
-                guideButtonDown = 1;
+                if (leftTriggerDown && !prevLeftTriggerDown)
+                    XPLMCommandBegin(pushToTalkCommand);
+                else if (!leftTriggerDown && prevLeftTriggerDown)
+                    XPLMCommandEnd(pushToTalkCommand);
+
+                if (rightTriggerDown && !prevRightTriggerDown)
+                    XPLMCommandBegin(cwsOrDisconnectAutopilotCommand);
+                else if (!rightTriggerDown && prevRightTriggerDown)
+                    XPLMCommandEnd(cwsOrDisconnectAutopilotCommand);
+            }
+            else
+            {
+                leftBrakeRatio = leftTriggerDown ? Normalize((float) xinputState.Gamepad.bLeftTrigger, (float) XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255.0f, 0.0f, 1.0f) : 0.0f;
+                rightBrakeRatio = rightTriggerDown ? Normalize((float) xinputState.Gamepad.bRightTrigger, (float) XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255.0f, 0.0f, 1.0f) : 0.0f;
+            }
+
+            XPLMSetDataf(leftBrakeRatioDataRef, leftBrakeRatio);
+            XPLMSetDataf(rightBrakeRatioDataRef, rightBrakeRatio);
+
+            prevLeftTriggerDown = leftTriggerDown;
+            prevRightTriggerDown = rightTriggerDown;
+
+            static int prevGuideButtonDown = 0;
+            const int guideButtonDown = xinputState.Gamepad.wButtons & 0x400;
+
+            if (!prevGuideButtonDown && guideButtonDown)
+            {
+                prevGuideButtonDown = 1;
                 XPLMCommandBegin(toggleMousePointerControlCommand);
             }
-            else if (guideButtonDown && !state.guideButton)
+            else if (prevGuideButtonDown && !guideButtonDown)
             {
-                guideButtonDown = 0;
+                prevGuideButtonDown = 0;
                 XPLMCommandEnd(toggleMousePointerControlCommand);
             }
         }
 #endif
 
 #if !LIN
-        if (controllerType == DS4)
+        if (settings.controllerType == DS4)
         {
             static float lastEnumerationTime = 0.0f;
             if (hidDeviceThread == 0 && currentTime - lastEnumerationTime >= 5.0f)
@@ -1849,17 +1873,17 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     struct hid_device_info *devs = hid_enumerate(0x0, 0x0);
                     struct hid_device_info *currentDev = devs;
 
-                    while (currentDev != NULL)
+                    while (currentDev)
                     {
                         if (currentDev->vendor_id == 0x54C && (currentDev->product_id == 0x5C4 || currentDev->product_id == 0x9CC || currentDev->product_id == 0xBA0))
                         {
-                            struct hid_device_info *currentDevCopy = (hid_device_info *)calloc(1, sizeof(hid_device_info));
+                            struct hid_device_info *currentDevCopy = (struct hid_device_info *)calloc(1, sizeof(struct hid_device_info));
                             currentDevCopy->vendor_id = currentDev->vendor_id;
                             currentDevCopy->product_id = currentDev->product_id;
 
 #if IBM
                             HANDLE threadHandle = (HANDLE)_beginthread(DeviceThread, 0, currentDevCopy);
-                            if (threadHandle != NULL)
+                            if (threadHandle)
                             {
                                 hidDeviceThread = threadHandle;
                                 break;
@@ -1900,7 +1924,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     potentialAxes[i] = 1;
                 else if (potentialAxes[i])
                 {
-                    axisOffset = i - (controllerType == XBOX360 ? JOYSTICK_AXIS_XBOX360_RIGHT_Y : JOYSTICK_AXIS_DS4_RIGHT_Y);
+                    settings.axisOffset = i - (settings.controllerType == XBOX360 ? JOYSTICK_AXIS_XBOX360_RIGHT_Y : JOYSTICK_AXIS_DS4_RIGHT_Y);
                     memset(potentialAxes, 0, sizeof potentialAxes);
                     configurationStep = BUTTONS;
                     UpdateSettingsWidgets();
@@ -1916,7 +1940,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
                     potentialButtons[i] = 1;
                 else if (potentialButtons[i])
                 {
-                    buttonOffset = i - (XBOX360 ? JOYSTICK_BUTTON_XBOX360_X : JOYSTICK_BUTTON_DS4_CROSS);
+                    settings.buttonOffset = i - (XBOX360 ? JOYSTICK_BUTTON_XBOX360_X : JOYSTICK_BUTTON_DS4_CROSS);
                     SetDefaultAssignments();
                     SaveSettings();
                     memset(potentialButtons, 0, sizeof potentialButtons);
@@ -1961,87 +1985,6 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         if (joystickAxisLeftXCalibrated)
         {
             const int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
-
-            // handle brakes
-            float leftBrakeRatio = 0.0f, rightBrakeRatio = 0.0f;
-
-            if (
-#if IBM
-                (controllerType == XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= -0.75f) ||
-#else
-                (controllerType == XBOX360 && joystickAxisValues[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + axisOffset] >= 0.5f) ||
-#endif
-                (controllerType == DS4 && joystickAxisValues[JOYSTICK_AXIS_DS4_R2 + axisOffset] >= 0.5f))
-            {
-                switch (controllerType)
-                {
-                case XBOX360:
-#if IBM
-                    leftBrakeRatio = rightBrakeRatio = Normalize(joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset], -0.75f, -1.0f, 0.0f, 1.0f);
-#else
-                    leftBrakeRatio = rightBrakeRatio = Normalize(joystickAxisValues[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + axisOffset], 0.5f, 1.0f, 0.0f, 1.0f);
-#endif
-                    break;
-                case DS4:
-                    leftBrakeRatio = rightBrakeRatio = Normalize(joystickAxisValues[JOYSTICK_AXIS_DS4_R2 + axisOffset], 0.5f, 1.0f, 0.0f, 1.0f);
-                    break;
-                }
-
-                if (mode == DEFAULT)
-                {
-                    // handle only left brake
-                    if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] <= 0.3f)
-                        rightBrakeRatio = 0.0f;
-                    // handle only right brake
-                    else if (joystickAxisValues[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] >= 0.7f)
-                        leftBrakeRatio = 0.0f;
-                }
-            }
-            XPLMSetDataf(leftBrakeRatioDataRef, leftBrakeRatio);
-            XPLMSetDataf(rightBrakeRatioDataRef, rightBrakeRatio);
-
-            if (controllerType == XBOX360)
-            {
-#if IBM
-                static int leftTriggerDown = 0, rightTriggerDown = 0;
-
-                if (!leftTriggerDown && !rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] >= 0.85f)
-                {
-                    leftTriggerDown = 1;
-                    if (mode == LOOK)
-                        XPLMCommandBegin(pushToTalkCommand);
-                    else
-                        XPLMCommandBegin(cwsOrDisconnectAutopilotCommand);
-                }
-                else if (!leftTriggerDown && !rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] <= 0.15f)
-                    rightTriggerDown = 1;
-                else if (leftTriggerDown && !rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] < 0.85f)
-                {
-                    leftTriggerDown = 0;
-                    if (mode == LOOK)
-                        XPLMCommandEnd(pushToTalkCommand);
-                    else
-                        XPLMCommandEnd(cwsOrDisconnectAutopilotCommand);
-                }
-                else if (!leftTriggerDown && rightTriggerDown && joystickAxisValues[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] > 0.15f)
-                    rightTriggerDown = 0;
-#else
-                if (joystickAxisValues[JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER + axisOffset] >= 0.5f)
-                {
-                    if (mode == LOOK)
-                        XPLMCommandBegin(pushToTalkCommand);
-                    else
-                        XPLMCommandBegin(cwsOrDisconnectAutopilotCommand);
-                }
-                else
-                {
-                    if (mode == LOOK)
-                        XPLMCommandEnd(pushToTalkCommand);
-                    else
-                        XPLMCommandEnd(cwsOrDisconnectAutopilotCommand);
-                }
-#endif
-            }
 
             if (mode == LOOK)
             {
@@ -2299,7 +2242,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
 #if LIN
                     MoveMousePointer(distX, distY, display);
 #else
-                    MoveMousePointer(distX, distY);
+                    MoveMousePointer(distX, distY, NULL);
 #endif
                 }
                 else
@@ -2441,7 +2384,7 @@ static float GetThrottleRatio(XPLMDataRef fallbackThrottleRatioDataRef)
     float throttRatio;
 
     const XPLMDataRef airbusThrottleInputDataRef = XPLMFindDataRef("AirbusFBW/throttle_input");
-    if (airbusThrottleInputDataRef != NULL)
+    if (airbusThrottleInputDataRef)
         XPLMGetDatavf(airbusThrottleInputDataRef, &throttRatio, 4, 1);
     else
         throttRatio = XPLMGetDataf(fallbackThrottleRatioDataRef);
@@ -2459,7 +2402,7 @@ static XPLMDataRef GetThrottleRatioDataRef(void)
         return throttleRatioAllDataRef;
 }
 
-static int inline GetKeyboardWidth(void)
+inline static int GetKeyboardWidth(void)
 {
     return KEY_BASE_SIZE * 17 + (int)(KEY_BASE_SIZE * 2.5f);
 }
@@ -2503,13 +2446,13 @@ static int HandleMouseClick(XPLMWindowID inWindowID, int x, int y, XPLMMouseStat
             int *right, *bottom;
             if (inWindowID == indicatorsWindow)
             {
-                right = &indicatorsRight;
-                bottom = &indicatorsBottom;
+                right = &settings.indicatorsRight;
+                bottom = &settings.indicatorsBottom;
             }
             else if (inWindowID == keyboardWindow)
             {
-                right = &keyboardRight;
-                bottom = &keyboardBottom;
+                right = &settings.keyboardRight;
+                bottom = &settings.keyboardBottom;
             }
             else
                 return 0;
@@ -2558,7 +2501,7 @@ static void HandleScrollCommand(XPLMCommandPhase phase, int clicks)
 #if LIN
         Scroll(clicks, display);
 #else
-        Scroll(clicks);
+        Scroll(clicks, NULL);
 #endif
         lastScrollTime = currentTime;
     }
@@ -2570,7 +2513,7 @@ static void HandleToggleMouseButtonCommand(XPLMCommandPhase phase, MouseButton b
 #if LIN
         ToggleMouseButton(button, phase == xplm_CommandBegin, display);
 #else
-        ToggleMouseButton(button, phase == xplm_CommandBegin);
+        ToggleMouseButton(button, phase == xplm_CommandBegin, NULL);
 #endif
 }
 
@@ -2583,12 +2526,12 @@ static int Has2DPanel(void)
 
     // search the '.acf' file for a special string which indicates that the aircraft shows the 3D cockpit object in the 2D forward panel view
     FILE *file = fopen(path, "r");
-    if (file != NULL)
+    if (file)
     {
         char temp[512];
-        while (fgets(temp, 512, file) != NULL)
+        while (fgets(temp, 512, file))
         {
-            if ((strstr(temp, ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS)) != NULL)
+            if ((strstr(temp, ACF_STRING_SHOW_COCKPIT_OBJECT_IN_2D_FORWARD_PANEL_VIEWS)))
             {
                 has2DPanel = 0;
                 break;
@@ -2597,7 +2540,6 @@ static int Has2DPanel(void)
 
         fclose(file);
     }
-
     return has2DPanel;
 }
 
@@ -2623,11 +2565,11 @@ static void InitShader(const char *fragmentShaderString, GLuint *program, GLuint
     if (isFragmentShaderCompiled == GL_FALSE)
     {
         GLsizei maxLength = 2048;
-        GLchar *log = new GLchar[maxLength];
+        GLchar *log = calloc(maxLength, sizeof(GLchar));
         glGetShaderInfoLog(*fragmentShader, maxLength, &maxLength, log);
         XPLMDebugString(NAME ": The following error occured while compiling a fragment shader:\n");
         XPLMDebugString(log);
-        delete[] log;
+        free(log);
 
         CleanupShader(*program, *fragmentShader, 1);
 
@@ -2640,11 +2582,11 @@ static void InitShader(const char *fragmentShaderString, GLuint *program, GLuint
     if (isProgramLinked == GL_FALSE)
     {
         GLsizei maxLength = 2048;
-        GLchar *log = new GLchar[maxLength];
+        GLchar *log = calloc(maxLength, sizeof(GLchar));
         glGetShaderInfoLog(*program, maxLength, &maxLength, log);
         XPLMDebugString(NAME ": The following error occured while linking a shader program:\n");
         XPLMDebugString(log);
-        delete[] log;
+        free(log);
 
         CleanupShader(*program, *fragmentShader, 1);
 
@@ -2719,46 +2661,6 @@ static int KeyboardSelectorUpCommand(XPLMCommandRef inCommand, XPLMCommandPhase 
     return 0;
 }
 
-static void LoadSettings(void)
-{
-    std::ifstream file;
-    file.open(CONFIG_PATH);
-
-    if (file.is_open())
-    {
-        std::string line;
-
-        while (getline(file, line))
-        {
-            std::string val = line.substr(line.find("=") + 1);
-            std::istringstream iss(val);
-
-            if (line.find("controllerType") != std::string::npos)
-            {
-                int v = 0;
-                iss >> v;
-                controllerType = (ControllerType)v;
-            }
-            else if (line.find("axisOffset") != std::string::npos)
-                iss >> axisOffset;
-            else if (line.find("buttonOffset") != std::string::npos)
-                iss >> buttonOffset;
-            else if (line.find("showIndicators") != std::string::npos)
-                iss >> showIndicators;
-            else if (line.find("indicatorsRight") != std::string::npos)
-                iss >> indicatorsRight;
-            else if (line.find("indicatorsBottom") != std::string::npos)
-                iss >> indicatorsBottom;
-            else if (line.find("keyboardRight") != std::string::npos)
-                iss >> keyboardRight;
-            else if (line.find("keyboardBottom") != std::string::npos)
-                iss >> keyboardBottom;
-        }
-
-        file.close();
-    }
-}
-
 static int LockKeyboardKeyCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhase, void *inRefcon)
 {
     if (!keyPressActive && inPhase == xplm_CommandBegin)
@@ -2801,6 +2703,13 @@ static int LookModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhas
             joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_YAW;
             joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
 
+            // assign the default controls to the DS4 triggers
+            if (settings.controllerType == DS4)
+            {
+                joystickAxisAssignments[JOYSTICK_AXIS_DS4_L2  + settings.axisOffset] = AXIS_ASSIGNMENT_LEFT_TOE_BRAKE;
+                joystickAxisAssignments[JOYSTICK_AXIS_DS4_R2  + settings.axisOffset] = AXIS_ASSIGNMENT_RIGHT_TOE_BRAKE;
+            }
+
             // restore the default button assignments
             PopButtonAssignments();
 
@@ -2825,18 +2734,21 @@ static int LookModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhas
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/left");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/right");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand("sim/general/up");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("sim/general/down");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/rot_left");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/rot_right");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand("sim/general/forward");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand("sim/general/backward");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (intptr_t)XPLMFindCommand("sim/general/left");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (intptr_t)XPLMFindCommand("sim/general/right");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (intptr_t)XPLMFindCommand("sim/general/up");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (intptr_t)XPLMFindCommand("sim/general/down");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (intptr_t)XPLMFindCommand("sim/general/rot_left");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (intptr_t)XPLMFindCommand("sim/general/rot_right");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (intptr_t)XPLMFindCommand("sim/general/forward");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (intptr_t)XPLMFindCommand("sim/general/backward");
 
-        // assign push-to-talk controls
-        if (controllerType == DS4)
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand(PUSH_TO_TALK_COMMAND);
+        // assign push-to-talk and autopilot controls to the DS4 triggers
+        if (settings.controllerType == DS4)
+        {
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + settings.buttonOffset] = (intptr_t)XPLMFindCommand(PUSH_TO_TALK_COMMAND);
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_R2 + settings.buttonOffset] = (intptr_t)XPLMFindCommand(CWS_OR_DISCONNECT_AUTOPILOT);
+        }
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
@@ -2864,10 +2776,10 @@ static void MakeInput(int keyCode, KeyState state)
     static CGEventSourceRef eventSource = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
     CGEventRef event = CGEventCreateKeyboardEvent(eventSource, (CGKeyCode)keyCode, state == DOWN);
     CGEventPost(kCGHIDEventTap, event);
-    if (event != NULL)
+    if (event)
         CFRelease(event);
 #elif LIN
-    if (display != NULL)
+    if (display)
     {
         XTestFakeKeyEvent(display, keyCode, state == DOWN, CurrentTime);
         XFlush(display);
@@ -2971,7 +2883,7 @@ static void MoveMousePointer(int distX, int distY, void *display)
         return;
 
 #if IBM
-    INPUT input = {0, 0, 0, 0, 0, 0, 0};
+    INPUT input = {0};
     input.type = INPUT_MOUSE;
     input.mi.dx = (long)distX;
     input.mi.dy = (long)distY;
@@ -3026,10 +2938,10 @@ static void MoveMousePointer(int distX, int distY, void *display)
     // move mouse pointer by distX and distY pixels
     CGEventRef moveMouseEvent = CGEventCreateMouseEvent(NULL, kCGEventMouseMoved, newLocation, kCGMouseButtonLeft);
     CGEventPost(kCGHIDEventTap, moveMouseEvent);
-    if (moveMouseEvent != NULL)
+    if (moveMouseEvent)
         CFRelease(moveMouseEvent);
 #elif LIN
-    if (display != NULL)
+    if (display)
     {
         XWarpPointer((Display *)display, None, None, 0, 0, 0, 0, distX, distY);
         XFlush((Display *)display);
@@ -3067,7 +2979,7 @@ static void OverrideCameraControls(void)
 
 static void PopButtonAssignments(void)
 {
-    if (pushedJoystickButtonAssignments != NULL)
+    if (pushedJoystickButtonAssignments)
     {
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, pushedJoystickButtonAssignments, 0, 1600);
         free(pushedJoystickButtonAssignments);
@@ -3203,11 +3115,11 @@ static int ResetSwitchViewCommand(XPLMCommandRef inCommand, XPLMCommandPhase inP
             int joystickButtonAssignments[1600];
             XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/view/chase");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/view/forward_with_hud");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (intptr_t)XPLMFindCommand("sim/view/chase");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (intptr_t)XPLMFindCommand("sim/view/forward_with_hud");
             int has2DPanel = Has2DPanel();
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand(has2DPanel ? "sim/view/forward_with_2d_panel" : "sim/view/3d_cockpit_cmnd_look");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand(has2DPanel ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_2d_panel");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (intptr_t)XPLMFindCommand(has2DPanel ? "sim/view/forward_with_2d_panel" : "sim/view/3d_cockpit_cmnd_look");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (intptr_t)XPLMFindCommand(has2DPanel ? "sim/view/3d_cockpit_cmnd_look" : "sim/view/forward_with_2d_panel");
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         }
@@ -3225,21 +3137,11 @@ static void RestoreCameraControls(void)
 
 static void SaveSettings(void)
 {
-    std::fstream file;
-    file.open(CONFIG_PATH, std::ios_base::out | std::ios_base::trunc);
-
-    if (file.is_open())
+    FILE *file = fopen(CONFIG_PATH, "w");
+    if (file)
     {
-        file << "controllerType=" << controllerType << std::endl;
-        file << "axisOffset=" << axisOffset << std::endl;
-        file << "buttonOffset=" << buttonOffset << std::endl;
-        file << "showIndicators=" << showIndicators << std::endl;
-        file << "indicatorsRight=" << indicatorsRight << std::endl;
-        file << "indicatorsBottom=" << indicatorsBottom << std::endl;
-        file << "keyboardRight=" << keyboardRight << std::endl;
-        file << "keyboardBottom=" << keyboardBottom << std::endl;
-
-        file.close();
+        fwrite (&settings, sizeof(Settings), 1, file);
+        fclose (file);
     }
 }
 
@@ -3257,10 +3159,10 @@ static void Scroll(int clicks, void *display)
 #elif APL
     CGEventRef event = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, clicks);
     CGEventPost(kCGHIDEventTap, event);
-    if (event != NULL)
+    if (event)
         CFRelease(event);
 #elif LIN
-    if (display != NULL)
+    if (display)
     {
         int button = clicks > 0 ? 4 : 5;
 
@@ -3300,19 +3202,19 @@ static void SetDefaultAssignments(void)
         joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
         joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_RIGHT_X)] = AXIS_ASSIGNMENT_ROLL;
         joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_RIGHT_Y)] = AXIS_ASSIGNMENT_PITCH;
-        if (controllerType == XBOX360)
+        if (settings.controllerType == XBOX360)
         {
 #if IBM
-            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_TRIGGERS + axisOffset] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_TRIGGERS + settings.axisOffset] = AXIS_ASSIGNMENT_NONE;
 #else
-            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER + axisOffset] = AXIS_ASSIGNMENT_NONE;
-            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + axisOffset] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_LEFT_TRIGGER + settings.axisOffset] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_XBOX360_RIGHT_TRIGGER + settings.axisOffset] = AXIS_ASSIGNMENT_NONE;
 #endif
         }
-        else if (controllerType == DS4)
+        else if (settings.controllerType == DS4)
         {
-            joystickAxisAssignments[JOYSTICK_AXIS_DS4_L2 + axisOffset] = AXIS_ASSIGNMENT_NONE;
-            joystickAxisAssignments[JOYSTICK_AXIS_DS4_R2 + axisOffset] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_DS4_L2 + settings.axisOffset] = AXIS_ASSIGNMENT_LEFT_TOE_BRAKE;
+            joystickAxisAssignments[JOYSTICK_AXIS_DS4_R2 + settings.axisOffset] = AXIS_ASSIGNMENT_RIGHT_TOE_BRAKE;
         }
 
         XPLMSetDatavi(joystickAxisAssignmentsDataRef, joystickAxisAssignments, 0, 100);
@@ -3321,34 +3223,35 @@ static void SetDefaultAssignments(void)
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/flaps_up");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/flaps_down");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_UP)] = (std::size_t)XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_DOWN)] = (std::size_t)XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_UP)] = (std::size_t)XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_DOWN)] = (std::size_t)XPLMFindCommand("sim/none/none");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand(CYCLE_RESET_VIEW_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TOGGLE_REVERSE_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/brakes_toggle_max");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (std::size_t)XPLMFindCommand(LOOK_MODIFIER_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT)] = (std::size_t)XPLMFindCommand("sim/general/zoom_out");
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT)] = (std::size_t)XPLMFindCommand("sim/general/zoom_in");
-        switch (controllerType)
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/flaps_up");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/flaps_down");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (intptr_t)XPLMFindCommand(TOGGLE_ARM_SPEED_BRAKE_OR_TOGGLE_CARB_HEAT_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (intptr_t)XPLMFindCommand("sim/flight_controls/landing_gear_toggle");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_UP)] = (intptr_t)XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT_DOWN)] = (intptr_t)XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_UP)] = (intptr_t)XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT_DOWN)] = (intptr_t)XPLMFindCommand("sim/none/none");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (intptr_t)XPLMFindCommand(CYCLE_RESET_VIEW_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (intptr_t)XPLMFindCommand(MIXTURE_CONTROL_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (intptr_t)XPLMFindCommand(PROP_PITCH_THROTTLE_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (intptr_t)XPLMFindCommand(COWL_FLAP_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (intptr_t)XPLMFindCommand(TOGGLE_REVERSE_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_RIGHT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/brakes_toggle_max");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_LEFT)] = (intptr_t)XPLMFindCommand(TRIM_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_BUMPER_RIGHT)] = (intptr_t)XPLMFindCommand(LOOK_MODIFIER_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_LEFT)] = (intptr_t)XPLMFindCommand("sim/general/zoom_out");
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_STICK_RIGHT)] = (intptr_t)XPLMFindCommand("sim/general/zoom_in");
+        switch (settings.controllerType)
         {
         case XBOX360:
 #if !IBM
-            joystickButtonAssignments[JOYSTICK_BUTTON_XBOX360_GUIDE + buttonOffset] = (std::size_t)XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
+            joystickButtonAssignments[JOYSTICK_BUTTON_XBOX360_GUIDE + settings.buttonOffset] = (intptr_t)XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
 #endif
             break;
         case DS4:
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + buttonOffset] = (std::size_t)XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + buttonOffset] = (std::size_t)XPLMFindCommand(CWS_OR_DISCONNECT_AUTOPILOT);
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + settings.buttonOffset] = (intptr_t)XPLMFindCommand("sim/none/none");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_R2 + settings.buttonOffset] = (intptr_t)XPLMFindCommand("sim/none/none");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + settings.buttonOffset] = (intptr_t)XPLMFindCommand("sim/none/none");
             break;
         }
 
@@ -3370,7 +3273,7 @@ static void SetToLissThrottle(float throttleRatio)
 {
     // the ToLiss A319 uses a custom dataref for throttle control, modifying the default throttle-ratio datarefs has no effect
     const XPLMDataRef airbusThrottleInputDataRef = XPLMFindDataRef("AirbusFBW/throttle_input");
-    if (airbusThrottleInputDataRef != NULL)
+    if (airbusThrottleInputDataRef)
     {
         float throttleInput[] = {throttleRatio, throttleRatio};
         // indices 0 and 1 are the left and right lever, index 4 seems to be an average between the two, in order to allow going from a value that is different than 0.0 into the thrust reverse mode we need to set all three of them accordingly
@@ -3397,7 +3300,8 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
             if ((int)XPGetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, 0))
             {
                 StopConfiguration();
-                controllerType = XBOX360;
+                settings.controllerType = XBOX360;
+                UpdateToeBrakeControl();
                 UpdateSettingsWidgets();
             }
 
@@ -3408,7 +3312,8 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
             if ((int)XPGetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, 0))
             {
                 StopConfiguration();
-                controllerType = DS4;
+                settings.controllerType = DS4;
+                UpdateToeBrakeControl();
                 UpdateSettingsWidgets();
             }
 
@@ -3416,8 +3321,8 @@ static int SettingsWidgetHandler(XPWidgetMessage inMessage, XPWidgetID inWidget,
         }
         else if (inParam1 == (intptr_t)showIndicatorsCheckbox)
         {
-            showIndicators = (int)XPGetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, 0);
-            UpdateIndicatorsWindow();
+            settings.showIndicators = (int)XPGetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, 0);
+            UpdateIndicatorsWindow(-1);
 
             return 1;
         }
@@ -3462,8 +3367,8 @@ static int SpeedbrakeModifierOrToggleCarbHeatCommand(XPLMCommandRef inCommand, X
             int joystickButtonAssignments[1600];
             XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (std::size_t)XPLMFindCommand("sim/flight_controls/speed_brakes_up_one");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand("sim/flight_controls/speed_brakes_down_one");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_UP)] = (intptr_t)XPLMFindCommand("sim/flight_controls/speed_brakes_up_one");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (intptr_t)XPLMFindCommand("sim/flight_controls/speed_brakes_down_one");
 
             XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
         }
@@ -3504,12 +3409,12 @@ static void ToggleKeyboardControl(int vrEnabled)
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand(KEYBOARD_SELECTOR_UP_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand(KEYBOARD_SELECTOR_DOWN_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand(KEYBOARD_SELECTOR_LEFT_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand(KEYBOARD_SELECTOR_RIGHT_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(PRESS_KEYBOARD_KEY_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand(LOCK_KEYBOARD_KEY_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (intptr_t)XPLMFindCommand(KEYBOARD_SELECTOR_UP_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (intptr_t)XPLMFindCommand(KEYBOARD_SELECTOR_DOWN_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (intptr_t)XPLMFindCommand(KEYBOARD_SELECTOR_LEFT_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (intptr_t)XPLMFindCommand(KEYBOARD_SELECTOR_RIGHT_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (intptr_t)XPLMFindCommand(PRESS_KEYBOARD_KEY_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (intptr_t)XPLMFindCommand(LOCK_KEYBOARD_KEY_COMMAND);
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
@@ -3520,10 +3425,10 @@ static void ToggleKeyboardControl(int vrEnabled)
         {
             XPLMCreateWindow_t keyboardWindowParameters;
             keyboardWindowParameters.structSize = sizeof keyboardWindowParameters;
-            keyboardWindowParameters.top = keyboardBottom + KEY_BASE_SIZE * 6;
-            keyboardWindowParameters.left = keyboardRight - GetKeyboardWidth();
-            keyboardWindowParameters.right = keyboardRight;
-            keyboardWindowParameters.bottom = keyboardBottom;
+            keyboardWindowParameters.top = settings.keyboardBottom + KEY_BASE_SIZE * 6;
+            keyboardWindowParameters.left = settings.keyboardRight - GetKeyboardWidth();
+            keyboardWindowParameters.right = settings.keyboardRight;
+            keyboardWindowParameters.bottom = settings.keyboardBottom;
             FitGeometryWithinScreenBounds(&keyboardWindowParameters.left, &keyboardWindowParameters.top, &keyboardWindowParameters.right, &keyboardWindowParameters.bottom);
             keyboardWindowParameters.visible = 1;
             keyboardWindowParameters.drawWindowFunc = DrawKeyboardWindow;
@@ -3596,16 +3501,16 @@ static void ToggleMouseButton(MouseButton button, int down, void *display)
     {
         CGEventRef getLocationEvent = CGEventCreate(NULL);
         CGPoint location = CGEventGetLocation(getLocationEvent);
-        if (getLocationEvent != NULL)
+        if (getLocationEvent)
             CFRelease(getLocationEvent);
 
         CGEventRef event = CGEventCreateMouseEvent(NULL, mouseType, location, mouseButton);
         CGEventPost(kCGHIDEventTap, event);
-        if (event != NULL)
+        if (event)
             CFRelease(event);
     }
 #elif LIN
-    if (display != NULL)
+    if (display)
     {
         XTestFakeButtonEvent((Display *)display, button == LEFT ? 1 : 3, !down ? False : True, CurrentTime);
         XFlush((Display *)display);
@@ -3618,7 +3523,7 @@ static void ToggleMouseControl(void)
     // if we are in keyboard mode we actually want to toggle it off instead of toggling mouse mode
     if (mode == KEYBOARD)
     {
-        ToggleKeyboardControl();
+        ToggleKeyboardControl(-1);
         return;
     }
 
@@ -3640,10 +3545,10 @@ static void ToggleMouseControl(void)
         int joystickButtonAssignments[1600];
         XPLMGetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (std::size_t)XPLMFindCommand(TOGGLE_LEFT_MOUSE_BUTTON_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand(TOGGLE_RIGHT_MOUSE_BUTTON_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand(SCROLL_UP_COMMAND);
-        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand(SCROLL_DOWN_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_DOWN)] = (intptr_t)XPLMFindCommand(TOGGLE_LEFT_MOUSE_BUTTON_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (intptr_t)XPLMFindCommand(TOGGLE_RIGHT_MOUSE_BUTTON_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (intptr_t)XPLMFindCommand(SCROLL_UP_COMMAND);
+        joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (intptr_t)XPLMFindCommand(SCROLL_DOWN_COMMAND);
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
 
@@ -3657,8 +3562,8 @@ static void ToggleMouseControl(void)
         ToggleMouseButton(LEFT, 0, display);
         ToggleMouseButton(RIGHT, 0, display);
 #else
-        ToggleMouseButton(LEFT, 0);
-        ToggleMouseButton(RIGHT, 0);
+        ToggleMouseButton(LEFT, 0, NULL);
+        ToggleMouseButton(RIGHT, 0, NULL);
 #endif
 
         // assign the default controls to the left joystick's axis
@@ -3691,7 +3596,7 @@ static int ToggleMouseOrKeyboardControlCommand(XPLMCommandRef inCommand, XPLMCom
             beginTime = XPLMGetElapsedTime();
         else if (inPhase == xplm_CommandContinue && XPLMGetElapsedTime() - beginTime >= BUTTON_LONG_PRESS_TIME)
         {
-            ToggleKeyboardControl();
+            ToggleKeyboardControl(-1);
             beginTime = FLT_MAX;
         }
         else if (inPhase == xplm_CommandEnd)
@@ -3703,7 +3608,7 @@ static int ToggleMouseOrKeyboardControlCommand(XPLMCommandRef inCommand, XPLMCom
         }
     }
     else if (inPhase == xplm_CommandBegin)
-        ToggleKeyboardControl();
+        ToggleKeyboardControl(-1);
 
     return 0;
 }
@@ -3783,39 +3688,39 @@ static int TrimModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhas
         // custom handling for DreamFoil AS350
         if (IsPluginEnabled(DREAMFOIL_AS350_PLUGIN_SIGNATURE))
         {
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_RESET_COMMAND);
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (intptr_t)XPLMFindCommand(TRIM_RESET_COMMAND);
 
             XPLMCommandBegin(XPLMFindCommand("AS350/Trim/Force_Trim"));
         }
         // custom handling for DreamFoil B407
         else if (IsPluginEnabled(DREAMFOIL_B407_PLUGIN_SIGNATURE))
         {
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_RESET_COMMAND);
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (intptr_t)XPLMFindCommand(TRIM_RESET_COMMAND);
 
             XPLMCommandBegin(XPLMFindCommand("B407/flight_controls/force_trim"));
         }
         // custom handling for RotorSim EC135
         else if (IsPluginEnabled(ROTORSIM_EC135_PLUGIN_SIGNATURE))
         {
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("ec135/autopilot/beep_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("ec135/autopilot/beep_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand("ec135/autopilot/beep_fwd");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("ec135/autopilot/beep_aft");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (intptr_t)XPLMFindCommand("ec135/autopilot/beep_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (intptr_t)XPLMFindCommand("ec135/autopilot/beep_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (intptr_t)XPLMFindCommand("ec135/autopilot/beep_fwd");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (intptr_t)XPLMFindCommand("ec135/autopilot/beep_aft");
         }
         // default handling
         else
         {
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/aileron_trim_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/aileron_trim_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (std::size_t)XPLMFindCommand("sim/flight_controls/pitch_trim_down");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (std::size_t)XPLMFindCommand("sim/flight_controls/pitch_trim_up");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (std::size_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
-            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (std::size_t)XPLMFindCommand(TRIM_RESET_COMMAND);
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_LEFT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/aileron_trim_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_RIGHT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/aileron_trim_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_UP)] = (intptr_t)XPLMFindCommand("sim/flight_controls/pitch_trim_down");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_DPAD_DOWN)] = (intptr_t)XPLMFindCommand("sim/flight_controls/pitch_trim_up");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_LEFT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/rudder_trim_left");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_FACE_RIGHT)] = (intptr_t)XPLMFindCommand("sim/flight_controls/rudder_trim_right");
+            joystickButtonAssignments[ButtonIndex(JOYSTICK_BUTTON_ABSTRACT_CENTER_LEFT)] = (intptr_t)XPLMFindCommand(TRIM_RESET_COMMAND);
         }
 
         XPLMSetDatavi(joystickButtonAssignmentsDataRef, joystickButtonAssignments, 0, 1600);
@@ -3863,7 +3768,7 @@ static void UpdateIndicatorsWindow(int vrEnabled)
     const int acfNumEngines = XPLMGetDatai(acfNumEnginesDataRef);
     const int gliderWithSpeedbrakes = IsGliderWithSpeedbrakes();
 
-    if (!showIndicators || (acfNumEngines < 1 && !gliderWithSpeedbrakes))
+    if (!settings.showIndicators || (acfNumEngines < 1 && !gliderWithSpeedbrakes))
         return;
 
     char acfICAO[40];
@@ -3900,10 +3805,10 @@ static void UpdateIndicatorsWindow(int vrEnabled)
 
     XPLMCreateWindow_t indicatorsWindowParameters;
     indicatorsWindowParameters.structSize = sizeof indicatorsWindowParameters;
-    indicatorsWindowParameters.top = indicatorsBottom + INDICATOR_LEVER_HEIGHT;
-    indicatorsWindowParameters.left = indicatorsRight - width;
-    indicatorsWindowParameters.right = indicatorsRight;
-    indicatorsWindowParameters.bottom = indicatorsBottom;
+    indicatorsWindowParameters.top = settings.indicatorsBottom + INDICATOR_LEVER_HEIGHT;
+    indicatorsWindowParameters.left = settings.indicatorsRight - width;
+    indicatorsWindowParameters.right = settings.indicatorsRight;
+    indicatorsWindowParameters.bottom = settings.indicatorsBottom;
     FitGeometryWithinScreenBounds(&indicatorsWindowParameters.left, &indicatorsWindowParameters.top, &indicatorsWindowParameters.right, &indicatorsWindowParameters.bottom);
     indicatorsWindowParameters.visible = 1;
     indicatorsWindowParameters.drawWindowFunc = DrawIndicatorsWindow;
@@ -3921,8 +3826,8 @@ static void UpdateIndicatorsWindow(int vrEnabled)
 
 static void UpdateSettingsWidgets(void)
 {
-    XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, (intptr_t)(controllerType == XBOX360));
-    XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, (intptr_t)(controllerType == DS4));
+    XPSetWidgetProperty(xbox360ControllerRadioButton, xpProperty_ButtonState, (intptr_t)(settings.controllerType == XBOX360));
+    XPSetWidgetProperty(dualShock4ControllerRadioButton, xpProperty_ButtonState, (intptr_t)(settings.controllerType == DS4));
 
     const char *configurationStatusString;
     switch (configurationStep)
@@ -3948,7 +3853,12 @@ static void UpdateSettingsWidgets(void)
 
     XPSetWidgetProperty(configurationStatusCaption, xpProperty_CaptionLit, (intptr_t)(configurationStep != START));
     XPSetWidgetDescriptor(startConfigurationtButton, configurationStep == AXES || configurationStep == BUTTONS ? "Abort Configuration" : "Start Configuration");
-    XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, (intptr_t)showIndicators);
+    XPSetWidgetProperty(showIndicatorsCheckbox, xpProperty_ButtonState, (intptr_t)settings.showIndicators);
+}
+
+static void UpdateToeBrakeControl(void)
+{
+    XPLMSetDatai(overrideToeBrakesDataRef, settings.controllerType == XBOX360);
 }
 
 inline static void WireKey(KeyboardKey *keyboardKey, KeyboardKey *left, KeyboardKey *right, KeyboardKey *above, KeyboardKey *below)
