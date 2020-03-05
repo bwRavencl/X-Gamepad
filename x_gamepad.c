@@ -680,18 +680,6 @@ typedef enum
     BETWEEN
 } KeyPosition;
 
-typedef struct
-{
-    ControllerType controllerType;
-    int axisOffset;
-    int buttonOffset;
-    int showIndicators;
-    int indicatorsRight;
-    int indicatorsBottom;
-    int keyboardRight;
-    int keyboardBottom;
-} Settings;
-
 typedef struct KeyboardKey
 {
     char *label;
@@ -707,6 +695,19 @@ typedef struct KeyboardKey
     struct KeyboardKey *left;
     struct KeyboardKey *right;
 } KeyboardKey;
+
+typedef struct
+{
+    ControllerType controllerType;
+    int axisOffset;
+    int buttonOffset;
+    int xinputUserIndex;
+    int showIndicators;
+    int indicatorsRight;
+    int indicatorsBottom;
+    int keyboardRight;
+    int keyboardBottom;
+} Settings;
 
 static int AxisIndex(int abstractAxisIndex);
 static int ButtonIndex(int abstractButtonIndex);
@@ -797,7 +798,7 @@ static KeyboardKey *selectedKey = &kKeyboardKey;
 
 static int numMixtureLevers = 0, numPropLevers = 0, keyPressActive = 0, lastCinemaVerite = 0, thrustReverserMode = 0, switchTo3DCommandLook = 0;
 static float defaultHeadPositionX = FLT_MAX, defaultHeadPositionY = FLT_MAX, defaultHeadPositionZ = FLT_MAX;
-static Settings settings = {XBOX360, 0, 0, 1, 0, 0, 0, 0};
+static Settings settings = {XBOX360, 0, 0, 0, 1, 0, 0, 0, 0};
 static Mode mode = DEFAULT;
 static ConfigurationStep configurationStep = START;
 static GLuint indicatorsProgram = 0, indicatorsFragmentShader = 0, keyboardKeyProgram = 0, keyboardKeyFragmentShader = 0;
@@ -1083,7 +1084,11 @@ PLUGIN_API int XPluginStart(char *outName, char *outSig, char *outDesc)
     FILE *file = fopen(CONFIG_PATH, "r");
     if (file)
     {
-        fread(&settings, sizeof(Settings), 1, file);
+        Settings readSettings = {0};
+        const size_t settingsSize = sizeof(Settings);
+        if (fread(&readSettings, settingsSize, 1, file) == settingsSize)
+            memcpy(&settings, &readSettings, settingsSize);
+
         fclose(file);
     }
 
@@ -1809,8 +1814,9 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         if (settings.controllerType == XBOX360)
         {
             XINPUT_STATE xinputState;
-            XInputGetState(0, &xinputState);
+            XInputGetState(settings.xinputUserIndex, &xinputState);
 
+            static Mode prevMode = DEFAULT;
             static int prevLeftTriggerDown = 0, prevRightTriggerDown = 0;
             const int leftTriggerDown = xinputState.Gamepad.bLeftTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
             const int rightTriggerDown = xinputState.Gamepad.bRightTrigger > XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
@@ -1831,6 +1837,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             }
             else
             {
+                if (mode != prevMode)
+                {
+                    if (prevLeftTriggerDown)
+                        XPLMCommandEnd(pushToTalkCommand);
+                    if (prevRightTriggerDown)
+                        XPLMCommandEnd(cwsOrDisconnectAutopilotCommand);
+                }
                 leftBrakeRatio = leftTriggerDown ? Normalize((float) xinputState.Gamepad.bLeftTrigger, (float) XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255.0f, 0.0f, 1.0f) : 0.0f;
                 rightBrakeRatio = rightTriggerDown ? Normalize((float) xinputState.Gamepad.bRightTrigger, (float) XINPUT_GAMEPAD_TRIGGER_THRESHOLD, 255.0f, 0.0f, 1.0f) : 0.0f;
             }
@@ -1838,6 +1851,7 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             XPLMSetDataf(leftBrakeRatioDataRef, leftBrakeRatio);
             XPLMSetDataf(rightBrakeRatioDataRef, rightBrakeRatio);
 
+            prevMode = mode;
             prevLeftTriggerDown = leftTriggerDown;
             prevRightTriggerDown = rightTriggerDown;
 
@@ -1914,6 +1928,13 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
         static int potentialAxes[100] = {0};
         static int potentialButtons[1600] = {0};
 
+#if IBM
+        static XINPUT_STATE initialXinputStates[4] = {0};
+        if (settings.controllerType == XBOX360)
+            for (int i = 0; i < 4; i++)
+                XInputGetState(i, &initialXinputStates[i]);
+#endif
+
         switch (configurationStep)
         {
         case AXES:
@@ -1933,6 +1954,21 @@ static float FlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTim
             }
             return -1.0f;
         case BUTTONS:
+#if IBM
+            // in order to obtain the xinput user index we go through all states and compare them with the initial state
+            if (settings.controllerType == XBOX360)
+                for (int i = 0; i < 4; i++) {
+                    XINPUT_STATE xinputState = {0};
+                    XInputGetState(i, &xinputState);
+                    if ((xinputState.Gamepad.wButtons & XINPUT_GAMEPAD_X) != (initialXinputStates[i].Gamepad.wButtons & XINPUT_GAMEPAD_X))
+                    {
+                        settings.xinputUserIndex = i;
+                        memset(initialXinputStates, 0, sizeof initialXinputStates);
+                        break;
+                    }
+                }
+#endif
+
             // because some joysticks have buttons that are in a depressed state by default, we go through all buttons and mark the indices of the buttons that are not pressed, if we see a previously marked button getting pressed we can assume it is the button the user pressed
             for (int i = 0; i < 1600; i++)
             {
@@ -2727,6 +2763,13 @@ static int LookModifierCommand(XPLMCommandRef inCommand, XPLMCommandPhase inPhas
         joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_X)] = AXIS_ASSIGNMENT_NONE;
         joystickAxisAssignments[AxisIndex(JOYSTICK_AXIS_ABSTRACT_LEFT_Y)] = AXIS_ASSIGNMENT_NONE;
 
+        // unassign the DS4 triggers
+        if (settings.controllerType == DS4)
+        {
+            joystickAxisAssignments[JOYSTICK_AXIS_DS4_L2  + settings.axisOffset] = AXIS_ASSIGNMENT_NONE;
+            joystickAxisAssignments[JOYSTICK_AXIS_DS4_R2  + settings.axisOffset] = AXIS_ASSIGNMENT_NONE;
+        }
+
         // store the default button assignments
         PushButtonAssignments();
 
@@ -3251,7 +3294,7 @@ static void SetDefaultAssignments(void)
         case DS4:
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_L2 + settings.buttonOffset] = (intptr_t)XPLMFindCommand("sim/none/none");
             joystickButtonAssignments[JOYSTICK_BUTTON_DS4_R2 + settings.buttonOffset] = (intptr_t)XPLMFindCommand("sim/none/none");
-            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + settings.buttonOffset] = (intptr_t)XPLMFindCommand("sim/none/none");
+            joystickButtonAssignments[JOYSTICK_BUTTON_DS4_PS + settings.buttonOffset] = (intptr_t)XPLMFindCommand(TOGGLE_MOUSE_OR_KEYBOARD_CONTROL_COMMAND);
             break;
         }
 
